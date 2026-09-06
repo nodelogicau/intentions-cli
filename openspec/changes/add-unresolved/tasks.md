@@ -11,4 +11,4 @@
 ## 3. Docs and release
 
 - [x] 3.1 Skill loop and verb table; README verb row; `docs/mcp.md` tool table and counts; CHANGELOG 0.6.0
-- [ ] 3.2 Tag `v0.6.0` and verify the release
+- [x] 3.2 Tag `v0.6.0` and verify the release
