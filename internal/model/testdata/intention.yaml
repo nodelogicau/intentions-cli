@@ -1,0 +1,25 @@
+id: int_01a06d10-4c2e-7a91-b3f0-2d8e1a7c5b44
+subject: https://example.com/people/ada
+title: Draft the Q4 budget narrative
+description: |
+  Two focused sessions should be enough; the numbers are already in.
+duration: PT90M
+window:
+  calendar: 2026-W37
+  relative:
+    target: int_01a06cf2-8e11-7b3a-9c7d-4f0a2b6e8d13
+    relation: FINISHTOSTART
+    gap: {min: P0D, max: P3D}
+stability: tentative
+activity: deep-work
+location:
+  - https://example.com/places/home
+serves:
+  - {id: int_01a05a00-1111-7000-8000-000000000001, role: for-the-sake-of}
+  - {id: int_01a06cf2-8e11-7b3a-9c7d-4f0a2b6e8d13, role: in-order-to}
+source:
+  author: https://example.com/people/ada
+  harness: claude
+  model: claude-fable-5-1
+timestamp: 2026-09-04T09:12:00Z
+acknowledgements: []

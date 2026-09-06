@@ -1,0 +1,18 @@
+id: avl_01a06d12-9b7e-7c03-a5d1-6e2f4a8b0c77
+subject: https://example.com/people/ada
+title: Tuesday mornings for deep work
+duration: PT3H
+window:
+  calendar: 2026-09/2026-12
+  clock: 09:00/12:00
+conditional:
+  - deep-work
+  - writing
+location:
+  - https://example.com/places/home
+cadence: FREQ=WEEKLY;BYDAY=TU
+valid_until: 2026-12
+scope: personal
+source:
+  author: https://example.com/people/ada
+timestamp: 2026-09-04T09:20:00Z

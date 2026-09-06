@@ -1,0 +1,12 @@
+id: res_01a06d14-7e2c-7b19-a0d3-5c8f2e4a6b91
+intention: int_01a06d10-4c2e-7a91-b3f0-2d8e1a7c5b44
+placement:
+  start: 2026-09-15T10:00:00+10:00
+  duration: PT1H
+selector: person
+candidates_considered: 4
+displaced:
+  - int_01a06c88-2b5d-7f40-9e17-3a6c8d0b2e59
+source:
+  author: https://example.com/people/ada
+timestamp: 2026-09-08T14:02:00Z

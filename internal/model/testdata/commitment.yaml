@@ -1,0 +1,25 @@
+id: cmt_01a06d15-3f8a-7d61-8c2b-9a4e6f1d3b05
+parties:
+  - uri: https://example.com/people/ada
+    status: accepted
+  - uri: https://example.com/people/rob
+    status: tentative
+  - uri: https://example.com/rooms/3
+    status: accepted
+placement:
+  start: 2026-09-15T10:00:00+10:00
+  duration: PT1H
+  location: https://example.com/rooms/3
+intention: int_01a06d10-4c2e-7a91-b3f0-2d8e1a7c5b44
+origin:
+  resolution: res_01a06d14-7e2c-7b19-a0d3-5c8f2e4a6b91
+transparent: false
+external:
+  system: jscalendar
+  uid: 2a6f0b3e-4d1c-4e8a-9b7f-0c5d3e2a1f44
+title: Budget narrative review
+source:
+  author: https://example.com/people/ada
+  harness: claude
+timestamp: 2026-09-08T14:02:00Z
+acknowledgements: []

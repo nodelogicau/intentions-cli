@@ -1,0 +1,1 @@
+{"cadence":"FREQ=WEEKLY;BYDAY=TU","conditional":["deep-work","writing"],"duration":"PT3H","location":["https://example.com/places/home"],"subject":"https://example.com/people/ada","valid_until":"2026-12","window":{"calendar":"2026-09/2026-12","clock":"09:00/12:00"}}
