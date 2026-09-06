@@ -53,4 +53,4 @@
 - [x] 8.1 SPEC-FEEDBACK.md items 14 to 22 in the established form; raise them as issues on nodelogicau/intentions
 - [x] 8.2 Update `skills/intentions/SKILL.md` with the resolution loop (resolve, put candidates to the person, select on their word, check, acknowledge on their word) and regenerate the committed copy
 - [x] 8.3 README: status table, verb table, a resolution walkthrough; CHANGELOG 0.4.0
-- [ ] 8.4 Tag `v0.4.0` and verify the release
+- [x] 8.4 Tag `v0.4.0` and verify the release
