@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -14,14 +16,26 @@ import (
 
 func (a *app) initCmd() *cobra.Command {
 	var author, subject, timezone, hemisphere, availHorizon, genHorizon string
+	var pointer bool
 	cmd := &cobra.Command{
-		Use:   "init [dir]",
+		Use:   "init [dir] [--pointer]",
 		Short: "Create a workspace: intentions.yaml, the type directories, index.yaml, intentions.md",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: a.run(func(cmd *cobra.Command, args []string) error {
 			dir := "."
 			if len(args) == 1 {
 				dir = args[0]
+			}
+			cwd, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			absDir, err := filepath.Abs(dir)
+			if err != nil {
+				return err
+			}
+			if pointer && absDir == cwd {
+				return usageErr("--pointer needs a workspace directory other than the current directory, e.g. `intentions init ./planning --pointer`")
 			}
 			cfg := store.NewConfig()
 			cfg.Defaults.Source.Author = firstNonEmpty(author, os.Getenv(EnvAuthor))
@@ -51,14 +65,29 @@ func (a *app) initCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return a.emit(map[string]any{
+			out := map[string]any{
 				"workspace": map[string]any{"root": ws.Root, "format": ws.Config.Format},
 				"config":    ws.Config,
 				"created":   created,
-			}, func(w io.Writer) {
+			}
+			var pointerPath string
+			if pointer {
+				rel, err := filepath.Rel(cwd, ws.Root)
+				if err != nil {
+					return err
+				}
+				if pointerPath, err = store.WritePointer(cwd, filepath.ToSlash(rel)); err != nil {
+					return err
+				}
+				out["pointer"] = pointerPath
+			}
+			return a.emit(out, func(w io.Writer) {
 				fmt.Fprintf(w, "Initialised Intentions workspace at %s\n", ws.Root)
 				for _, c := range created {
 					fmt.Fprintf(w, "  %s\n", c)
+				}
+				if pointerPath != "" {
+					fmt.Fprintf(w, "Wrote %s pointing at the workspace\n", pointerPath)
 				}
 			})
 		}),
@@ -69,6 +98,7 @@ func (a *app) initCmd() *cobra.Command {
 	cmd.Flags().StringVar(&hemisphere, "hemisphere", "", "resolver.hemisphere for season codes: north or south (default north)")
 	cmd.Flags().StringVar(&availHorizon, "availability-horizon", "P13W", "availability.default_horizon")
 	cmd.Flags().StringVar(&genHorizon, "generation-horizon", "P4W", "generation.horizon")
+	cmd.Flags().BoolVar(&pointer, "pointer", false, "also write ./"+store.PointerFile+" pointing at dir")
 	return cmd
 }
 
@@ -91,7 +121,7 @@ func localZoneName() string {
 }
 
 func (a *app) workspaceCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "workspace",
 		Short: "Print the resolved workspace root, how it was found, and its configuration",
 		Args:  cobra.NoArgs,
@@ -115,4 +145,83 @@ func (a *app) workspaceCmd() *cobra.Command {
 			})
 		}),
 	}
+	cmd.AddCommand(a.workspacePointerCmd())
+	return cmd
+}
+
+// workspacePointerCmd writes the pointer that `init --pointer` writes at
+// creation time, for a workspace that already exists.
+func (a *app) workspacePointerCmd() *cobra.Command {
+	var at string
+	var force bool
+	cmd := &cobra.Command{
+		Use:   "pointer [workspace-dir]",
+		Short: "Write a " + store.PointerFile + " pointer so this directory resolves to the workspace",
+		Long: `Writes <dir>/` + store.PointerFile + ` naming the workspace, so ` + "`intentions`" + ` run anywhere at
+or below <dir> finds it without --workspace or $INTENTIONS_WORKSPACE. This is
+what ` + "`init --pointer`" + ` writes when the workspace is created; use this verb when
+the workspace already exists.
+
+With no argument the pointer names the workspace that would be used now
+(--workspace, then $INTENTIONS_WORKSPACE, then discovery). The path is written
+relative when the workspace lies inside <dir>, so the file survives being cloned
+elsewhere, and absolute when it does not, in which case it is machine-specific
+and should not be committed.`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: a.run(func(cmd *cobra.Command, args []string) error {
+			dir := at
+			if dir == "" {
+				cwd, err := os.Getwd()
+				if err != nil {
+					return err
+				}
+				dir = cwd
+			}
+			dir, err := filepath.Abs(dir)
+			if err != nil {
+				return err
+			}
+			if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+				return usageErr("%s is not a directory", dir)
+			}
+			var ws *store.Workspace
+			if len(args) == 1 {
+				ws, err = store.Open(args[0])
+			} else {
+				ws, _, err = store.Discover(a.workspace)
+			}
+			if err != nil {
+				return err
+			}
+			if ws.Root == dir {
+				return usageErr("%s is the workspace itself; its %s is already found from here", dir, store.ConfigFile)
+			}
+			if _, err := os.Stat(filepath.Join(dir, store.ConfigFile)); err == nil {
+				return usageErr("%s already holds a %s, which wins over a pointer at the same level", dir, store.ConfigFile)
+			}
+			target, relative := ws.Root, false
+			if rel, err := filepath.Rel(dir, ws.Root); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				target, relative = filepath.ToSlash(rel), true
+			}
+			path := filepath.Join(dir, store.PointerFile)
+			if force {
+				if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+					return err
+				}
+			}
+			path, err = store.WritePointer(dir, target)
+			if err != nil {
+				return runtimeErr(fmt.Errorf("%v; pass --force to replace it", err))
+			}
+			return a.emit(map[string]any{"pointer": path, "root": ws.Root, "target": target, "relative": relative}, func(w io.Writer) {
+				fmt.Fprintf(w, "Wrote %s -> %s\n", path, target)
+				if !relative {
+					fmt.Fprintf(w, "  absolute: the workspace is outside %s, so this pointer is machine-specific; do not commit it\n", dir)
+				}
+			})
+		}),
+	}
+	cmd.Flags().StringVar(&at, "at", "", "directory to write "+store.PointerFile+" in (default: the current directory)")
+	cmd.Flags().BoolVar(&force, "force", false, "replace an existing pointer that names a different workspace")
+	return cmd
 }

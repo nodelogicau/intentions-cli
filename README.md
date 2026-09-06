@@ -110,8 +110,9 @@ intentions intention add --title "Read the board pack" --json
 
 | Verb | What it does |
 |---|---|
-| `init [dir]` | Create `intentions.yaml`, the type directories, `index.yaml`, `intentions.md` |
+| `init [dir] [--pointer]` | Create `intentions.yaml`, the type directories, `index.yaml`, `intentions.md`; `--pointer` also writes `./.intentions` naming it |
 | `workspace` | Print the resolved workspace root, how it was found, and its configuration |
+| `workspace pointer [dir] [--at D] [--force]` | Write a `.intentions` pointer so a directory and everything below it resolves to the workspace |
 | `intention add` | Create an intention. `--title` is required; `subject` defaults from `intentions.yaml` |
 | `intention edit <id>` | Edit fields in place. Prose edits leave the version unchanged; `--clear-<field>` removes one |
 | `intention firm <id>` | Set stability to firm. A harness must pass `--policy <int_id>` naming a terminus of the subject carrying `auto_firm`; the id is written to `firmed_under` |
@@ -262,6 +263,20 @@ stdout is the result and whose exit code is the verdict.
 `intentions.yaml` is an error, never a fallback), then the nearest ancestor of
 the current directory holding `intentions.yaml` or a `.intentions` pointer file
 whose content is a path.
+
+Keep the workspace in a subdirectory of a repository and write a pointer at the
+root, so every verb finds it from anywhere in the tree:
+
+```sh
+intentions init ./planning --pointer --author <uri>   # at creation
+intentions workspace pointer ./planning               # for a workspace that exists
+```
+
+The path is written relative when the workspace lies inside the pointer's
+directory, so the file survives being cloned elsewhere, and absolute when it
+does not, in which case the verb says it is machine-specific and should not be
+committed. A pointer naming a different workspace is never replaced without
+`--force`.
 
 ## Versions
 

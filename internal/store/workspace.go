@@ -191,10 +191,20 @@ intention's ` + "`activity`" + ` and an availability's ` + "`conditional`" + `.
 - meeting
 `
 
-// WritePointer writes a .intentions pointer file in dir naming target.
+// WritePointer writes a .intentions pointer file in dir naming target. A
+// pointer already naming the same target is left alone; one naming a
+// different workspace is refused rather than silently redirecting every verb
+// run in that tree.
 func WritePointer(dir, target string) (string, error) {
 	p := filepath.Join(dir, PointerFile)
-	if err := os.WriteFile(p, []byte(target+"\n"), 0o644); err != nil {
+	content := target + "\n"
+	if existing, err := os.ReadFile(p); err == nil {
+		if strings.TrimSpace(string(existing)) == strings.TrimSpace(content) {
+			return p, nil
+		}
+		return p, apperr.Runtime(fmt.Errorf("%s already points at %s", p, strings.TrimSpace(string(existing))))
+	}
+	if err := atomicWrite(p, []byte(content)); err != nil {
 		return "", err
 	}
 	return p, nil

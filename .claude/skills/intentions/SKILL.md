@@ -62,8 +62,12 @@ If there is no workspace and the user wants one:
 
 ```sh
 intentions init ./planning --author <user URI> --subject <user URI> \
-  --timezone <IANA zone> [--hemisphere south] --json
+  --timezone <IANA zone> [--hemisphere south] [--pointer] --json
 ```
+
+`--pointer` writes `./.intentions` naming the new workspace, so every later
+call finds it from anywhere in the repository. For a workspace that already
+exists, `intentions workspace pointer ./planning --json` does the same.
 
 Set attribution once per session rather than per call:
 

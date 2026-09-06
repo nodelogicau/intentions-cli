@@ -27,6 +27,7 @@ var (
 	notFoundErr = apperr.NotFound
 	refusedErr  = apperr.Refused
 	invalidErr  = apperr.Invalid
+	runtimeErr  = apperr.Runtime
 	classify    = apperr.Classify
 )
 

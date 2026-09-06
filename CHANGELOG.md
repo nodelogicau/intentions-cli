@@ -3,6 +3,22 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.0] - 2026-09-06
+
+### Added
+
+- `workspace pointer [workspace-dir] [--at <dir>] [--force]`: write a
+  `.intentions` pointer so a directory and everything below it resolves to an
+  existing workspace. The target is relative when the workspace lies inside
+  the pointer's directory and absolute otherwise, which the result reports.
+- `init [dir] --pointer`: write `./.intentions` naming the new workspace.
+
+### Changed
+
+- `store.WritePointer` is idempotent on an identical pointer and refuses one
+  naming a different workspace with exit code 1, rather than silently
+  redirecting every verb run in that tree.
+
 ## [0.6.0] - 2026-09-06
 
 ### Added
@@ -142,6 +158,7 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
+[0.7.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.3.0...v0.4.0

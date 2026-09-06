@@ -1255,3 +1255,130 @@ func TestUnresolved(t *testing.T) {
 		t.Error("unresolved wrote a record")
 	}
 }
+
+func TestWorkspacePointer(t *testing.T) {
+	root := t.TempDir()
+	real, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root = real
+	wsDir := filepath.Join(root, "planning")
+	mustOK(t, run(t, "", "", "init", wsDir, "--author", ada, "--subject", ada, "--timezone", "Australia/Melbourne"), "init")
+
+	// Relative pointer at the repository root, and discovery through it.
+	r := mustOK(t, run(t, "", "", "workspace", "pointer", wsDir, "--at", root), "pointer")
+	if r.str("target") != "planning" || r.json["relative"] != true || r.str("root") != wsDir {
+		t.Fatalf("pointer: %v", r.json)
+	}
+	body := readFileAt(t, filepath.Join(root, ".intentions"))
+	if strings.TrimSpace(body) != "planning" {
+		t.Errorf("pointer file: %q", body)
+	}
+	sub := filepath.Join(root, "src", "pkg")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	w := mustOK(t, runIn(t, sub, "workspace"), "discover through pointer")
+	if w.str("found_by") != "pointer" || w.str("root") != wsDir {
+		t.Errorf("discovery: %v", w.json)
+	}
+
+	// Idempotent; a different target is refused until --force.
+	mustOK(t, run(t, "", "", "workspace", "pointer", wsDir, "--at", root), "rewrite same")
+	other := filepath.Join(root, "other")
+	mustOK(t, run(t, "", "", "init", other, "--author", ada, "--timezone", "UTC"), "init other")
+	if r := run(t, "", "", "workspace", "pointer", other, "--at", root); r.code != 1 || !strings.Contains(errMsg(r), "--force") {
+		t.Errorf("clobber refused: %d %s", r.code, errMsg(r))
+	}
+	if strings.TrimSpace(readFileAt(t, filepath.Join(root, ".intentions"))) != "planning" {
+		t.Error("refused write changed the file")
+	}
+	f := mustOK(t, run(t, "", "", "workspace", "pointer", other, "--at", root, "--force"), "force")
+	if f.str("target") != "other" {
+		t.Errorf("force: %v", f.json)
+	}
+
+	// Absolute when the workspace lies outside the pointer's tree.
+	outside := t.TempDir()
+	away := mustOK(t, run(t, "", "", "workspace", "pointer", wsDir, "--at", outside), "outside")
+	if away.json["relative"] != false || !filepath.IsAbs(away.str("target")) {
+		t.Errorf("outside: %v", away.json)
+	}
+	tx := textIn(t, outside, "workspace", "pointer", wsDir, "--at", outside)
+	if !strings.Contains(tx.stdout, "machine-specific") {
+		t.Errorf("absolute note missing:\n%s", tx.stdout)
+	}
+
+	// Usage guards.
+	if r := run(t, "", "", "workspace", "pointer", wsDir, "--at", wsDir); r.code != 2 || !strings.Contains(errMsg(r), "the workspace itself") {
+		t.Errorf("pointer at the workspace: %d %s", r.code, errMsg(r))
+	}
+	if r := run(t, "", "", "workspace", "pointer", wsDir, "--at", filepath.Join(root, "nope")); r.code != 2 || !strings.Contains(errMsg(r), "not a directory") {
+		t.Errorf("--at missing: %d %s", r.code, errMsg(r))
+	}
+	nowhere := t.TempDir()
+	if r := runIn(t, nowhere, "workspace", "pointer", "--at", nowhere); r.code == 0 {
+		t.Error("no argument outside a workspace should fail")
+	}
+}
+
+func TestInitPointer(t *testing.T) {
+	root := t.TempDir()
+	real, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root = real
+	r := mustOK(t, runIn(t, root, "init", "./planning", "--pointer", "--author", ada, "--timezone", "UTC"), "init --pointer")
+	if r.str("pointer") != filepath.Join(root, ".intentions") {
+		t.Fatalf("pointer: %v", r.json)
+	}
+	if strings.TrimSpace(readFileAt(t, filepath.Join(root, ".intentions"))) != "planning" {
+		t.Errorf("pointer file: %q", readFileAt(t, filepath.Join(root, ".intentions")))
+	}
+	w := mustOK(t, runIn(t, root, "workspace"), "workspace")
+	if w.str("found_by") != "pointer" || w.str("root") != filepath.Join(root, "planning") {
+		t.Errorf("discovery: %v", w.json)
+	}
+	// --pointer needs a directory other than the current one.
+	if r := runIn(t, t.TempDir(), "init", "--pointer", "--author", ada); r.code != 2 || !strings.Contains(errMsg(r), "--pointer needs") {
+		t.Errorf("pointer without dir: %d %s", r.code, errMsg(r))
+	}
+}
+
+// runIn drives the CLI with the working directory set to dir.
+func runIn(t *testing.T, dir string, args ...string) result {
+	t.Helper()
+	restore := chdir(t, dir)
+	defer restore()
+	return run(t, "", "", args...)
+}
+
+func textIn(t *testing.T, dir string, args ...string) result {
+	t.Helper()
+	restore := chdir(t, dir)
+	defer restore()
+	return text(t, "", args...)
+}
+
+func chdir(t *testing.T, dir string) func() {
+	t.Helper()
+	prev, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	return func() { _ = os.Chdir(prev) }
+}
+
+func readFileAt(t *testing.T, path string) string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
