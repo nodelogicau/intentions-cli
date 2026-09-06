@@ -73,6 +73,8 @@ export INTENTIONS_HARNESS=claude INTENTIONS_MODEL=<your model id>
 
 If this skill is not yet installed for your harness, `intentions skill install`
 does it (`--harness copilot|agents|cursor|agents-md` for others; `skill --help`).
+A harness with no shell uses `intentions serve --mcp` instead: the same
+operations as MCP tools, the same files, the same refusals.
 
 **In zsh, brace every id you follow with a colon:** write `--serves "${id}:in-order-to"`
 and `--relative "${id}:FINISHTOSTART"`, not `"$id:…"`. zsh applies history

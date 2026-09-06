@@ -282,3 +282,31 @@ func durationString(d *temporal.DurationSpec) string {
 	}
 	return d.String()
 }
+
+// ParsePolicy parses a condition given as comma-separated term=value pairs,
+// the form both front-ends accept: max_duration=PT30M,stability=tentative.
+func ParsePolicy(s string) (*Policy, error) {
+	if strings.TrimSpace(s) == "" {
+		return nil, nil
+	}
+	p := &Policy{}
+	for _, term := range strings.Split(s, ",") {
+		kv := strings.SplitN(strings.TrimSpace(term), "=", 2)
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("use term=value pairs such as max_duration=PT30M,stability=tentative")
+		}
+		switch kv[0] {
+		case "max_duration":
+			d, err := temporal.ParseDuration(kv[1])
+			if err != nil {
+				return nil, err
+			}
+			p.MaxDuration = &d
+		case "stability":
+			p.Stability = kv[1]
+		default:
+			return nil, fmt.Errorf("unknown policy term %q; admitted terms are max_duration and stability", kv[0])
+		}
+	}
+	return p, nil
+}

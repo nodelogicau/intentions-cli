@@ -1,0 +1,69 @@
+{
+  "manifest_version": "0.3",
+  "name": "intentions",
+  "display_name": "intentions — what a person means to do",
+  "version": "__VERSION__",
+  "description": "Record intentions and availability as YAML in an Intentions Format workspace, resolve candidate placements, and let the person choose. One server per workspace; reviewed by humans through git.",
+  "long_description": "intentions stores what a person means to do — a duration and a window, never a slot — and the capacity they have offered, as YAML files in an Intentions Format workspace. An assistant drafts intentions tentatively, ranks candidate placements against availability, and puts the candidates to the person; the person selects, firms, and retires. Nothing is deleted; every act carries attribution; a human reviews the files (typically as a pull request). This extension runs the intentions MCP server bound to one workspace folder.",
+  "author": { "name": "NodeLogic", "url": "https://github.com/nodelogicau" },
+  "homepage": "https://github.com/nodelogicau/intentions-cli",
+  "documentation": "https://github.com/nodelogicau/intentions-cli/blob/main/docs/mcp.md",
+  "license": "MIT",
+  "icon": "icon.png",
+  "keywords": ["intentions", "planning", "availability", "scheduling", "calendar"],
+  "server": {
+    "type": "binary",
+    "entry_point": "server/darwin/intentions",
+    "mcp_config": {
+      "command": "${__dirname}/server/darwin/intentions",
+      "args": ["serve", "--mcp", "--workspace", "${user_config.workspace}", "--author", "${user_config.author}"],
+      "env": {},
+      "platform_overrides": {
+        "darwin": { "command": "${__dirname}/server/darwin/intentions" },
+        "win32":  { "command": "${__dirname}/server/win32/intentions.exe" }
+      }
+    }
+  },
+  "tools": [
+    { "name": "workspace_status", "description": "Workspace root, counts, validation, flags, uncommitted files" },
+    { "name": "intention_add", "description": "Record an intention: a duration and a window, tentative" },
+    { "name": "intention_edit", "description": "Edit an intention in place" },
+    { "name": "intention_firm", "description": "Set stability to firm (a harness needs a policy)" },
+    { "name": "intention_retire", "description": "Retire as fulfilled, abandoned, or superseded" },
+    { "name": "intention_show", "description": "One intention with its version and flags" },
+    { "name": "intention_list", "description": "Intentions, filtered" },
+    { "name": "availability_add", "description": "Record capacity a particular has offered" },
+    { "name": "availability_renew", "description": "Advance valid_until" },
+    { "name": "availability_supersede", "description": "Change terms by creating a new availability and retiring the old" },
+    { "name": "availability_retire", "description": "Retire as retracted or superseded" },
+    { "name": "availability_list", "description": "Availability, filtered, with effective validity" },
+    { "name": "generate", "description": "Materialise instances of recurring intentions" },
+    { "name": "resolve", "description": "Rank candidate placements; chooses nothing" },
+    { "name": "select", "description": "The recorded act of selection: a person's candidate or a harness's policy" },
+    { "name": "check", "description": "The consistency check: computed flags, never decisions" },
+    { "name": "acknowledge", "description": "Record that the person has seen a flag and proceeds" },
+    { "name": "bounds", "description": "What a window means in clock time" },
+    { "name": "validate", "description": "Check the workspace against the format" }
+  ],
+  "prompts": [
+    { "name": "intentions-discipline", "description": "List before you add; draft tentative; resolve then ask; a policy is the only way a harness firms or selects alone", "text": "Use the intentions tools to record what the person means to do and to put candidate placements to them." }
+  ],
+  "user_config": {
+    "workspace": {
+      "type": "directory",
+      "title": "Intentions workspace",
+      "description": "Folder containing intentions.yaml. Create one with `intentions init <folder>` (installer: https://github.com/nodelogicau/intentions-cli#install).",
+      "required": true
+    },
+    "author": {
+      "type": "string",
+      "title": "Your URI or name (source.author)",
+      "description": "Recorded as the person behind intentions written from this app. Optional when the workspace's intentions.yaml sets defaults.source.author; the harness name is recorded regardless.",
+      "required": false,
+      "default": ""
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32"]
+  }
+}

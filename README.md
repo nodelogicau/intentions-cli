@@ -134,6 +134,7 @@ intentions intention add --title "Read the board pack" --json
 | `validate` | Check the whole workspace; exits 4 on any error |
 | `index [--check]` | Rebuild `index.yaml`, or verify it and exit 4 on drift |
 | `skill show\|install` | Print or install the embedded agent skill for a harness; `install --check` for CI |
+| `serve --mcp [--workspace D]` | Serve the workspace to an MCP client over stdio (see [docs/mcp.md](docs/mcp.md)) |
 | `version` | Binary version and the format version it implements |
 
 ### Windows
@@ -210,6 +211,20 @@ and for `agents-md` it owns only the text between its markers. `skill install
 --check` verifies without writing and exits 4 on drift, which is how CI keeps
 the committed copy at [`.claude/skills/intentions/SKILL.md`](.claude/skills/intentions/SKILL.md)
 honest. The source is [`skills/intentions/SKILL.md`](skills/intentions/SKILL.md).
+
+## Use from Claude Desktop or any MCP client
+
+`intentions serve --mcp` serves one workspace over stdio with one tool per
+verb; every result equals the verb's `--json` output, and every refusal the
+verbs make, the tools make. Claude Desktop users install the `.mcpb` bundle
+from the releases page and pick a workspace folder; other clients run the
+binary with `serve --mcp`. The server sends the agent skill as its
+instructions, so a client that never reads the repository still gets the
+discipline, plus the workspace's own `intentions.md`.
+
+Use the skill and CLI where the harness has a shell, and the server where it
+does not; the reasoning and the client configurations are in
+[`docs/mcp.md`](docs/mcp.md).
 
 ## Attribution
 

@@ -432,3 +432,28 @@ refused.
 
 **Proposed text:** say under Resolution that a new selection may replace a
 placement, and that each selection is its own record.
+
+## 23. A reference tool set for harnesses ([#23](https://github.com/nodelogicau/intentions/issues/23))
+
+**The draft says:** nothing about how a harness reaches an implementation
+programmatically. The verbs are described as operations without naming a
+tool set, and every harness that is not a shell has to invent one.
+
+**The problem:** DKF names its tools so two implementations expose the same
+surface to a model and the discipline transfers between them. The Intentions
+Format does not, so another MCP server for intentions would name and shape its
+tools differently, and a skill written against one would not work against the
+other.
+
+**We decided:** v0.5.0 exposes one MCP tool per operation, named after the
+verb (`intention_add` … `workspace_status`), with inputs typed after the
+format's own structures: a window is `{calendar, clock, relative}`, a duration
+a string or `{nominal, min, max}`, `serves` a list of `{id, role}`, and
+`select` takes a person's `candidate` or a harness's `policy`. Results equal
+the CLI's `--json`. The server tells the model these names are the
+implementation's, not the format's. See [docs/mcp.md](docs/mcp.md#tools).
+
+**Proposed text:** a non-normative "Reference tool set" appendix listing
+these names and parameters, with the status DKF gives its tool names: an
+implementation MAY expose them under other names, but one that exposes these
+SHOULD keep their semantics, so that skills and prompts transfer.

@@ -3,6 +3,34 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0] - 2026-09-06
+
+The same operations over the Model Context Protocol, for harnesses without a
+shell.
+
+### Added
+
+- `serve --mcp`: an MCP server over stdio bound to one workspace, with one
+  tool per verb (`intention_*`, `availability_*`, `generate`, `resolve`,
+  `select`, `check`, `acknowledge`, `bounds`, `validate`,
+  `workspace_status`). Results equal the verbs' `--json` output; errors carry
+  the CLI's codes; writes are serialised. Inputs are typed: a window is
+  `{calendar, clock, relative}`, a duration a string or `{nominal, min, max}`,
+  `serves` a list of `{id, role}`.
+- The server's `initialize` instructions carry the agent skill and the
+  workspace's `intentions.md` (to 16 KiB); the same text is the prompt
+  `intentions-discipline`, and `intentions.md` is a `file://` resource.
+- Attribution over MCP: the call, then `serve --author/--harness/--model`,
+  then `INTENTIONS_*`, then `intentions.yaml`, then the client's name as the
+  harness. An unsubstituted `${…}` placeholder counts as absent.
+- Claude Desktop extension bundle (`intentions-<version>.mcpb`, macOS
+  universal and Windows x64) on every release; `make bundle` locally.
+- `internal/render`: the JSON result shapes shared by both front-ends.
+- `docs/mcp.md`: skill-versus-server guidance, client configurations, the
+  tool table.
+- SPEC-FEEDBACK item 23: the format names no tool set; this implementation's
+  is proposed as a reference.
+
 ## [0.4.0] - 2026-09-06
 
 The format starts computing. Nine rules the draft did not state are recorded
@@ -100,6 +128,7 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
+[0.5.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.2.1...v0.3.0
 [0.2.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.1.0...v0.2.0

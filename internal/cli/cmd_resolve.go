@@ -9,6 +9,7 @@ import (
 
 	"github.com/nodelogicau/intentions-cli/internal/consistency"
 	"github.com/nodelogicau/intentions-cli/internal/model"
+	"github.com/nodelogicau/intentions-cli/internal/render"
 	"github.com/nodelogicau/intentions-cli/internal/resolve"
 	"github.com/nodelogicau/intentions-cli/internal/store"
 	"github.com/nodelogicau/intentions-cli/internal/temporal"
@@ -211,25 +212,7 @@ func (a *app) generateForRange(e resolve.Env, in *model.Intention, act actFlags)
 	return generated, nil
 }
 
-func resultMap(res resolve.Result, id string) map[string]any {
-	out := map[string]any{"intention": id, "candidates": res.Candidates, "candidates_considered": res.Considered, "generated": res.Generated}
-	if res.RangeText != "" {
-		out["range"] = res.RangeText
-	}
-	if res.Reason != "" {
-		out["reason"] = res.Reason
-	}
-	if res.Blocked != "" {
-		out["blocked_on"] = res.Blocked
-	}
-	if len(res.NoSupply) > 0 {
-		out["no_supply"] = res.NoSupply
-	}
-	if len(res.Excluded) > 0 {
-		out["excluded"] = res.Excluded
-	}
-	return out
-}
+func resultMap(res resolve.Result, id string) map[string]any { return render.Resolution(res, id) }
 
 func (a *app) printResult(w io.Writer, in *model.Intention, res resolve.Result) {
 	fmt.Fprintf(w, "%s  %s\n", in.ID, oneLine(in.Title, 60))
@@ -307,19 +290,7 @@ func (a *app) selectCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			recMap, _ := model.ToMap(sel.Resolution)
-			inMap, _ := model.ToMap(sel.Intention)
-			out := map[string]any{"resolution": recMap, "intention": inMap, "candidate": sel.Candidate, "candidates_considered": res.Considered, "flags": flags}
-			if sel.Commitment != nil {
-				cm, _ := model.ToMap(sel.Commitment)
-				out["commitment"] = cm
-			}
-			if sel.Replaced != nil {
-				out["replaced"] = map[string]any{"start": sel.Replaced.Start.Raw, "duration": sel.Replaced.Duration.String(), "location": sel.Replaced.Location}
-			}
-			if policy != "" {
-				out["policy"] = policy
-			}
+			out := render.Selection(sel, res, flags, policy)
 			return a.emit(out, func(w io.Writer) {
 				fmt.Fprintln(w, sel.Describe())
 				printFlags(w, flags)
@@ -484,7 +455,7 @@ func (a *app) acknowledgeCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out["acknowledgement"] = map[string]any{"kind": ack.Kind, "counterpart": ack.Counterpart, "counterpart_version": ack.CounterpartVersion, "reason": ack.Reason, "timestamp": temporal.FormatTimestamp(ack.Timestamp)}
+			out["acknowledgement"] = render.Acknowledgement(ack)
 			out["flags"] = flags
 			return a.emit(out, func(w io.Writer) {
 				fmt.Fprintf(w, "Acknowledged %s on %s", kind, updated.GetID())

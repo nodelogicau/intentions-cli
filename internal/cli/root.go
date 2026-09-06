@@ -178,6 +178,7 @@ without a policy the person holds.`,
 		a.validateCmd(),
 		a.indexCmd(),
 		a.skillCmd(),
+		a.serveCmd(),
 		a.versionCmd(),
 	)
 	return root

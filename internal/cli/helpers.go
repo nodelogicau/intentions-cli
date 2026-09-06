@@ -11,6 +11,7 @@ import (
 
 	"github.com/nodelogicau/intentions-cli/internal/model"
 	"github.com/nodelogicau/intentions-cli/internal/projection"
+	"github.com/nodelogicau/intentions-cli/internal/render"
 	"github.com/nodelogicau/intentions-cli/internal/store"
 	"github.com/nodelogicau/intentions-cli/internal/temporal"
 )
@@ -310,27 +311,7 @@ func writeObject(ws *store.Workspace, obj model.Object) error {
 func projectionVersion(obj model.Object) (string, error) { return projection.Version(obj) }
 
 // objectResult is the common JSON shape for a written or shown object.
-func objectResult(obj model.Object) (map[string]any, error) {
-	m, err := model.ToMap(obj)
-	if err != nil {
-		return nil, err
-	}
-	v, err := projection.Version(obj)
-	if err != nil {
-		return nil, err
-	}
-	out := map[string]any{
-		"id":      obj.GetID(),
-		"type":    string(obj.GetType()),
-		"path":    store.RelPath(obj.GetType(), obj.GetID()),
-		"version": v,
-		"object":  m,
-	}
-	if cached := obj.CachedVersion(); cached != "" && cached != v {
-		out["version_cached"] = cached
-	}
-	return out, nil
-}
+func objectResult(obj model.Object) (map[string]any, error) { return render.Object(obj) }
 
 func oneLine(s string, max int) string {
 	s = strings.TrimSpace(strings.ReplaceAll(s, "\n", " "))
