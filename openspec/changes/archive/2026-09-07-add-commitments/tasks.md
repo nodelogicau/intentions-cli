@@ -13,4 +13,4 @@
 
 - [x] 3.1 README status table and verb rows; skill; `docs/mcp.md`; CHANGELOG 0.8.0
 - [x] 3.2 SPEC-FEEDBACK item 24 raised upstream and linked
-- [ ] 3.3 Tag `v0.8.0` and verify the release
+- [x] 3.3 Tag `v0.8.0` and verify the release

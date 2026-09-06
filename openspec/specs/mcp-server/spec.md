@@ -18,7 +18,7 @@
 - **THEN** the process exits with code 5 and stdout is empty
 
 ### Requirement: Tool surface
-The server SHALL expose tools named `workspace_status`, `intention_add`, `intention_edit`, `intention_firm`, `intention_retire`, `intention_show`, `intention_list`, `availability_add`, `availability_renew`, `availability_supersede`, `availability_retire`, `availability_list`, `generate`, `resolve`, `select`, `unresolved`, `check`, `acknowledge`, `bounds`, and `validate`. Each tool's structured result SHALL equal the corresponding CLI verb's `--json` output. Every write SHALL apply the same rules and refusals as the verb. Query tools SHALL be annotated read-only and no tool destructive. Inputs that name a window SHALL take `{calendar, clock, relative}`; a duration SHALL be a string or `{nominal, min, max}`; `serves` a list of `{id, role}`.
+The server SHALL expose tools named `workspace_status`, `intention_add`, `intention_edit`, `intention_firm`, `intention_retire`, `intention_show`, `intention_list`, `availability_add`, `availability_renew`, `availability_supersede`, `availability_retire`, `availability_list`, `commitment_accept`, `commitment_decline`, `commitment_cancel`, `commitment_show`, `commitment_list`, `generate`, `resolve`, `select`, `unresolved`, `check`, `acknowledge`, `bounds`, and `validate`. Each tool's structured result SHALL equal the corresponding CLI verb's `--json` output. Every write SHALL apply the same rules and refusals as the verb. Query tools SHALL be annotated read-only and no tool destructive. Inputs that name a window SHALL take `{calendar, clock, relative}`; a duration SHALL be a string or `{nominal, min, max}`; `serves` a list of `{id, role}`.
 
 #### Scenario: Add, resolve, select over MCP
 - **WHEN** a client calls `availability_add`, then `intention_add{title, duration: "PT90M", window: {calendar: "2026-W38"}}`, then `resolve{id}`, then `select{id, candidate: 1}`
@@ -38,6 +38,17 @@ The server SHALL expose `unresolved{subject?, scope?, now?}` as a read-only tool
 #### Scenario: Unresolved over MCP
 - **WHEN** a client adds an intention with a duration and a window, and one with a window only, then calls `unresolved{}`
 - **THEN** the result has two entries, one `ready` and one `incomplete`, and `counts` reflects both
+
+### Requirement: Commitment tools
+The server SHALL expose `commitment_accept`, `commitment_decline`, `commitment_cancel`, `commitment_show` and `commitment_list`, whose structured results equal the corresponding CLI verbs' `--json` output. The answering tools SHALL be described as recording the person's own answer, never the model's inference.
+
+#### Scenario: Accept over MCP
+- **WHEN** a client calls `commitment_accept{id}` for a commitment listing the workspace's default subject
+- **THEN** that party's status is `accepted`, the source records the client as harness, and the result equals `commitment accept --json`
+
+#### Scenario: Cancel frees the intention
+- **WHEN** a client calls `commitment_cancel{id, reason}` and then `unresolved{}`
+- **THEN** the commitment is retired as cancelled and the intention it named is listed again
 
 ### Requirement: The harness boundary holds
 `intention_firm` and `select` with `policy` SHALL require, for a source carrying a harness, a terminus of the subject carrying the matching condition that the intention satisfies, exactly as the CLI does; a client identifying itself in `initialize` is a harness unless the call names an author with no harness. `intention_firm` without `policy` from a harness SHALL be an error result.
