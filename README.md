@@ -35,8 +35,9 @@ This is the foundation release. It ends where the format's computation begins:
 | Intentions: add, edit, firm, retire, show, list | `resolve` and `select` (candidates, placements, RESOLUTION records) |
 | Availability: add, edit, renew, supersede, retire, show, list | The consistency check and its flags; `acknowledge` |
 | The temporal engine: durations, EDTF, clock anchors, cadence, bounds | Commitment writing; iCalendar and JSCalendar import and export |
-| Projection versioning (`sha256:` of RFC 8785 canonical JSON) | Agent skill, installer, Homebrew cask, MCP server |
+| Projection versioning (`sha256:` of RFC 8785 canonical JSON) | MCP server |
 | `validate` over every object type, `index`, `show`, `bounds` | |
+| Agent skill, installer, Homebrew cask | |
 
 ## Install
 
@@ -119,6 +120,7 @@ intentions intention add --title "Read the board pack" --json
 | `bounds [<id>] [--calendar] [--clock]` | Clock-time bounds of a window in the resolver context, with overrides |
 | `validate` | Check the whole workspace; exits 4 on any error |
 | `index [--check]` | Rebuild `index.yaml`, or verify it and exit 4 on drift |
+| `skill show\|install` | Print or install the embedded agent skill for a harness; `install --check` for CI |
 | `version` | Binary version and the format version it implements |
 
 ### Windows
@@ -146,6 +148,38 @@ makes the intention recurring and needs a `--calendar` anchor to expand within.
 A **terminus** is an intention with no window, no duration and no `serves`
 entries: a held self-understanding, or a **policy** when it carries
 `--auto-select` or `--auto-firm`. Conditions are admitted on termini only.
+
+## Agent skill
+
+The binary carries an agent-facing skill: the list-before-add loop, a verb
+table, and the rules that keep a harness on its side of the line (draft
+tentative, never invent a slot, never firm without a policy). It is stamped
+with the binary's version so skill and verbs cannot drift. This is the
+recommended setup for any harness that will drive `intentions`.
+
+| Preset | Writes | Read by |
+|---|---|---|
+| `claude` (default) | `.claude/skills/intentions/SKILL.md` | Claude Code, GitHub Copilot |
+| `copilot` | `.github/skills/intentions/SKILL.md` | GitHub Copilot |
+| `agents` | `.agents/skills/intentions/SKILL.md` | GitHub Copilot; the vendor-neutral Agent Skills location |
+| `cursor` | `.cursor/rules/intentions.mdc` | Cursor |
+| `agents-md` | a bounded section in `AGENTS.md` | Codex, Jules, Gemini CLI, Cursor, Copilot, and others |
+
+```sh
+intentions skill install                      # Claude Code (and Copilot)
+intentions skill install --harness cursor     # Cursor rule
+intentions skill install --harness agents-md  # section in AGENTS.md; the rest of the file is untouched
+intentions skill install --user               # personal location (claude/copilot/agents presets)
+intentions skill show --harness agents-md     # print any variant to pipe elsewhere
+```
+
+GitHub Copilot reads all three skills directories, so install to exactly one;
+`install` warns if it sees a second. `install` never overwrites a skill file it
+did not write (pass `--force` once if you are replacing a hand-written one),
+and for `agents-md` it owns only the text between its markers. `skill install
+--check` verifies without writing and exits 4 on drift, which is how CI keeps
+the committed copy at [`.claude/skills/intentions/SKILL.md`](.claude/skills/intentions/SKILL.md)
+honest. The source is [`skills/intentions/SKILL.md`](skills/intentions/SKILL.md).
 
 ## Attribution
 

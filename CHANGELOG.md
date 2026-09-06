@@ -3,6 +3,21 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 2026-09-06
+
+### Added
+
+- `intentions skill show|install`: the agent-facing skill is embedded in the
+  binary, stamped with its version, and installed for Claude Code, GitHub
+  Copilot, the vendor-neutral `.agents/skills` location, Cursor, or as a
+  bounded section of `AGENTS.md`. `install --check` verifies without writing
+  and exits 4 on drift; CI runs it against the committed copy. A file the tool
+  did not write is never overwritten without `--force`.
+- `install.sh`, a checksum-verified installer for Linux and macOS, with a CI
+  matrix that installs `latest` and a pinned release on both and refuses a
+  tampered checksum. (Shipped on `main` after 0.2.1.)
+- A Homebrew cask in `nodelogicau/homebrew-tap`: `brew install nodelogicau/tap/intentions`. (0.2.1.)
+
 ## [0.2.0] - 2026-09-06
 
 Aligns the CLI with the thirteen resolutions the draft made in
@@ -55,5 +70,6 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
+[0.3.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.2.1...v0.3.0
 [0.2.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/nodelogicau/intentions-cli/releases/tag/v0.1.0

@@ -888,3 +888,98 @@ acknowledgements: []
 		t.Error("transparent: false re-emitted")
 	}
 }
+
+// --- skill ---------------------------------------------------------------
+
+func TestSkillShowAndInstall(t *testing.T) {
+	work := t.TempDir()
+	cwd, _ := os.Getwd()
+	_ = os.Chdir(work)
+	defer func() { _ = os.Chdir(cwd) }()
+	t.Setenv("HOME", filepath.Join(work, "home"))
+
+	// show needs no workspace and renders the embedded skill.
+	show := text(t, "", "skill", "show")
+	if show.code != 0 || !strings.HasPrefix(show.stdout, "---\n") || !strings.Contains(show.stdout, "name: intentions") {
+		t.Fatalf("show: %d %q", show.code, show.stdout[:60])
+	}
+	sj := mustOK(t, run(t, "", "", "skill", "show"), "show json")
+	if sj.str("content") != show.stdout || sj.str("version") != "dev" {
+		t.Errorf("show json: %v", sj.json["version"])
+	}
+	// Fresh install, idempotent reinstall, check.
+	r := mustOK(t, run(t, "", "", "skill", "install"), "install")
+	target := filepath.Join(work, ".claude", "skills", "intentions", "SKILL.md")
+	gotPath, _ := filepath.EvalSymlinks(r.str("path"))
+	wantPath, _ := filepath.EvalSymlinks(target)
+	if r.json["created"] != true || gotPath != wantPath {
+		t.Errorf("install: %v", r.json)
+	}
+	if b, _ := os.ReadFile(target); string(b) != show.stdout {
+		t.Error("installed content differs from show")
+	}
+	if r := run(t, "", "", "skill", "install"); r.code != 0 || r.json["unchanged"] != true {
+		t.Errorf("reinstall: %v", r.json)
+	}
+	if r := run(t, "", "", "skill", "install", "--check"); r.code != 0 || r.str("status") != "ok" {
+		t.Errorf("check: %d %v", r.code, r.json)
+	}
+	// A foreign file is protected; --force replaces it; a drifted own file is updated.
+	_ = os.WriteFile(target, []byte("# mine\n"), 0o644)
+	if r := run(t, "", "", "skill", "install"); r.code != 1 || !strings.Contains(errMsg(r), "--force") {
+		t.Errorf("foreign: %d %s", r.code, errMsg(r))
+	}
+	if r := run(t, "", "", "skill", "install", "--check"); r.code != 4 || r.str("status") != "foreign" {
+		t.Errorf("check foreign: %d %v", r.code, r.json)
+	}
+	if r := run(t, "", "", "skill", "install", "--force"); r.code != 0 || r.json["updated"] != true {
+		t.Errorf("force: %v", r.json)
+	}
+	b, _ := os.ReadFile(target)
+	_ = os.WriteFile(target, []byte(strings.Replace(string(b), "## The loop", "## The loop!", 1)), 0o644)
+	if r := run(t, "", "", "skill", "install", "--check"); r.code != 4 || r.str("status") != "differs" {
+		t.Errorf("check differs: %d %v", r.code, r.json)
+	}
+	if r := run(t, "", "", "skill", "install"); r.code != 0 || r.json["updated"] != true {
+		t.Errorf("update own: %v", r.json)
+	}
+	// Presets: copilot, agents (user), cursor, agents-md, several at once, --dir.
+	mustOK(t, run(t, "", "", "skill", "install", "--harness", "copilot"), "copilot")
+	if _, err := os.Stat(filepath.Join(work, ".github", "skills", "intentions", "SKILL.md")); err != nil {
+		t.Error("copilot target missing")
+	}
+	mustOK(t, run(t, "", "", "skill", "install", "--harness", "agents", "--user"), "agents user")
+	if _, err := os.Stat(filepath.Join(work, "home", ".agents", "skills", "intentions", "SKILL.md")); err != nil {
+		t.Error("agents user target missing")
+	}
+	mustOK(t, run(t, "", "", "skill", "install", "--harness", "cursor"), "cursor")
+	if c, _ := os.ReadFile(filepath.Join(work, ".cursor", "rules", "intentions.mdc")); !strings.Contains(string(c), "alwaysApply: false") {
+		t.Error("cursor rule shape")
+	}
+	_ = os.WriteFile(filepath.Join(work, "AGENTS.md"), []byte("# Project\n\nBuild with make.\n"), 0o644)
+	mustOK(t, run(t, "", "", "skill", "install", "--harness", "agents-md"), "agents-md")
+	am, _ := os.ReadFile(filepath.Join(work, "AGENTS.md"))
+	if !strings.HasPrefix(string(am), "# Project\n\nBuild with make.\n\n<!-- intentions:skill:start") || !strings.HasSuffix(string(am), "<!-- intentions:skill:end -->\n") {
+		t.Errorf("agents-md splice:\n%s", am[:200])
+	}
+	multi := mustOK(t, run(t, "", "", "skill", "install", "--harness", "claude", "--harness", "cursor"), "multi")
+	if len(multi.json["targets"].([]any)) != 2 {
+		t.Errorf("multi targets: %v", multi.json["targets"])
+	}
+	mustOK(t, run(t, "", "", "skill", "install", "--dir", filepath.Join(work, "tmp", "skills")), "dir")
+	if _, err := os.Stat(filepath.Join(work, "tmp", "skills", "SKILL.md")); err != nil {
+		t.Error("dir target missing")
+	}
+	// Conflicting flags.
+	for _, args := range [][]string{{"--user", "--dir", "x"}, {"--harness", "cursor", "--user"}, {"--file", "AGENTS.md"}, {"--harness", "nope"}} {
+		full := append([]string{"skill", "install"}, args...)
+		if r := run(t, "", "", full...); r.code != 2 {
+			t.Errorf("%v: exit %d", args, r.code)
+		}
+	}
+	// Copilot duplicate warning: three project locations now hold a skill.
+	w := mustOK(t, run(t, "", "", "skill", "install", "--harness", "agents"), "agents project")
+	if ws, _ := w.json["warnings"].([]any); len(ws) == 0 {
+		t.Error("expected a duplicate-location warning")
+	}
+}
