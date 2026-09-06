@@ -40,14 +40,20 @@ This is the foundation release. It ends where the format's computation begins:
 
 ## Install
 
+```sh
+# macOS — Homebrew cask, from the same tap as particulars
+brew install nodelogicau/tap/intentions
+```
+
+Release binaries for macOS, Linux and Windows are published on tags at the
+[releases page](https://github.com/nodelogicau/intentions-cli/releases).
+
 From source (Go 1.26+):
 
 ```sh
 git clone https://github.com/nodelogicau/intentions-cli && cd intentions-cli
 make build    # → dist/intentions
 ```
-
-Release binaries for macOS, Linux and Windows are published on tags.
 
 ## Quick start
 

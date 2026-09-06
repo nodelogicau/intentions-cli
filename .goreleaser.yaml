@@ -38,3 +38,45 @@ archives:
 
 checksum:
   name_template: checksums.txt
+
+# Homebrew cask (macOS), published to the same tap as particulars. `brews`
+# was removed in GoReleaser 2.16; casks are the supported way to ship a
+# pre-built binary.
+homebrew_casks:
+  - name: intentions
+    repository:
+      owner: nodelogicau
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Casks
+    homepage: https://github.com/nodelogicau/intentions-cli
+    description: Write and check Intentions Format workspaces from the command line
+    license: MIT
+    skip_upload: auto
+    commit_author:
+      name: intentions-release
+      email: noreply@nodelogic.au
+    url:
+      verified: github.com/nodelogicau/intentions-cli/
+    binaries:
+      - intentions
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/intentions"]
+          end
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^chore:"
+      - "^test:"
+
+release:
+  draft: false
+  prerelease: auto
