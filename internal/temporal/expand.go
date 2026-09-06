@@ -10,14 +10,15 @@ import (
 
 // Expand returns the calendar days a cadence generates within the window's
 // calendar bounds, as day granules in order. Expansion is seeded from the
-// first local day of the calendar anchor, or from the start of ctx.Horizon
-// when the lower bound is open. FREQ=WEEKLY without BYDAY takes the seed's
-// weekday. The upper bound is the calendar anchor's end, clamped to the
-// horizon when one is set.
+// first local day of the calendar anchor's lower bound, or from the start of
+// ctx.Horizon when that bound is open. FREQ=WEEKLY without BYDAY takes the
+// seed's weekday. WKST defaults to MO unless the rule states otherwise. The
+// upper bound is the calendar anchor's end, clamped to the horizon when one
+// is set.
 func Expand(c Cadence, w Window, ctx Context) ([]Granule, error) {
 	var start, end time.Time
 	if w.Calendar != nil {
-		start, end = w.Calendar.civilBounds(ctx.Hemisphere, ctx.WeekStart)
+		start, end = w.Calendar.civilBounds(ctx.Hemisphere)
 	}
 	if ctx.Horizon != nil {
 		if !ctx.Horizon.OpenStart {
@@ -50,7 +51,7 @@ func Expand(c Cadence, w Window, ctx Context) ([]Granule, error) {
 	opt := c.option
 	opt.Dtstart = start
 	if !strings.Contains(strings.ToUpper(c.Raw), "WKST=") {
-		opt.Wkst = toRRuleWeekday(ctx.WeekStart)
+		opt.Wkst = rrule.MO
 	}
 	r, err := rrule.NewRRule(opt)
 	if err != nil {
@@ -63,22 +64,4 @@ func Expand(c Cadence, w Window, ctx Context) ([]Granule, error) {
 		out = append(out, Day(t))
 	}
 	return out, nil
-}
-
-func toRRuleWeekday(d time.Weekday) rrule.Weekday {
-	switch d {
-	case time.Tuesday:
-		return rrule.TU
-	case time.Wednesday:
-		return rrule.WE
-	case time.Thursday:
-		return rrule.TH
-	case time.Friday:
-		return rrule.FR
-	case time.Saturday:
-		return rrule.SA
-	case time.Sunday:
-		return rrule.SU
-	}
-	return rrule.MO
 }

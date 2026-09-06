@@ -81,12 +81,12 @@ func ParseGranule(s string) (Granule, error) {
 		switch {
 		case mo >= 1 && mo <= 12:
 			return Granule{Kind: KindMonth, Year: y, Month: mo}, nil
-		case mo >= 21 && mo <= 24:
+		case mo >= 21 && mo <= 32:
 			return Granule{Kind: KindSeason, Year: y, Month: mo}, nil
 		case mo >= 33 && mo <= 36:
 			return Granule{Kind: KindQuarter, Year: y, Month: mo}, nil
 		}
-		return Granule{}, fmt.Errorf("invalid calendar expression %q: %02d is not a month, a season code (21-24) or a quarter code (33-36)", s, mo)
+		return Granule{}, fmt.Errorf("invalid calendar expression %q: %02d is not a month, a season code (21-24 neutral, 25-28 Northern, 29-32 Southern) or a quarter code (33-36)", s, mo)
 	case reDay.MatchString(s):
 		m := reDay.FindStringSubmatch(s)
 		y, _ := strconv.Atoi(m[1])
@@ -161,14 +161,22 @@ func (g Granule) civilEnd(hemi Hemisphere) time.Time {
 	return time.Time{}
 }
 
-// seasonStart maps an EDTF season code to the first month of the season. In
-// the northern hemisphere spring is March; in the southern it is September.
-// A winter or summer that begins in December starts in the granule's year and
-// ends in the next.
+// seasonStart maps an EDTF season code to the first month of the season.
+// Neutral codes 21-24 resolve through the context hemisphere; 25-28 are
+// Northern and 29-32 Southern regardless of it. In the north spring is March;
+// in the south it is September. A season that begins in December starts in
+// the granule's year and runs into the next.
 func seasonStart(year, code int, hemi Hemisphere) (int, time.Month) {
+	season := code
+	switch {
+	case code >= 25 && code <= 28:
+		hemi, season = North, code-4
+	case code >= 29 && code <= 32:
+		hemi, season = South, code-8
+	}
 	var m time.Month
 	if hemi == South {
-		switch code {
+		switch season {
 		case 21:
 			m = time.September
 		case 22:
@@ -179,7 +187,7 @@ func seasonStart(year, code int, hemi Hemisphere) (int, time.Month) {
 			m = time.June
 		}
 	} else {
-		switch code {
+		switch season {
 		case 21:
 			m = time.March
 		case 22:
@@ -275,19 +283,13 @@ func (c Calendar) OpenStart() bool { return c.Start == nil }
 func (c Calendar) OpenEnd() bool   { return c.End == nil }
 
 // civilBounds returns the first civil day and the day after the last, with
-// zero values on open sides.
-func (c Calendar) civilBounds(hemi Hemisphere, weekStart time.Weekday) (start, end time.Time) {
+// zero values on open sides. Weeks are ISO weeks in every context.
+func (c Calendar) civilBounds(hemi Hemisphere) (start, end time.Time) {
 	if c.Start != nil {
 		start = c.Start.civilStart(hemi)
-		if c.Start.Kind == KindWeek {
-			start = weekStartOnOrBefore(start, weekStart)
-		}
 	}
 	if c.End != nil {
 		end = c.End.civilEnd(hemi)
-		if c.End.Kind == KindWeek {
-			end = weekStartOnOrBefore(c.End.civilStart(hemi), weekStart).AddDate(0, 0, 7)
-		}
 	}
 	return start, end
 }
@@ -316,11 +318,4 @@ func isoWeekMonday(y, w int) time.Time {
 func isoWeeksInYear(y int) int {
 	_, w := civil(y, 12, 28).ISOWeek()
 	return w
-}
-
-// weekStartOnOrBefore returns the most recent day on or before d whose
-// weekday is ws.
-func weekStartOnOrBefore(d time.Time, ws time.Weekday) time.Time {
-	diff := (int(d.Weekday()) - int(ws) + 7) % 7
-	return d.AddDate(0, 0, -diff)
 }

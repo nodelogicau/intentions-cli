@@ -119,9 +119,6 @@ func (v *validator) structural() {
 		for _, p := range model.Check(obj) {
 			v.add(SeverityError, p.Code, id, "%s", p.Error())
 		}
-		if in, ok := obj.(*model.Intention); ok && in.Stability == "firm" && in.Source.Harness != "" {
-			v.add(SeverityWarning, "harness_firm", id, "stability is firm and the source carries harness %q; the file cannot show whether a policy authorised it", in.Source.Harness)
-		}
 	}
 }
 
@@ -153,6 +150,13 @@ func (v *validator) referential() {
 		case *model.Intention:
 			for i, r := range o.Serves {
 				check(fmt.Sprintf("serves[%d]", i), r.ID, model.TypeIntention)
+			}
+			if o.FirmedUnder != "" {
+				if _, err := model.LookupPolicy(v.g, o.FirmedUnder, o.Subject); err != nil {
+					v.add(SeverityError, "firmed_under_target", id, "firmed_under: %v", err)
+				} else if p, _ := v.g.Get(o.FirmedUnder); p.(*model.Intention).AutoFirm == nil {
+					v.add(SeverityError, "firmed_under_target", id, "firmed_under names %s, which carries no auto_firm condition", o.FirmedUnder)
+				}
 			}
 			if o.Window != nil && o.Window.Relative != nil {
 				check("window.relative.target", o.Window.Relative.Target, model.TypeIntention, model.TypeCommitment)
@@ -296,6 +300,7 @@ func (v *validator) versions() {
 		}
 		cached := obj.CachedVersion()
 		if cached == "" {
+			v.add(SeverityWarning, "missing_version", id, "no version in the file; every writer stamps one immediately after id, and the next edit will add it")
 			continue
 		}
 		computed, err := projection.Version(obj)
@@ -364,5 +369,12 @@ func (v *validator) terms() {
 func (v *validator) conventions() {
 	if _, err := os.Stat(filepath.Join(v.ws.Root, store.ConventionsFile)); err != nil {
 		v.addPath(SeverityInfo, "no_conventions", store.ConventionsFile, "no %s; a prose conventions file helps agents and people agree on activity terms", store.ConventionsFile)
+	}
+	for _, k := range v.ws.Config.UnknownResolverKeys {
+		if k == "week_start" {
+			v.addPath(SeverityInfo, "resolver_unknown_key", store.ConfigFile, "resolver.week_start is no longer a configuration key and is ignored; weeks are ISO weeks, Monday to Sunday, in every context")
+			continue
+		}
+		v.addPath(SeverityInfo, "resolver_unknown_key", store.ConfigFile, "resolver.%s is not a configuration key this implementation knows and is ignored", k)
 	}
 }

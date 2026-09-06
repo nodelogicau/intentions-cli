@@ -13,7 +13,7 @@ import (
 )
 
 func (a *app) initCmd() *cobra.Command {
-	var author, subject, timezone, weekStart, hemisphere, availHorizon, genHorizon string
+	var author, subject, timezone, hemisphere, availHorizon, genHorizon string
 	cmd := &cobra.Command{
 		Use:   "init [dir]",
 		Short: "Create a workspace: intentions.yaml, the type directories, index.yaml, intentions.md",
@@ -33,10 +33,6 @@ func (a *app) initCmd() *cobra.Command {
 			if _, err := time.LoadLocation(cfg.Resolver.Timezone); err != nil {
 				return usageErr("--timezone %q is not a known IANA zone", cfg.Resolver.Timezone)
 			}
-			if _, err := temporal.ParseWeekday(weekStart); err != nil {
-				return usageErr("--week-start: %v", err)
-			}
-			cfg.Resolver.WeekStart = weekStart
 			if hemisphere != "" {
 				h, err := temporal.ParseHemisphere(hemisphere)
 				if err != nil {
@@ -70,7 +66,6 @@ func (a *app) initCmd() *cobra.Command {
 	cmd.Flags().StringVar(&author, "author", "", "defaults.source.author: the person the workspace is for (URI or name)")
 	cmd.Flags().StringVar(&subject, "subject", "", "defaults.subject: applied to intentions written without one (omit for an organisation workspace)")
 	cmd.Flags().StringVar(&timezone, "timezone", "", "resolver.timezone (default: the local zone, else UTC)")
-	cmd.Flags().StringVar(&weekStart, "week-start", "monday", "resolver.week_start")
 	cmd.Flags().StringVar(&hemisphere, "hemisphere", "", "resolver.hemisphere for season codes: north or south (default north)")
 	cmd.Flags().StringVar(&availHorizon, "availability-horizon", "P13W", "availability.default_horizon")
 	cmd.Flags().StringVar(&genHorizon, "generation-horizon", "P4W", "generation.horizon")
@@ -112,7 +107,7 @@ func (a *app) workspaceCmd() *cobra.Command {
 			return a.emit(out, func(w io.Writer) {
 				fmt.Fprintf(w, "%s (found by %s)\n", ws.Root, res.FoundBy)
 				fmt.Fprintf(w, "  format %s, hash %s\n", ws.Config.Format, ws.Config.Hash)
-				fmt.Fprintf(w, "  resolver %s, week starts %s\n", ws.Config.Resolver.Timezone, ws.Config.Resolver.WeekStart)
+				fmt.Fprintf(w, "  resolver %s, %s hemisphere; weeks are ISO weeks\n", ws.Config.Resolver.Timezone, firstNonEmpty(ws.Config.Resolver.Hemisphere, "north"))
 				fmt.Fprintf(w, "  author %s\n", ws.Config.Defaults.Source.Author)
 				if ws.Config.Defaults.Subject != "" {
 					fmt.Fprintf(w, "  subject %s\n", ws.Config.Defaults.Subject)

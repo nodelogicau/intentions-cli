@@ -43,7 +43,7 @@ func sample(id string) *model.Intention {
 func TestInitAndConfig(t *testing.T) {
 	ws := initWS(t)
 	data, _ := os.ReadFile(filepath.Join(ws.Root, ConfigFile))
-	for _, want := range []string{"format: intentions/0.1", "hash: sha256", "timezone: Australia/Melbourne", "week_start: monday", "default_horizon: P13W", "horizon: P4W", "subject: https://example.com/people/ada", "author: https://example.com/people/ada"} {
+	for _, want := range []string{"format: intentions/0.1", "hash: sha256", "timezone: Australia/Melbourne", "default_horizon: P13W", "horizon: P4W", "subject: https://example.com/people/ada", "author: https://example.com/people/ada"} {
 		if !strings.Contains(string(data), want) {
 			t.Errorf("config missing %q:\n%s", want, data)
 		}
@@ -71,6 +71,14 @@ func TestInitAndConfig(t *testing.T) {
 	bad.Resolver.Timezone = "Mars/Olympus"
 	if err := bad.Validate(); err == nil {
 		t.Error("bad timezone accepted")
+	}
+	if strings.Contains(string(data), "week_start") {
+		t.Error("week_start written")
+	}
+	// A stale week_start is ignored and reported, not an error.
+	stale, err := ParseConfig([]byte(strings.Replace(string(data), "resolver:\n", "resolver:\n  week_start: sunday\n", 1)))
+	if err != nil || stale.Validate() != nil || len(stale.UnknownResolverKeys) != 1 || stale.UnknownResolverKeys[0] != "week_start" {
+		t.Errorf("stale week_start: %v %v %v", err, stale.Validate(), stale.UnknownResolverKeys)
 	}
 }
 

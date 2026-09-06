@@ -119,7 +119,7 @@ func (v ValidUntil) Instant(ctx Context) time.Time {
 	if v.Calendar == nil {
 		return v.Time
 	}
-	_, e := v.Calendar.civilBounds(ctx.Hemisphere, ctx.WeekStart)
+	_, e := v.Calendar.civilBounds(ctx.Hemisphere)
 	return ctx.Midnight(e)
 }
 

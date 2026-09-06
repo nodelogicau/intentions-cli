@@ -160,10 +160,11 @@ type Extra struct {
 	Node *yaml.Node
 }
 
-// Intention is what a person means to do. Canonical order: id, subject,
-// title, description, duration, window, stability, activity, location,
-// parties, serves, cadence, occurrence, placement, preference, auto_select,
-// auto_firm, reference, source, timestamp, acknowledgements, retired.
+// Intention is what a person means to do. Canonical order: id, version,
+// subject, title, description, duration, window, stability, firmed_under,
+// activity, location, parties, serves, cadence, occurrence, placement,
+// preference, auto_select, auto_firm, reference, source, timestamp,
+// acknowledgements, retired.
 type Intention struct {
 	ID               string
 	Subject          string
@@ -172,6 +173,7 @@ type Intention struct {
 	Duration         *temporal.DurationSpec
 	Window           *temporal.Window
 	Stability        string
+	FirmedUnder      string // the policy under which a harness set firm; outside the projection
 	Activity         string
 	Location         []string
 	Parties          []string
@@ -192,7 +194,7 @@ type Intention struct {
 }
 
 // Availability is a standing statement of capacity. Canonical order: id,
-// subject, title, description, duration, window, conditional, location,
+// version, subject, title, description, duration, window, conditional, location,
 // cadence, valid_until, scope, source, timestamp, retired.
 type Availability struct {
 	ID          string
@@ -213,7 +215,7 @@ type Availability struct {
 	Extras      []Extra
 }
 
-// Commitment is the interpersonal object. Canonical order: id, parties,
+// Commitment is the interpersonal object. Canonical order: id, version, parties,
 // placement, intention, origin, transparent, external, title, description,
 // source, timestamp, acknowledgements, retired.
 type Commitment struct {
@@ -234,7 +236,7 @@ type Commitment struct {
 	Extras           []Extra
 }
 
-// Resolution is the record of a selection. Canonical order: id, intention,
+// Resolution is the record of a selection. Canonical order: id, version, intention,
 // placement, selector, candidates_considered, displaced, source, timestamp.
 type Resolution struct {
 	ID                   string
@@ -285,8 +287,23 @@ func (o *Intention) Refs() []string {
 	return uniqueSorted(ids)
 }
 
-// IsStanding reports whether the intention carries a cadence.
-func (o *Intention) IsStanding() bool { return o.Cadence != nil }
+// IsRecurring reports whether the intention carries a cadence.
+func (o *Intention) IsRecurring() bool { return o.Cadence != nil }
+
+// IsTerminus reports whether the intention is a terminus: no window, no
+// duration, no outbound serves references. Only a terminus may carry a policy
+// condition.
+func (o *Intention) IsTerminus() bool {
+	return o.Window == nil && o.Duration == nil && len(o.Serves) == 0
+}
+
+// IsPolicy reports whether the intention is a terminus carrying a condition.
+func (o *Intention) IsPolicy() bool {
+	return o.IsTerminus() && (o.AutoSelect != nil || o.AutoFirm != nil)
+}
+
+// HasCondition reports whether the intention carries auto_select or auto_firm.
+func (o *Intention) HasCondition() bool { return o.AutoSelect != nil || o.AutoFirm != nil }
 
 // InstanceOf returns the standing intention id when this is an instance.
 func (o *Intention) InstanceOf() string {

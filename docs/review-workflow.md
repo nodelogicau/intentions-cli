@@ -78,9 +78,10 @@ jobs:
 
 ## What a reviewer looks for
 
-- **A new `firm`** with `harness` in the source: the PR description or the
-  command's JSON result should name the policy. Without one the write should
-  have been refused; if it was hand-edited, `validate` warns.
+- **A new `firm`** with `harness` in the source: the file must carry
+  `firmed_under` naming a terminus of the subject with `auto_firm`. Without
+  one the write should have been refused; if it arrived by merge, `validate`
+  reports an error.
 - **A `retired` record** with a reason that makes sense, and a `superseded_by`
   that points at the replacement.
 - **A `window` change** on an intention the person considered settled. The

@@ -184,7 +184,7 @@ func TestStdinAndAttribution(t *testing.T) {
 func TestInitAndDiscovery(t *testing.T) {
 	ws := initWS(t)
 	cfg := readFile(t, ws, "intentions.yaml")
-	for _, want := range []string{"format: intentions/0.1", "hash: sha256", "timezone: Australia/Melbourne", "week_start: monday", "default_horizon: P13W", "horizon: P4W", "subject: " + ada, "author: " + ada} {
+	for _, want := range []string{"format: intentions/0.1", "hash: sha256", "timezone: Australia/Melbourne", "default_horizon: P13W", "horizon: P4W", "subject: " + ada, "author: " + ada} {
 		if !strings.Contains(cfg, want) {
 			t.Errorf("config missing %q", want)
 		}
@@ -196,6 +196,17 @@ func TestInitAndDiscovery(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(ws, "intentions.md")); err != nil {
 		t.Error("missing intentions.md")
+	}
+	if strings.Contains(cfg, "week_start") {
+		t.Error("init wrote week_start")
+	}
+	if r := run(t, "", "", "init", filepath.Join(t.TempDir(), "y"), "--author", ada, "--week-start", "sunday"); r.code != 2 {
+		t.Errorf("--week-start still accepted: %d", r.code)
+	}
+	south := filepath.Join(t.TempDir(), "south")
+	mustOK(t, run(t, "", "", "init", south, "--author", ada, "--hemisphere", "south"), "south init")
+	if !strings.Contains(readFile(t, south, "intentions.yaml"), "hemisphere: south") {
+		t.Error("hemisphere not written")
 	}
 	// Second init refused with exit 1.
 	r := run(t, "", "", "init", ws, "--author", ada)
@@ -288,7 +299,7 @@ func TestIntentionAddMinimalAndFull(t *testing.T) {
 		"--harness", "claude", "--model", "claude-fable-5-1",
 		"--timestamp", "2026-09-04T09:12:00Z")
 	body = readFile(t, ws, full.str("path"))
-	want := "id: " + full.str("id") + `
+	want := "id: " + full.str("id") + "\nversion: " + full.str("version") + `
 subject: https://example.com/people/ada
 title: Draft the Q4 budget narrative
 description: |
@@ -309,7 +320,7 @@ serves:
 	if !strings.HasPrefix(body, want) {
 		t.Errorf("full example prefix:\n%s\nwant\n%s", body, want)
 	}
-	for _, line := range []string{"source:\n  author: https://example.com/people/ada\n  harness: claude\n  model: claude-fable-5-1\ntimestamp: 2026-09-04T09:12:00Z\nacknowledgements: []\nversion: sha256:"} {
+	for _, line := range []string{"source:\n  author: https://example.com/people/ada\n  harness: claude\n  model: claude-fable-5-1\ntimestamp: 2026-09-04T09:12:00Z\nacknowledgements: []\n"} {
 		if !strings.Contains(body, line) {
 			t.Errorf("full example missing:\n%s\nin\n%s", line, body)
 		}
@@ -424,10 +435,46 @@ func TestFirmAndPolicies(t *testing.T) {
 	if !strings.Contains(readFile(t, ws, p.str("path")), "auto_firm: {max_duration: PT30M, stability: tentative}") {
 		t.Errorf("policy file:\n%s", readFile(t, ws, p.str("path")))
 	}
-	// Harness under policy.
+	// Harness under policy: firmed_under written after stability, version moves only for the stability edit.
 	r = mustOK(t, run(t, ws, "", "intention", "firm", b.str("id"), "--harness", "claude", "--policy", p.str("id")), "harness under policy")
-	if r.str("policy") != p.str("id") || r.obj()["stability"] != "firm" {
+	if r.str("policy") != p.str("id") || r.obj()["stability"] != "firm" || r.obj()["firmed_under"] != p.str("id") {
 		t.Errorf("policy result: %v", r.json)
+	}
+	body := readFile(t, ws, b.str("path"))
+	if !strings.Contains(body, "stability: firm\nfirmed_under: "+p.str("id")+"\n") {
+		t.Errorf("firmed_under placement:\n%s", body)
+	}
+	if !strings.HasPrefix(body, "id: "+b.str("id")+"\nversion: sha256:") {
+		t.Errorf("version not second:\n%s", body)
+	}
+	// A person's own firming leaves firmed_under absent, clearing a previous one.
+	mustOK(t, run(t, ws, "", "intention", "edit", b.str("id"), "--stability", "tentative"), "unfirm")
+	if strings.Contains(readFile(t, ws, b.str("path")), "firmed_under") {
+		t.Error("firmed_under survived unfirming")
+	}
+	r = mustOK(t, run(t, ws, "", "intention", "firm", b.str("id")), "person re-firm")
+	if _, has := r.obj()["firmed_under"]; has {
+		t.Error("person firming wrote firmed_under")
+	}
+	// A scheduled intention cannot be a policy.
+	sched := addIntention(t, ws, "--title", "Scheduled", "--calendar", "2026-W37")
+	d := addIntention(t, ws, "--title", "D2", "--duration", "PT10M")
+	r = run(t, ws, "", "intention", "firm", d.str("id"), "--harness", "claude", "--policy", sched.str("id"))
+	if r.code != 2 || !strings.Contains(errMsg(r), "terminus") {
+		t.Errorf("scheduled policy: %d %s", r.code, errMsg(r))
+	}
+	// Conditions on termini only; a cadence needs a calendar anchor.
+	if r := run(t, ws, "", "intention", "add", "--title", "X", "--calendar", "2026-W37", "--auto-select", "max_duration=PT30M"); r.code != 2 || !strings.Contains(errMsg(r), "termini") {
+		t.Errorf("condition on scheduled: %d %s", r.code, errMsg(r))
+	}
+	if r := run(t, ws, "", "intention", "add", "--title", "X", "--cadence", "FREQ=WEEKLY;BYDAY=TU", "--calendar", "2026-09/..", "--auto-firm", "max_duration=PT30M"); r.code != 2 {
+		t.Errorf("condition on recurring: %d", r.code)
+	}
+	if r := run(t, ws, "", "intention", "add", "--title", "X", "--cadence", "FREQ=WEEKLY;BYDAY=TU", "--clock", "09:00/12:00"); r.code != 2 || !strings.Contains(errMsg(r), "calendar anchor") {
+		t.Errorf("cadence without anchor: %d %s", r.code, errMsg(r))
+	}
+	if r := run(t, ws, "", "availability", "add", "--subject", ada, "--duration", "PT3H", "--clock", "09:00/12:00", "--cadence", "FREQ=WEEKLY;BYDAY=TU"); r.code != 2 || !strings.Contains(errMsg(r), "calendar anchor") {
+		t.Errorf("availability cadence without anchor: %d %s", r.code, errMsg(r))
 	}
 	// Policy not met.
 	c := addIntention(t, ws, "--title", "C", "--duration", "PT2H")
@@ -482,7 +529,7 @@ func TestEditAndRetire(t *testing.T) {
 	}
 	r = mustOK(t, run(t, ws, "", "intention", "retire", a.str("id"), "--kind", "superseded", "--superseded-by", c.str("id"), "--reason", "split", "--now", now), "retire")
 	body := readFile(t, ws, a.str("path"))
-	if !strings.Contains(body, "retired:\n  kind: superseded\n  reason: split\n  superseded_by: "+c.str("id")+"\n  source:\n    author: "+ada+"\n  timestamp: 2026-09-04T09:00:00Z\nversion: sha256:") {
+	if !strings.Contains(body, "retired:\n  kind: superseded\n  reason: split\n  superseded_by: "+c.str("id")+"\n  source:\n    author: "+ada+"\n  timestamp: 2026-09-04T09:00:00Z\n") || !strings.HasPrefix(body, "id: "+a.str("id")+"\nversion: "+r.str("version")+"\n") {
 		t.Errorf("retired file:\n%s", body)
 	}
 	if r.str("previous_version") == r.str("version") {
@@ -506,9 +553,12 @@ func TestEditAndRetire(t *testing.T) {
 	}
 	// Standing filter.
 	addIntention(t, ws, "--title", "S", "--cadence", "FREQ=WEEKLY;BYDAY=TU", "--calendar", "2026-09/..")
-	r = mustOK(t, run(t, ws, "", "intention", "list", "--standing"), "standing")
+	r = mustOK(t, run(t, ws, "", "intention", "list", "--recurring"), "recurring")
 	if int(r.json["count"].(float64)) != 1 {
-		t.Errorf("standing count: %v", r.json["count"])
+		t.Errorf("recurring count: %v", r.json["count"])
+	}
+	if r := run(t, ws, "", "intention", "list", "--standing"); r.code != 2 {
+		t.Errorf("--standing still accepted: %d", r.code)
 	}
 }
 
@@ -534,7 +584,7 @@ func TestAvailabilityAddAndRules(t *testing.T) {
 	// Recurring mornings matches the spec's example.
 	r = addAvail(t, ws, "--title", "Tuesday mornings for deep work", "--duration", "PT3H", "--calendar", "2026-09/2026-12", "--clock", "09:00/12:00", "--conditional", "writing", "--conditional", "deep-work", "--location", "https://example.com/places/home", "--cadence", "FREQ=WEEKLY;BYDAY=TU", "--valid-until", "2026-12", "--timestamp", "2026-09-04T09:20:00Z")
 	body := readFile(t, ws, r.str("path"))
-	want := "id: " + r.str("id") + `
+	want := "id: " + r.str("id") + "\nversion: " + r.str("version") + `
 subject: https://example.com/people/ada
 title: Tuesday mornings for deep work
 duration: PT3H
@@ -552,8 +602,8 @@ scope: personal
 source:
   author: https://example.com/people/ada
 timestamp: 2026-09-04T09:20:00Z
-version: sha256:`
-	if !strings.HasPrefix(body, want) {
+`
+	if body != want {
 		t.Errorf("example:\n%s\nwant\n%s", body, want)
 	}
 	if r.str("effective_valid_until") != "2027-01-01T00:00:00Z" && !strings.HasPrefix(r.str("effective_valid_until"), "2026-12-31T13:00:00Z") {
@@ -700,9 +750,17 @@ func TestShowVersionBounds(t *testing.T) {
 	if len(ivs) != 7 || ivs[0].(map[string]any)["start"] != "2026-09-07T09:00:00+10:00" {
 		t.Errorf("ad hoc: %v", ivs)
 	}
-	r = mustOK(t, run(t, ws, "", "bounds", "--calendar", "2026-W36", "--week-start", "sunday", "--timezone", "Europe/London"), "bounds override")
-	if r.json["intervals"].([]any)[0].(map[string]any)["start"] != "2026-08-30T00:00:00+01:00" {
+	r = mustOK(t, run(t, ws, "", "bounds", "--calendar", "2026-W36", "--timezone", "Europe/London"), "bounds override")
+	if r.json["intervals"].([]any)[0].(map[string]any)["start"] != "2026-08-31T00:00:00+01:00" {
 		t.Errorf("override: %v", r.json["intervals"])
+	}
+	if r := run(t, ws, "", "bounds", "--calendar", "2026-W36", "--week-start", "sunday"); r.code != 2 {
+		t.Errorf("--week-start still accepted: %d", r.code)
+	}
+	// Explicit season codes ignore the workspace hemisphere.
+	r = mustOK(t, run(t, ws, "", "bounds", "--calendar", "2026-29"), "southern spring")
+	if r.json["intervals"].([]any)[0].(map[string]any)["start"] != "2026-09-01T00:00:00+10:00" {
+		t.Errorf("explicit southern spring: %v", r.json["intervals"])
 	}
 	entries, _ := os.ReadDir(filepath.Join(ws, "intentions"))
 	if len(entries) != 1 {
@@ -761,5 +819,72 @@ func TestValidateAndIndexVerbs(t *testing.T) {
 	tr := text(t, ws, "validate")
 	if tr.code != 4 || !strings.Contains(tr.stdout, "cycle") {
 		t.Errorf("text validate: %d\n%s", tr.code, tr.stdout)
+	}
+}
+
+// TestLegacyWorkspace reads a v0.1.0-shaped workspace: version last, an
+// explicit transparent: false, week_start in the configuration. It must load,
+// validate with only the expected findings, and be re-emitted canonically on
+// edit.
+func TestLegacyWorkspace(t *testing.T) {
+	ws := initWS(t)
+	cfg := readFile(t, ws, "intentions.yaml")
+	_ = os.WriteFile(filepath.Join(ws, "intentions.yaml"), []byte(strings.Replace(cfg, "resolver:\n", "resolver:\n  week_start: monday\n", 1)), 0o644)
+	legacy := `id: int_01a06d10-4c2e-7a91-b3f0-2d8e1a7c5b44
+subject: https://example.com/people/ada
+title: Legacy
+window:
+  calendar: 2026-W37
+stability: tentative
+serves: []
+source:
+  author: https://example.com/people/ada
+timestamp: 2026-09-04T09:12:00Z
+acknowledgements: []
+version: sha256:0000000000000000000000000000000000000000000000000000000000000000
+`
+	_ = os.WriteFile(filepath.Join(ws, "intentions", "int_01a06d10-4c2e-7a91-b3f0-2d8e1a7c5b44.yaml"), []byte(legacy), 0o644)
+	cmt := `id: cmt_01a06d15-3f8a-7d61-8c2b-9a4e6f1d3b05
+parties:
+  - uri: https://example.com/people/ada
+    status: accepted
+placement:
+  start: 2026-09-15T10:00:00+10:00
+  duration: PT1H
+origin: import
+transparent: false
+source:
+  author: https://example.com/people/ada
+timestamp: 2026-09-08T14:02:00Z
+acknowledgements: []
+`
+	_ = os.WriteFile(filepath.Join(ws, "commitments", "cmt_01a06d15-3f8a-7d61-8c2b-9a4e6f1d3b05.yaml"), []byte(cmt), 0o644)
+	mustOK(t, run(t, ws, "", "index"), "index")
+	r := mustOK(t, run(t, ws, "", "validate"), "legacy validates")
+	got := map[string]int{}
+	for _, f := range r.json["findings"].([]any) {
+		got[f.(map[string]any)["code"].(string)]++
+	}
+	if got["stale_version"] != 1 || got["missing_version"] != 1 || got["resolver_unknown_key"] != 1 || r.json["ok"] != true {
+		t.Errorf("legacy findings: %v", got)
+	}
+	// Bounds still work with the stale key present, and weeks are ISO.
+	b := mustOK(t, run(t, ws, "", "bounds", "int_01a06d10-4c2e-7a91-b3f0-2d8e1a7c5b44"), "bounds")
+	if b.json["intervals"].([]any)[0].(map[string]any)["start"] != "2026-09-07T00:00:00+10:00" {
+		t.Errorf("legacy bounds: %v", b.json["intervals"])
+	}
+	// An edit re-emits canonically: version second, correct.
+	e := mustOK(t, run(t, ws, "", "intention", "edit", "int_01a06d10-4c2e-7a91-b3f0-2d8e1a7c5b44", "--description", "touched"), "edit legacy")
+	body := readFile(t, ws, e.str("path"))
+	if !strings.HasPrefix(body, "id: int_01a06d10-4c2e-7a91-b3f0-2d8e1a7c5b44\nversion: "+e.str("version")+"\nsubject:") {
+		t.Errorf("legacy re-emit:\n%s", body)
+	}
+	if strings.Count(body, "version:") != 1 {
+		t.Errorf("version written twice:\n%s", body)
+	}
+	// The commitment shown by the generic verb re-emits without transparent.
+	s := mustOK(t, run(t, ws, "", "show", "cmt_01a06d15-3f8a-7d61-8c2b-9a4e6f1d3b05"), "show legacy commitment")
+	if _, has := s.obj()["transparent"]; has {
+		t.Error("transparent: false re-emitted")
 	}
 }

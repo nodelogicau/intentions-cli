@@ -26,30 +26,6 @@ func ParseHemisphere(s string) (Hemisphere, error) {
 	return "", fmt.Errorf("invalid hemisphere %q: must be north or south", s)
 }
 
-// ParseWeekday parses a lowercase weekday name such as monday.
-func ParseWeekday(s string) (time.Weekday, error) {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "monday":
-		return time.Monday, nil
-	case "tuesday":
-		return time.Tuesday, nil
-	case "wednesday":
-		return time.Wednesday, nil
-	case "thursday":
-		return time.Thursday, nil
-	case "friday":
-		return time.Friday, nil
-	case "saturday":
-		return time.Saturday, nil
-	case "sunday":
-		return time.Sunday, nil
-	}
-	return 0, fmt.Errorf("invalid week start %q: use a weekday name such as monday", s)
-}
-
-// WeekdayName renders a weekday as the configuration expects it.
-func WeekdayName(d time.Weekday) string { return strings.ToLower(d.String()) }
-
 // Interval is a half-open span of absolute instants. An open side carries a
 // zero time and the matching flag; callers clamp to their own horizon.
 type Interval struct {
@@ -58,10 +34,10 @@ type Interval struct {
 }
 
 // Context is the resolver context: everything needed to turn a stored
-// expression into instants.
+// expression into instants. There is no week start: weeks are ISO weeks,
+// Monday to Sunday, in every context.
 type Context struct {
 	Location   *time.Location
-	WeekStart  time.Weekday
 	Hemisphere Hemisphere
 	Now        time.Time
 	// Horizon, when set, clamps open interval sides and seeds cadence
@@ -69,9 +45,9 @@ type Context struct {
 	Horizon *Interval
 }
 
-// DefaultContext is UTC, Monday, north, now.
+// DefaultContext is UTC, north, now.
 func DefaultContext() Context {
-	return Context{Location: time.UTC, WeekStart: time.Monday, Hemisphere: North, Now: time.Now()}
+	return Context{Location: time.UTC, Hemisphere: North, Now: time.Now()}
 }
 
 func (c Context) loc() *time.Location {

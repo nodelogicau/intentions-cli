@@ -39,7 +39,7 @@ func Bounds(w Window, ctx Context) ([]Interval, error) {
 	var start, end time.Time
 	openStart, openEnd := true, true
 	if w.Calendar != nil {
-		s, e := w.Calendar.civilBounds(ctx.Hemisphere, ctx.WeekStart)
+		s, e := w.Calendar.civilBounds(ctx.Hemisphere)
 		if !s.IsZero() {
 			start, openStart = s, false
 		}

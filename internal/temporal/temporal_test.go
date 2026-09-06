@@ -12,7 +12,7 @@ func melbourne(t *testing.T) Context {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return Context{Location: loc, WeekStart: time.Monday, Hemisphere: North, Now: time.Date(2026, 9, 4, 9, 0, 0, 0, time.UTC)}
+	return Context{Location: loc, Hemisphere: North, Now: time.Date(2026, 9, 4, 9, 0, 0, 0, time.UTC)}
 }
 
 func TestDurationParseAndNormalise(t *testing.T) {
@@ -76,7 +76,7 @@ func TestGranuleParse(t *testing.T) {
 			t.Errorf("%s: %s want %s", in, g, want)
 		}
 	}
-	for _, bad := range []string{"2026-09~", "2026-09?", "2026-13", "2026-25", "2026-W54", "2026-02-30", "sept", "2026-9"} {
+	for _, bad := range []string{"2026-09~", "2026-09?", "2026-13", "2026-20", "2026-W54", "2026-02-30", "sept", "2026-9"} {
 		if _, err := ParseGranule(bad); err == nil {
 			t.Errorf("%s: expected error", bad)
 		}
@@ -196,14 +196,8 @@ func TestWeekBounds(t *testing.T) {
 	if got := fmtIv(ivs[0]); got != "2026-08-31T00:00:00+10:00 / 2026-09-07T00:00:00+10:00" {
 		t.Errorf("monday week: %s", got)
 	}
-	ctx.WeekStart = time.Sunday
-	ivs, _ = Bounds(Window{Calendar: &c}, ctx)
-	if got := fmtIv(ivs[0]); got != "2026-08-30T00:00:00+10:00 / 2026-09-06T00:00:00+10:00" {
-		t.Errorf("sunday week: %s", got)
-	}
 	// Timezone change moves bounds, stored window unchanged.
 	london, _ := time.LoadLocation("Europe/London")
-	ctx.WeekStart = time.Monday
 	ctx.Location = london
 	ivs, _ = Bounds(Window{Calendar: &c}, ctx)
 	if got := fmtIv(ivs[0]); got != "2026-08-31T00:00:00+01:00 / 2026-09-07T00:00:00+01:00" {
@@ -233,6 +227,25 @@ func TestSeasonQuarterBounds(t *testing.T) {
 	ivs, _ = Bounds(Window{Calendar: &w}, ctx)
 	if got := fmtIv(ivs[0]); got != "2026-12-01T00:00:00+11:00 / 2027-03-01T00:00:00+11:00" {
 		t.Errorf("northern winter spans years: %s", got)
+	}
+	// Explicit codes ignore the context hemisphere.
+	ctx.Hemisphere = South
+	nw, _ := ParseCalendar("2026-28")
+	ivs, _ = Bounds(Window{Calendar: &nw}, ctx)
+	if got := fmtIv(ivs[0]); got != "2026-12-01T00:00:00+11:00 / 2027-03-01T00:00:00+11:00" {
+		t.Errorf("explicit northern winter in the south: %s", got)
+	}
+	ctx.Hemisphere = North
+	ss, _ := ParseCalendar("2026-29")
+	ivs, _ = Bounds(Window{Calendar: &ss}, ctx)
+	if got := fmtIv(ivs[0]); got != "2026-09-01T00:00:00+10:00 / 2026-12-01T00:00:00+11:00" {
+		t.Errorf("explicit southern spring in the north: %s", got)
+	}
+	if _, err := ParseGranule("2026-40"); err == nil {
+		t.Error("code 40 accepted")
+	}
+	if g, err := ParseGranule("2026-32"); err != nil || g.String() != "2026-32" {
+		t.Errorf("code 32: %v %v", g, err)
 	}
 }
 
@@ -332,6 +345,27 @@ func TestExpand(t *testing.T) {
 	if len(gs) != 2 || gs[0].String() != "2026-09-07" || gs[1].String() != "2026-09-14" {
 		t.Errorf("weekly seed: %v", gs)
 	}
+	// Seed from the anchor: a Wednesday start makes every occurrence a Wednesday.
+	wed, _ := ParseCalendar("2026-09-16/2026-12")
+	gs, _ = Expand(weekly, Window{Calendar: &wed}, ctx)
+	if len(gs) == 0 || gs[0].String() != "2026-09-16" {
+		t.Errorf("anchor seed: %v", gs)
+	}
+	for _, g := range gs {
+		if civil(g.Year, time.Month(g.Month), g.Day).Weekday() != time.Wednesday {
+			t.Errorf("not a wednesday: %s", g)
+		}
+	}
+	// Seed from the horizon: monthly on the tenth.
+	monthlyPlain, _ := ParseCadence("FREQ=MONTHLY")
+	openLow, _ := ParseCalendar("../2026-12")
+	hz := Interval{Start: time.Date(2026, 9, 10, 0, 0, 0, 0, ctx.Location), OpenEnd: true}
+	ctx.Horizon = &hz
+	gs, err = Expand(monthlyPlain, Window{Calendar: &openLow}, ctx)
+	if err != nil || len(gs) != 4 || gs[0].String() != "2026-09-10" || gs[3].String() != "2026-12-10" {
+		t.Errorf("horizon seed monthly: %v %v", gs, err)
+	}
+	ctx.Horizon = nil
 	open, _ := ParseCalendar("../2026-12")
 	if _, err := Expand(cad, Window{Calendar: &open}, ctx); err == nil {
 		t.Error("open lower bound without horizon accepted")

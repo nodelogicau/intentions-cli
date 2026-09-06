@@ -543,6 +543,8 @@ func (d *decoder) intention(root *yaml.Node) *Intention {
 			o.Window = d.window(k, v)
 		case "stability":
 			o.Stability = d.str(k, v)
+		case "firmed_under":
+			o.FirmedUnder = d.str(k, v)
 		case "activity":
 			o.Activity = d.str(k, v)
 		case "location":

@@ -219,36 +219,54 @@ func Satisfies(p *Policy, target *Intention) error {
 }
 
 // CheckFirm applies the harness boundary: firm may be set by an act with no
-// harness, or by a harness under a policy of the subject that the intention
-// satisfies. target is the intention as it stands before the act.
-func CheckFirm(g Graph, target *Intention, act Source, policyID string) error {
+// harness, or by a harness under a policy of the subject, a terminus carrying
+// auto_firm, that the intention satisfies. target is the intention as it
+// stands before the act. It returns the value to write into firmed_under:
+// the policy id for a harness, empty for a person's own act.
+func CheckFirm(g Graph, target *Intention, act Source, policyID string) (string, error) {
 	if act.Harness == "" {
-		return nil
+		return "", nil
 	}
 	if policyID == "" {
-		return refuse("harness_firm", "a harness may draft but may not make an intention firm without a policy the person holds; pass --policy <int_id> naming an intention of the subject carrying auto_firm")
+		return "", refuse("harness_firm", "a harness may draft but may not make an intention firm without a policy the person holds; pass --policy <int_id> naming a terminus of the subject carrying auto_firm")
 	}
+	policy, err := LookupPolicy(g, policyID, target.Subject)
+	if err != nil {
+		return "", err
+	}
+	if policy.AutoFirm == nil {
+		return "", refuse("policy", "policy %s carries no auto_firm condition", policyID)
+	}
+	if err := Satisfies(policy.AutoFirm, target); err != nil {
+		return "", refuse("policy", "policy %s does not cover %s: %v", policyID, target.ID, err)
+	}
+	return policyID, nil
+}
+
+// LookupPolicy resolves a policy id for a subject: an existing, active
+// intention of that subject that is a terminus carrying a condition.
+func LookupPolicy(g Graph, policyID, subject string) (*Intention, error) {
 	obj, ok := g.Get(policyID)
 	if !ok {
-		return refuse("dangling", "policy %s does not exist", policyID)
+		return nil, refuse("dangling", "policy %s does not exist", policyID)
 	}
 	policy, ok := obj.(*Intention)
 	if !ok {
-		return refuse("policy", "policy %s is not an intention", policyID)
+		return nil, refuse("policy", "policy %s is not an intention", policyID)
 	}
 	if policy.Retired != nil {
-		return refuse("policy", "policy %s is retired", policyID)
+		return nil, refuse("policy", "policy %s is retired", policyID)
 	}
-	if policy.Subject != target.Subject {
-		return refuse("policy", "policy %s belongs to %s, not to %s", policyID, policy.Subject, target.Subject)
+	if policy.Subject != subject {
+		return nil, refuse("policy", "policy %s belongs to %s, not to %s", policyID, policy.Subject, subject)
 	}
-	if policy.AutoFirm == nil {
-		return refuse("policy", "policy %s carries no auto_firm condition", policyID)
+	if !policy.IsTerminus() {
+		return nil, refuse("policy", "policy %s is not a terminus: a policy has no window, no duration and no serves entries, so a scheduled intention cannot authorise a firming", policyID)
 	}
-	if err := Satisfies(policy.AutoFirm, target); err != nil {
-		return refuse("policy", "policy %s does not cover %s: %v", policyID, target.ID, err)
+	if !policy.HasCondition() {
+		return nil, refuse("policy", "policy %s carries no condition", policyID)
 	}
-	return nil
+	return policy, nil
 }
 
 func windowString(w *temporal.Window) string {

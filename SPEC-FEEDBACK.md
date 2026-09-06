@@ -10,25 +10,28 @@ raised.
 
 Items 1 to 13 were raised on 2026-09-06 from the `bootstrap-intentions-cli`
 change (v0.1.0), which implements the object model, the temporal engine,
-validation and the index and stops before resolution. Each is an issue on
-nodelogicau/intentions; the resolution will be recorded under each item once
-decided.
+validation and the index and stops before resolution. **All thirteen were
+settled the same day** in
+[nodelogicau/intentions@b3bb420](https://github.com/nodelogicau/intentions/commit/b3bb420)
+(the `settle-first-reader-feedback` change); the resolution is recorded under
+each item. Nine were adopted as proposed; bold entries are where the draft
+decided differently and v0.2.0 changed to follow it.
 
 | # | Topic | Status |
 |---|---|---|
-| 1 | Duration normalisation in the projection | open, [#1](https://github.com/nodelogicau/intentions/issues/1) |
-| 2 | Set-valued list ordering in the projection | open, [#2](https://github.com/nodelogicau/intentions/issues/2) |
-| 3 | Position of the cached `version` in canonical order | open, [#3](https://github.com/nodelogicau/intentions/issues/3) |
-| 4 | The seed an RRULE cadence expands from | open, [#4](https://github.com/nodelogicau/intentions/issues/4) |
-| 5 | Week granules under a non-Monday `week_start` | open, [#5](https://github.com/nodelogicau/intentions/issues/5) |
-| 6 | Season codes need a hemisphere | open, [#6](https://github.com/nodelogicau/intentions/issues/6) |
-| 7 | Explicit `transparent: false` in the projection | open, [#7](https://github.com/nodelogicau/intentions/issues/7) |
-| 8 | Where a policy-authorised firming is recorded | open, [#8](https://github.com/nodelogicau/intentions/issues/8) |
-| 9 | "Standing intention" names two things | open, [#9](https://github.com/nodelogicau/intentions/issues/9) |
-| 10 | Deictic vocabulary a writer accepts | open, [#10](https://github.com/nodelogicau/intentions/issues/10) |
-| 11 | `validate` cannot tell a policy-authorised harness firming from an unauthorised one | open, [#11](https://github.com/nodelogicau/intentions/issues/11) |
-| 12 | The canonical form of a zero duration | open, [#12](https://github.com/nodelogicau/intentions/issues/12) |
-| 13 | The example objects disagree on list style | open, [#13](https://github.com/nodelogicau/intentions/issues/13) |
+| 1 | Duration normalisation in the projection | adopted, [#1](https://github.com/nodelogicau/intentions/issues/1) |
+| 2 | Set-valued list ordering in the projection | adopted, [#2](https://github.com/nodelogicau/intentions/issues/2) |
+| 3 | Position of the cached `version` in canonical order | adopted, [#3](https://github.com/nodelogicau/intentions/issues/3) |
+| 4 | The seed an RRULE cadence expands from | adopted, [#4](https://github.com/nodelogicau/intentions/issues/4) |
+| 5 | Week granules under a non-Monday `week_start` | **decided differently**, [#5](https://github.com/nodelogicau/intentions/issues/5) |
+| 6 | Season codes need a hemisphere | **decided differently**, [#6](https://github.com/nodelogicau/intentions/issues/6) |
+| 7 | Explicit `transparent: false` in the projection | adopted, [#7](https://github.com/nodelogicau/intentions/issues/7) |
+| 8 | Where a policy-authorised firming is recorded | **decided differently**, [#8](https://github.com/nodelogicau/intentions/issues/8) |
+| 9 | "Standing intention" names two things | **decided differently**, [#9](https://github.com/nodelogicau/intentions/issues/9) |
+| 10 | Deictic vocabulary a writer accepts | adopted, [#10](https://github.com/nodelogicau/intentions/issues/10) |
+| 11 | `validate` cannot tell a policy-authorised harness firming from an unauthorised one | adopted, [#11](https://github.com/nodelogicau/intentions/issues/11) |
+| 12 | The canonical form of a zero duration | adopted, [#12](https://github.com/nodelogicau/intentions/issues/12) |
+| 13 | The example objects disagree on list style | adopted, [#13](https://github.com/nodelogicau/intentions/issues/13) |
 
 ---
 
@@ -51,6 +54,8 @@ becomes `PT1H`); never convert between the date part and the time part, so
 
 **Proposed text:** state these rules in the Versioning section.
 
+**Resolution (b3bb420):** Settled as proposed: zero components dropped, weeks folded into days, the time part re-expressed from total seconds as hours, minutes and seconds, no conversion between the date and time parts, months and years untouched. Stated as a list under Versioning.
+
 ## 2. Set-valued list ordering in the projection ([#2](https://github.com/nodelogicau/intentions/issues/2))
 
 **The draft says:** "reference lists sorted by id".
@@ -65,6 +70,8 @@ sorts them too, so files are byte-identical across writers.
 
 **Proposed text:** "set-valued lists sorted" in place of "reference lists
 sorted by id", naming the lists.
+
+**Resolution (b3bb420):** Settled as proposed. Every set-valued list is sorted and the lists are named: references by id then role, commitment parties by uri, and location, conditional, intention parties and displaced lexically. The on-disk writer sorts them too.
 
 ## 3. Position of the cached `version` in canonical order ([#3](https://github.com/nodelogicau/intentions/issues/3))
 
@@ -83,6 +90,8 @@ place it last, per the letter.
 **Proposed text:** give `version` a canonical position. We suggest immediately
 after `id`, where a reviewer reading a diff sees it first.
 
+**Resolution (b3bb420):** Settled: `version` is now always written, immediately after `id`, on every object and on RESOLUTION records, as suggested. Optional caching defeated byte-identical files, and the second line of a diff is where a reviewer looks. v0.2.0 writes it second; a missing `version` is a validation warning.
+
 ## 4. The seed an RRULE cadence expands from ([#4](https://github.com/nodelogicau/intentions/issues/4))
 
 **The draft says:** a cadence is an RRULE using only date-level parts.
@@ -97,6 +106,8 @@ expansion horizon the caller supplies. `WKST` defaults to the resolver's
 `week_start` unless the rule states one.
 
 **Proposed text:** state the seed in the Cadence section.
+
+**Resolution (b3bb420):** Settled as proposed: the seed is the first local day of the calendar anchor's lower bound, or the horizon start when that bound is open. Added: an object with `cadence` must have a calendar anchor, which validation checks. `WKST` defaults to `MO` since `week_start` is gone (see 5).
 
 ## 5. Week granules under a non-Monday `week_start` ([#5](https://github.com/nodelogicau/intentions/issues/5))
 
@@ -114,6 +125,8 @@ that Monday. `this-week` resolves to the ISO week of today either way.
 **Proposed text:** either state this rule, or drop `week_start` and let weeks
 be ISO weeks.
 
+**Resolution (b3bb420):** **Decided differently:** `week_start` is removed and weeks are ISO weeks in every context. The proposed rule contradicted its own deixis rule on a Sunday, where `this-week` resolves to the ISO week of today but the shifted W36 bounds ended the day before. A week identifier that lies about the ISO week it names seemed worse than no preference. A stale `week_start` key is ignored and reported at info level. v0.2.0 drops the flag and the key.
+
 ## 6. Season codes need a hemisphere ([#6](https://github.com/nodelogicau/intentions/issues/6))
 
 **The draft says:** `2026-21` to `2026-24` are spring, summer, autumn, winter,
@@ -130,6 +143,8 @@ granule's year and runs into the next.
 **Proposed text:** add `resolver.hemisphere` to the workspace configuration,
 and state the month mapping.
 
+**Resolution (b3bb420):** **Partly differently:** EDTF's own hemisphere-specific season codes `25` to `32` are now admitted, from the same extended set the quarter codes come from, so a season can be unambiguous in the file. The neutral `21` to `24` stay admitted and resolve through `resolver.hemisphere`, default north, with the proposed month mapping and December seasons running into the next year. v0.2.0 admits all twelve codes.
+
 ## 7. Explicit `transparent: false` in the projection ([#7](https://github.com/nodelogicau/intentions/issues/7))
 
 **The draft says:** `transparent` is optional and "absent means false", and it
@@ -142,6 +157,8 @@ identical state.
 **We decided:** `transparent` enters the projection only when true.
 
 **Proposed text:** say so under Versioning.
+
+**Resolution (b3bb420):** Settled as proposed: a boolean equal to its documented default leaves the projection, and the writer omits it. The example that wrote `transparent: false` is fixed upstream; v0.2.0 omits it on write.
 
 ## 8. Where a policy-authorised firming is recorded ([#8](https://github.com/nodelogicau/intentions/issues/8))
 
@@ -158,6 +175,8 @@ written to the file.
 
 **Proposed text:** either a field on the intention (`firmed_under`) or an
 embedded record, so the file itself shows the policy.
+
+**Resolution (b3bb420):** **Decided with a field rather than a record:** `firmed_under` on the intention names the policy, sits after `stability` and outside the projection like `source`, and is required whenever a firm intention's source carries a harness. A firming is an edit to stability, not a record, so a field is the format's own pattern for it. v0.2.0 writes it on every harness firming and clears it on a person's own act.
 
 ## 9. "Standing intention" names two things ([#9](https://github.com/nodelogicau/intentions/issues/9))
 
@@ -176,6 +195,8 @@ with a cadence only.
 **Proposed text:** distinct terms, for example "recurring intention" for the
 cadenced kind and "policy" for the condition holder.
 
+**Resolution (b3bb420):** **Decided with distinct terms, narrower than this implementation's reading:** an intention with `cadence` is a recurring intention; a terminus is an intention with no window, duration or outbound references; a policy is a terminus carrying `auto_select` or `auto_firm`. Conditions are admitted on termini only, because a policy is a for-the-sake-of sink and a scheduled intention should not be able to authorise a firming. v0.2.0 accepts only termini as `--policy`, refuses a condition elsewhere, and renames `list --standing` to `--recurring`.
+
 ## 10. Deictic vocabulary a writer accepts ([#10](https://github.com/nodelogicau/intentions/issues/10))
 
 **The draft says:** "Deixis is resolved at write time".
@@ -186,6 +207,8 @@ cadenced kind and "policy" for the condition holder.
 
 **Proposed text:** informative; a list of terms writers should accept helps
 harnesses behave alike.
+
+**Resolution (b3bb420):** Settled: the deixis paragraph now lists `today`, `tomorrow`, `this-week`, `next-week`, `this-month`, `next-month`, `this-quarter`, `next-quarter` and `this-year`, resolved in the resolver's timezone, plus a note on `this-week` on a Sunday.
 
 ## 11. `validate` cannot tell a policy-authorised harness firming from an unauthorised one ([#11](https://github.com/nodelogicau/intentions/issues/11))
 
@@ -202,6 +225,8 @@ refuses the unauthorised case.
 
 **Proposed text:** resolve item 8, after which this becomes an error again.
 
+**Resolution (b3bb420):** Settled via 8: with `firmed_under` in the file, `firm` with a harness source and no `firmed_under` is an error again, and `firmed_under` naming anything but an active policy of the subject is also an error. v0.2.0 reports both.
+
 ## 12. The canonical form of a zero duration ([#12](https://github.com/nodelogicau/intentions/issues/12))
 
 **The draft says:** nothing; its example writes `gap: {min: P0D, max: P3D}`.
@@ -213,6 +238,8 @@ stably.
 **We decided:** `P0D`, as the example writes it, on disk and in the projection.
 
 **Proposed text:** state it under Values.
+
+**Resolution (b3bb420):** Settled as proposed: `P0D` is the one form of zero, on disk and in the projection, stated under Values and in the normalisation list.
 
 ## 13. The example objects disagree on list style ([#13](https://github.com/nodelogicau/intentions/issues/13))
 
@@ -231,3 +258,5 @@ is block style. Multi-line prose is a literal block scalar.
 
 **Proposed text:** fix a list style in the Field order section and align the
 examples.
+
+**Resolution (b3bb420):** Settled as proposed: block sequences for string lists, flow mappings for small records, literal block scalars for multi-line prose. Stated under Field order; the availability example's `conditional` is now a block sequence.

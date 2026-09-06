@@ -84,6 +84,7 @@ version: sha256:stale
 	}
 	out, _ := Encode(obj)
 	want := `id: int_01a06d10-4c2e-7a91-b3f0-2d8e1a7c5b44
+version: sha256:stale
 subject: https://example.com/people/ada
 title: Reordered
 window:
@@ -100,7 +101,6 @@ source:
 timestamp: 2026-09-04T09:12:00Z
 acknowledgements: []
 notes: keep me
-version: sha256:stale
 `
 	if string(out) != want {
 		t.Errorf("canonical re-emit:\n%s\nwant\n%s", out, want)
@@ -202,6 +202,63 @@ func TestCheckRules(t *testing.T) {
 	if ps := Check(c); len(ps) > 0 {
 		t.Errorf("import transparent: %v", ps)
 	}
+	// transparent: false is omitted on write; true is written.
+	f := false
+	c.Transparent = &f
+	out, _ := Encode(c)
+	if strings.Contains(string(out), "transparent") {
+		t.Errorf("transparent: false written:\n%s", out)
+	}
+	c.Transparent = &tr
+	out, _ = Encode(c)
+	if !strings.Contains(string(out), "transparent: true") {
+		t.Errorf("transparent: true missing:\n%s", out)
+	}
+	// Conditions on termini only; cadence needs a calendar anchor; firmed_under rules.
+	o = base()
+	d30 := temporal.Duration{Minutes: 30}
+	o.AutoFirm = &Policy{MaxDuration: &d30}
+	if ps := Check(o); len(ps) > 0 {
+		t.Errorf("terminus policy: %v", ps)
+	}
+	cal, _ := temporal.ParseCalendar("2026-W37")
+	o.Window = &temporal.Window{Calendar: &cal}
+	if got := fieldOf(Check(o)); got != "auto_firm:policy_not_terminus" {
+		t.Errorf("policy on scheduled: %s", got)
+	}
+	o = base()
+	cad, _ := temporal.ParseCadence("FREQ=WEEKLY;BYDAY=TU")
+	o.Cadence = &cad
+	if got := fieldOf(Check(o)); got != "cadence:cadence_anchor" {
+		t.Errorf("cadence without anchor: %s", got)
+	}
+	o.Window = &temporal.Window{Calendar: &cal}
+	if ps := Check(o); len(ps) > 0 {
+		t.Errorf("cadence with anchor: %v", ps)
+	}
+	o = base()
+	o.Stability = "firm"
+	o.Source.Harness = "claude"
+	if got := fieldOf(Check(o)); got != "firmed_under:harness_firm" {
+		t.Errorf("harness firm without firmed_under: %s", got)
+	}
+	o.FirmedUnder = "int_p"
+	if ps := Check(o); len(ps) > 0 {
+		t.Errorf("harness firm with firmed_under: %v", ps)
+	}
+	o.Stability = "tentative"
+	if got := fieldOf(Check(o)); got != "firmed_under:firmed_under_not_firm" {
+		t.Errorf("firmed_under on tentative: %s", got)
+	}
+	// version is second on every type.
+	for _, obj := range []Object{base(), c, &Resolution{ID: "res_a", Intention: "int_a", Selector: "person", Version: "sha256:x"}} {
+		obj.SetVersion("sha256:x")
+		out, _ := Encode(obj)
+		lines := strings.SplitN(string(out), "\n", 3)
+		if !strings.HasPrefix(lines[0], "id: ") || lines[1] != "version: sha256:x" {
+			t.Errorf("%T: version not second:\n%s", obj, out)
+		}
+	}
 }
 
 // fakeGraph is a minimal Graph for policy tests.
@@ -266,18 +323,25 @@ func TestFirmPolicy(t *testing.T) {
 	target := intention("int_x")
 	target.Duration = &temporal.DurationSpec{Nominal: temporal.Duration{Minutes: 20}}
 	g := fakeGraph{objs: map[string]Object{"int_p": policy, "int_x": target}}
-	if err := CheckFirm(g, target, Source{Author: "a"}, ""); err != nil {
-		t.Errorf("person: %v", err)
+	if fu, err := CheckFirm(g, target, Source{Author: "a"}, ""); err != nil || fu != "" {
+		t.Errorf("person: %q %v", fu, err)
 	}
-	if err := CheckFirm(g, target, Source{Author: "a", Harness: "claude"}, ""); err == nil {
+	if _, err := CheckFirm(g, target, Source{Author: "a", Harness: "claude"}, ""); err == nil {
 		t.Error("harness without policy accepted")
 	}
-	if err := CheckFirm(g, target, Source{Author: "a", Harness: "claude"}, "int_p"); err != nil {
-		t.Errorf("harness under policy: %v", err)
+	if fu, err := CheckFirm(g, target, Source{Author: "a", Harness: "claude"}, "int_p"); err != nil || fu != "int_p" {
+		t.Errorf("harness under policy: %q %v", fu, err)
 	}
 	target.Duration = &temporal.DurationSpec{Nominal: temporal.Duration{Hours: 2}}
-	if err := CheckFirm(g, target, Source{Author: "a", Harness: "claude"}, "int_p"); err == nil || !strings.Contains(err.Error(), "max_duration") {
+	if _, err := CheckFirm(g, target, Source{Author: "a", Harness: "claude"}, "int_p"); err == nil || !strings.Contains(err.Error(), "max_duration") {
 		t.Errorf("policy not met: %v", err)
+	}
+	// A scheduled intention cannot be a policy.
+	c, _ := temporal.ParseCalendar("2026-W37")
+	policy.Window = &temporal.Window{Calendar: &c}
+	target.Duration = &temporal.DurationSpec{Nominal: temporal.Duration{Minutes: 20}}
+	if _, err := CheckFirm(g, target, Source{Author: "a", Harness: "claude"}, "int_p"); err == nil || !strings.Contains(err.Error(), "terminus") {
+		t.Errorf("scheduled policy: %v", err)
 	}
 }
 

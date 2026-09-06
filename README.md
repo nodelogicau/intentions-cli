@@ -31,7 +31,7 @@ This is the foundation release. It ends where the format's computation begins:
 
 | Implemented | Deferred to follow-on changes |
 |---|---|
-| Workspace: `init`, discovery, `intentions.yaml` | `generate` instances of standing intentions |
+| Workspace: `init`, discovery, `intentions.yaml` | `generate` instances of recurring intentions |
 | Intentions: add, edit, firm, retire, show, list | `resolve` and `select` (candidates, placements, RESOLUTION records) |
 | Availability: add, edit, renew, supersede, retire, show, list | The consistency check and its flags; `acknowledge` |
 | The temporal engine: durations, EDTF, clock anchors, cadence, bounds | Commitment writing; iCalendar and JSCalendar import and export |
@@ -93,9 +93,9 @@ intentions intention add --title "Read the board pack" --json
 | `workspace` | Print the resolved workspace root, how it was found, and its configuration |
 | `intention add` | Create an intention. `--title` is required; `subject` defaults from `intentions.yaml` |
 | `intention edit <id>` | Edit fields in place. Prose edits leave the version unchanged; `--clear-<field>` removes one |
-| `intention firm <id>` | Set stability to firm. A harness must pass `--policy <int_id>` naming an `auto_firm` policy of the subject |
+| `intention firm <id>` | Set stability to firm. A harness must pass `--policy <int_id>` naming a terminus of the subject carrying `auto_firm`; the id is written to `firmed_under` |
 | `intention retire <id>` | Append a retirement record: `--kind fulfilled\|abandoned\|superseded [--superseded-by id]` |
-| `intention show <id>`, `intention list` | Show one with its version and resolved serves targets; list active (or `--retired`) with filters |
+| `intention show <id>`, `intention list` | Show one with its version and resolved serves targets; list active (or `--retired`, `--recurring`) with filters |
 | `availability add` | Create an availability. `--subject`, `--duration` and a window are required |
 | `availability edit <id>` | Edit prose or widen `--scope`. A change of terms is refused: use `supersede` |
 | `availability renew <id>` | Advance `--valid-until` on the same object |
@@ -114,11 +114,13 @@ intentions intention add --title "Read the board pack" --json
 A window is stored as the person expressed it and never as computed bounds:
 
 - `--calendar` takes an EDTF expression from the admitted subset (`2026`,
-  `2026-09`, `2026-W36`, `2026-09-04`, a season `2026-21..24`, a quarter
-  `2026-33..36`, an interval `2026-W36/2026-W38`, `../2026-09`, `2026-09/..`)
-  or a deictic term resolved at write time: `today`, `tomorrow`, `this-week`,
-  `next-week`, `this-month`, `next-month`, `this-quarter`, `next-quarter`,
-  `this-year`.
+  `2026-09`, `2026-W36`, `2026-09-04`, a neutral season `2026-21..24` resolved
+  by `resolver.hemisphere`, an explicit Northern `2026-25..28` or Southern
+  `2026-29..32` season, a quarter `2026-33..36`, an interval
+  `2026-W36/2026-W38`, `../2026-09`, `2026-09/..`), or a deictic term resolved
+  at write time: `today`, `tomorrow`, `this-week`, `next-week`, `this-month`,
+  `next-month`, `this-quarter`, `next-quarter`, `this-year`. Weeks are ISO
+  weeks, Monday to Sunday, in every context.
 - `--clock HH:MM/HH:MM` is a time-of-day interval, read in the resolver's
   timezone, which may cross midnight.
 - `--relative target:RELATION[:min[:max]]` anchors to another intention or
@@ -126,7 +128,12 @@ A window is stored as the person expressed it and never as computed bounds:
   `STARTTOFINISH`, `STARTTOSTART`) and an optional gap.
 
 `--duration` is an ISO 8601 duration (`PT90M`) or a range `nominal:min:max`
-(`PT1H:PT30M:PT2H`). `--cadence` is an RRULE using date-level parts only.
+(`PT1H:PT30M:PT2H`). `--cadence` is an RRULE using date-level parts only; it
+makes the intention recurring and needs a `--calendar` anchor to expand within.
+
+A **terminus** is an intention with no window, no duration and no `serves`
+entries: a held self-understanding, or a **policy** when it carries
+`--auto-select` or `--auto-firm`. Conditions are admitted on termini only.
 
 ## Attribution
 
@@ -135,7 +142,9 @@ Every writing verb resolves its `source` from `--author`, `--harness`,
 then `defaults.source.author` in `intentions.yaml`. An intention or an
 availability with no author is refused: a speech act with no speaker is not
 one. A harness may draft a tentative intention; setting `firm` with a harness
-in the source needs `--policy`.
+in the source needs `--policy`, and the policy's id is written to the
+intention's `firmed_under` so the file itself shows what authorised it. A
+person's own firming leaves `firmed_under` absent.
 
 For deterministic tests, `--now` (or `INTENTIONS_NOW`) fixes the clock that
 deictic terms and default timestamps use.
@@ -166,8 +175,9 @@ whose content is a path.
 
 Every object has a version: the sha256 of the RFC 8785 canonical JSON of its
 scheduling projection, the fields that bear on consistency. It is written to
-the file under `version` so a diff shows whether an edit changed the
-projection, and the computed value is always authoritative. Prose, `source`,
+the file under `version`, immediately after `id`, so a diff shows whether an
+edit changed the projection, and the computed value is always authoritative.
+`firmed_under`, like `source`, is outside the projection. Prose, `source`,
 `timestamp` and acknowledgements are never in the projection; editing them
 leaves the version unchanged. The golden vectors in
 `internal/projection/testdata` pin the canonical bytes for the spec's examples.

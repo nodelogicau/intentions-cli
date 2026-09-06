@@ -172,6 +172,27 @@ func (c *checker) intention(o *Intention) {
 	c.enum("preference", o.Preference, Preferences, false)
 	c.policy("auto_select", o.AutoSelect)
 	c.policy("auto_firm", o.AutoFirm)
+	if o.HasCondition() && !o.IsTerminus() {
+		what := "a window, a duration or a serves entry"
+		if o.Cadence != nil {
+			what = "a cadence"
+		}
+		c.add("policy_not_terminus", "auto_firm", "auto_select and auto_firm are admitted on termini only; this intention has %s", what)
+	}
+	if o.FirmedUnder != "" {
+		if o.Stability != "firm" {
+			c.add("firmed_under_not_firm", "firmed_under", "firmed_under is admitted only on a firm intention")
+		}
+		if !ValidID(o.FirmedUnder) {
+			c.add("invalid", "firmed_under", "%q is not an identifier", o.FirmedUnder)
+		}
+	}
+	if o.Stability == "firm" && o.Source.Harness != "" && o.FirmedUnder == "" {
+		c.add("harness_firm", "firmed_under", "stability is firm and the source carries harness %q but no firmed_under names the policy; a harness may not firm without one", o.Source.Harness)
+	}
+	if o.Cadence != nil && (o.Window == nil || o.Window.Calendar == nil) {
+		c.add("cadence_anchor", "cadence", "a cadence needs a window with a calendar anchor to expand within")
+	}
 	if o.Window != nil {
 		if err := o.Window.Validate(); err != nil {
 			c.add("invalid", "window", "%v", err)
@@ -210,6 +231,9 @@ func (c *checker) availability(o *Availability) {
 		c.add("missing", "window", "window is required")
 	} else if err := o.Window.Validate(); err != nil {
 		c.add("invalid", "window", "%v", err)
+	}
+	if o.Cadence != nil && (o.Window == nil || o.Window.Calendar == nil) {
+		c.add("cadence_anchor", "cadence", "a cadence needs a window with a calendar anchor to expand within")
 	}
 	for i, t := range o.Conditional {
 		c.term(fmt.Sprintf("conditional[%d]", i), t)

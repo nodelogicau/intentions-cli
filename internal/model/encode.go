@@ -13,10 +13,11 @@ import (
 )
 
 // Encode serialises an object deterministically in canonical field order:
-// 2-space indent, literal block scalars for multi-line prose, RFC 3339 Z
-// timestamps, optional fields omitted, set-valued lists sorted, fields this
-// implementation does not know after every specified field, the cached
-// version last, no document markers.
+// version second after id, 2-space indent, literal block scalars for
+// multi-line prose, RFC 3339 Z timestamps, optional fields omitted, a boolean
+// equal to its documented default omitted, set-valued lists sorted, fields
+// this implementation does not know after every specified field, no document
+// markers.
 func Encode(obj Object) ([]byte, error) {
 	var root *yaml.Node
 	switch o := obj.(type) {
@@ -232,10 +233,17 @@ func acknowledgementsNode(as []Acknowledgement) *yaml.Node {
 	return seq
 }
 
-func addExtras(m *yaml.Node, extras []Extra, version string) {
+func addExtras(m *yaml.Node, extras []Extra) {
 	for _, e := range extras {
 		addKV(m, e.Key, e.Node)
 	}
+}
+
+// addHead writes id and version, the first two keys of every type. A
+// version is written whenever one is known; a writer stamps it before
+// encoding, so only a read-and-re-emit of a foreign file lacks one.
+func addHead(m *yaml.Node, id, version string) {
+	addStrAlways(m, "id", id)
 	addStr(m, "version", version)
 }
 
@@ -250,13 +258,14 @@ func cadenceNode(c *temporal.Cadence) *yaml.Node {
 
 func intentionNode(o *Intention) *yaml.Node {
 	m := mapping()
-	addStrAlways(m, "id", o.ID)
+	addHead(m, o.ID, o.Version)
 	addStrAlways(m, "subject", o.Subject)
 	addStrAlways(m, "title", o.Title)
 	addStr(m, "description", o.Description)
 	addKV(m, "duration", durationSpecNode(o.Duration))
 	addKV(m, "window", windowNode(o.Window))
 	addStrAlways(m, "stability", o.Stability)
+	addStr(m, "firmed_under", o.FirmedUnder)
 	addStr(m, "activity", o.Activity)
 	addStrList(m, "location", o.Location, false)
 	addStrList(m, "parties", o.Parties, false)
@@ -272,13 +281,13 @@ func intentionNode(o *Intention) *yaml.Node {
 	addTime(m, "timestamp", o.Timestamp)
 	addKV(m, "acknowledgements", acknowledgementsNode(o.Acknowledgements))
 	addKV(m, "retired", retiredNode(o.Retired))
-	addExtras(m, o.Extras, o.Version)
+	addExtras(m, o.Extras)
 	return m
 }
 
 func availabilityNode(o *Availability) *yaml.Node {
 	m := mapping()
-	addStrAlways(m, "id", o.ID)
+	addHead(m, o.ID, o.Version)
 	addStrAlways(m, "subject", o.Subject)
 	addStr(m, "title", o.Title)
 	addStr(m, "description", o.Description)
@@ -292,13 +301,13 @@ func availabilityNode(o *Availability) *yaml.Node {
 	addKV(m, "source", sourceNode(o.Source))
 	addTime(m, "timestamp", o.Timestamp)
 	addKV(m, "retired", retiredNode(o.Retired))
-	addExtras(m, o.Extras, o.Version)
+	addExtras(m, o.Extras)
 	return m
 }
 
 func commitmentNode(o *Commitment) *yaml.Node {
 	m := mapping()
-	addStrAlways(m, "id", o.ID)
+	addHead(m, o.ID, o.Version)
 	addKV(m, "parties", partiesNode(o.Parties))
 	addKV(m, "placement", placementNode(o.Placement))
 	addStr(m, "intention", o.Intention)
@@ -309,7 +318,8 @@ func commitmentNode(o *Commitment) *yaml.Node {
 		addStrAlways(om, "resolution", o.Origin.Resolution)
 		addKV(m, "origin", om)
 	}
-	if o.Transparent != nil {
+	// A boolean equal to its documented default is omitted; absent means false.
+	if o.Transparent != nil && *o.Transparent {
 		addKV(m, "transparent", plain("!!bool", strconv.FormatBool(*o.Transparent)))
 	}
 	if o.External != nil {
@@ -324,13 +334,13 @@ func commitmentNode(o *Commitment) *yaml.Node {
 	addTime(m, "timestamp", o.Timestamp)
 	addKV(m, "acknowledgements", acknowledgementsNode(o.Acknowledgements))
 	addKV(m, "retired", retiredNode(o.Retired))
-	addExtras(m, o.Extras, o.Version)
+	addExtras(m, o.Extras)
 	return m
 }
 
 func resolutionNode(o *Resolution) *yaml.Node {
 	m := mapping()
-	addStrAlways(m, "id", o.ID)
+	addHead(m, o.ID, o.Version)
 	addStrAlways(m, "intention", o.Intention)
 	addKV(m, "placement", placementNode(o.Placement))
 	addStrAlways(m, "selector", o.Selector)
@@ -340,7 +350,7 @@ func resolutionNode(o *Resolution) *yaml.Node {
 	addStrList(m, "displaced", o.Displaced, false)
 	addKV(m, "source", sourceNode(o.Source))
 	addTime(m, "timestamp", o.Timestamp)
-	addExtras(m, o.Extras, o.Version)
+	addExtras(m, o.Extras)
 	return m
 }
 

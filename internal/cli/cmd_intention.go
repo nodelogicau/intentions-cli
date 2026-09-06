@@ -36,12 +36,12 @@ func addIntentionFieldFlags(cmd *cobra.Command, f *intentionFields, edit bool) {
 	cmd.Flags().StringArrayVar(&f.location, "location", nil, "URI at one of which this must happen (repeatable)")
 	cmd.Flags().StringArrayVar(&f.parties, "party", nil, "URI of another particular whose availability must be satisfied (repeatable)")
 	cmd.Flags().StringArrayVar(&f.serves, "serves", nil, "outbound reference id:role, role in-order-to, for-the-sake-of, instance-of (repeatable)")
-	cmd.Flags().StringVar(&f.cadence, "cadence", "", "RRULE with date-level parts only; makes this a standing intention")
+	cmd.Flags().StringVar(&f.cadence, "cadence", "", "RRULE with date-level parts only; makes this a recurring intention, whose window needs a calendar anchor")
 	cmd.Flags().StringVar(&f.preference, "preference", "", "earliest, latest, adjacent, or spread")
-	cmd.Flags().StringVar(&f.autoSelect, "auto-select", "", "policy condition, e.g. max_duration=PT30M,stability=tentative")
-	cmd.Flags().StringVar(&f.autoFirm, "auto-firm", "", "policy condition, e.g. max_duration=PT30M")
+	cmd.Flags().StringVar(&f.autoSelect, "auto-select", "", "policy condition on a terminus, e.g. max_duration=PT30M,stability=tentative")
+	cmd.Flags().StringVar(&f.autoFirm, "auto-firm", "", "policy condition on a terminus, e.g. max_duration=PT30M")
 	cmd.Flags().StringVar(&f.reference, "reference", "", "informal pointer to a DKF claim; never validated")
-	cmd.Flags().StringVar(&f.policy, "policy", "", "id of the intention carrying auto_firm that authorises a harness to set firm")
+	cmd.Flags().StringVar(&f.policy, "policy", "", "id of the terminus carrying auto_firm that authorises a harness to set firm; written to firmed_under")
 	addWindowFlags(cmd, &f.window, edit)
 	if !edit {
 		cmd.Flags().StringVar(&f.subject, "subject", "", "URI of the particular whose intention this is (default: defaults.subject)")
@@ -100,6 +100,10 @@ func (a *app) applyIntentionFields(cmd *cobra.Command, f intentionFields, o *mod
 	o.Window = w
 	if changed("stability") {
 		o.Stability = f.stability
+		if o.Stability != "firm" {
+			// A person's act, or an unfirming: firmed_under belongs to firm only.
+			o.FirmedUnder = ""
+		}
 	}
 	if changed("activity") {
 		o.Activity = f.activity
@@ -184,7 +188,9 @@ func (a *app) applyIntentionFields(cmd *cobra.Command, f intentionFields, o *mod
 }
 
 // checkIntentionWrite applies the workspace-level write policy for a proposed
-// state, given the state before the act (nil on add).
+// state, given the state before the act (nil on add). When the act sets firm
+// it also settles firmed_under on o: the policy id for a harness, absent for
+// a person's own act.
 func checkIntentionWrite(g *store.Graph, before, o *model.Intention, act model.Source, policy string) error {
 	if before != nil {
 		if err := model.CheckNotRetired(before); err != nil {
@@ -202,9 +208,14 @@ func checkIntentionWrite(g *store.Graph, before, o *model.Intention, act model.S
 		if before != nil {
 			target = before
 		}
-		if err := model.CheckFirm(g, target, act, policy); err != nil {
+		fu, err := model.CheckFirm(g, target, act, policy)
+		if err != nil {
 			return err
 		}
+		o.FirmedUnder = fu
+	}
+	if o.Stability != "firm" {
+		o.FirmedUnder = ""
 	}
 	return nil
 }
@@ -365,11 +376,13 @@ func (a *app) intentionFirmCmd() *cobra.Command {
 			if before.Stability == "firm" {
 				return refusedErr("%s is already firm", before.ID)
 			}
-			if err := model.CheckFirm(g, before, src, policy); err != nil {
+			fu, err := model.CheckFirm(g, before, src, policy)
+			if err != nil {
 				return err
 			}
 			o := *before
 			o.Stability = "firm"
+			o.FirmedUnder = fu
 			prev, _ := projection.Version(before)
 			if err := writeObject(ws, &o); err != nil {
 				return err
@@ -388,7 +401,7 @@ func (a *app) intentionFirmCmd() *cobra.Command {
 			})
 		}),
 	}
-	cmd.Flags().StringVar(&policy, "policy", "", "id of the intention carrying auto_firm that authorises a harness to firm")
+	cmd.Flags().StringVar(&policy, "policy", "", "id of the terminus carrying auto_firm that authorises a harness to firm; written to firmed_under")
 	addActFlags(cmd, &act)
 	return cmd
 }
@@ -503,7 +516,7 @@ func (a *app) intentionShowCmd() *cobra.Command {
 
 func (a *app) intentionListCmd() *cobra.Command {
 	var subject, activity, stability string
-	var standing, retired bool
+	var recurring, retired bool
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List intentions, active by default",
@@ -531,7 +544,7 @@ func (a *app) intentionListCmd() *cobra.Command {
 				if stability != "" && o.Stability != stability {
 					continue
 				}
-				if standing && !o.IsStanding() {
+				if recurring && !o.IsRecurring() {
 					continue
 				}
 				items = append(items, o)
@@ -547,8 +560,8 @@ func (a *app) intentionListCmd() *cobra.Command {
 			return a.emit(map[string]any{"intentions": list, "count": len(list)}, func(w io.Writer) {
 				for _, o := range items {
 					flags := ""
-					if o.IsStanding() {
-						flags += " standing"
+					if o.IsRecurring() {
+						flags += " recurring"
 					}
 					if o.Retired != nil {
 						flags += " retired:" + o.Retired.Kind
@@ -564,7 +577,7 @@ func (a *app) intentionListCmd() *cobra.Command {
 	cmd.Flags().StringVar(&subject, "subject", "", "filter by subject URI")
 	cmd.Flags().StringVar(&activity, "activity", "", "filter by activity term")
 	cmd.Flags().StringVar(&stability, "stability", "", "filter by stability")
-	cmd.Flags().BoolVar(&standing, "standing", false, "only standing intentions (with a cadence)")
+	cmd.Flags().BoolVar(&recurring, "recurring", false, "only recurring intentions (with a cadence)")
 	cmd.Flags().BoolVar(&retired, "retired", false, "list retired intentions instead of active ones")
 	return cmd
 }

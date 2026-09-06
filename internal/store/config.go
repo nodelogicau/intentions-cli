@@ -31,10 +31,12 @@ type Config struct {
 	Hash     string `json:"hash"`
 	Resolver struct {
 		Timezone   string `json:"timezone"`
-		WeekStart  string `json:"week_start"`
 		Hemisphere string `json:"hemisphere,omitempty"`
 	} `json:"resolver"`
-	Availability struct {
+	// UnknownResolverKeys are keys under resolver this implementation does
+	// not know (a stale week_start, say): ignored, reported at info level.
+	UnknownResolverKeys []string `json:"-"`
+	Availability        struct {
 		DefaultHorizon string `json:"default_horizon"`
 	} `json:"availability"`
 	Generation struct {
@@ -54,7 +56,6 @@ func NewConfig() Config {
 	c.Format = model.Format
 	c.Hash = "sha256"
 	c.Resolver.Timezone = "UTC"
-	c.Resolver.WeekStart = "monday"
 	c.Availability.DefaultHorizon = "P13W"
 	c.Generation.Horizon = "P4W"
 	return c
@@ -74,8 +75,8 @@ func ParseConfig(data []byte) (Config, error) {
 	c.Format = getPath(root, "format")
 	c.Hash = getPath(root, "hash")
 	c.Resolver.Timezone = getPath(root, "resolver", "timezone")
-	c.Resolver.WeekStart = getPath(root, "resolver", "week_start")
 	c.Resolver.Hemisphere = getPath(root, "resolver", "hemisphere")
+	c.UnknownResolverKeys = unknownKeys(root, []string{"timezone", "hemisphere"}, "resolver")
 	c.Availability.DefaultHorizon = getPath(root, "availability", "default_horizon")
 	c.Generation.Horizon = getPath(root, "generation", "horizon")
 	c.Defaults.Subject = getPath(root, "defaults", "subject")
@@ -98,9 +99,6 @@ func (c Config) Validate() error {
 	}
 	if _, err := time.LoadLocation(c.Resolver.Timezone); err != nil {
 		return fmt.Errorf("%s: resolver.timezone %q is not a known IANA zone", ConfigFile, c.Resolver.Timezone)
-	}
-	if _, err := temporal.ParseWeekday(c.Resolver.WeekStart); err != nil {
-		return fmt.Errorf("%s: resolver.week_start: %v", ConfigFile, err)
 	}
 	if _, err := temporal.ParseHemisphere(c.Resolver.Hemisphere); err != nil {
 		return fmt.Errorf("%s: resolver.hemisphere: %v", ConfigFile, err)
@@ -126,9 +124,8 @@ func (c Config) Context(now time.Time) temporal.Context {
 	if err != nil {
 		loc = time.UTC
 	}
-	ws, _ := temporal.ParseWeekday(c.Resolver.WeekStart)
 	h, _ := temporal.ParseHemisphere(c.Resolver.Hemisphere)
-	return temporal.Context{Location: loc, WeekStart: ws, Hemisphere: h, Now: now}
+	return temporal.Context{Location: loc, Hemisphere: h, Now: now}
 }
 
 // DefaultHorizon returns availability.default_horizon parsed.
@@ -149,7 +146,6 @@ func (c Config) Marshal() ([]byte, error) {
 	setPath(root, c.Format, "format")
 	setPath(root, c.Hash, "hash")
 	setPath(root, c.Resolver.Timezone, "resolver", "timezone")
-	setPath(root, c.Resolver.WeekStart, "resolver", "week_start")
 	if c.Resolver.Hemisphere != "" {
 		setPath(root, c.Resolver.Hemisphere, "resolver", "hemisphere")
 	}
@@ -173,6 +169,37 @@ func (c Config) Marshal() ([]byte, error) {
 	}
 	_ = enc.Close()
 	return buf.Bytes(), nil
+}
+
+// unknownKeys lists the keys of the mapping at path that are not in known.
+func unknownKeys(m *yaml.Node, known []string, path ...string) []string {
+	n := m
+	for _, key := range path {
+		var next *yaml.Node
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			if n.Content[i].Value == key {
+				next = n.Content[i+1]
+			}
+		}
+		if next == nil || next.Kind != yaml.MappingNode {
+			return nil
+		}
+		n = next
+	}
+	var out []string
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		k := n.Content[i].Value
+		isKnown := false
+		for _, x := range known {
+			if x == k {
+				isKnown = true
+			}
+		}
+		if !isKnown {
+			out = append(out, k)
+		}
+	}
+	return out
 }
 
 func getPath(m *yaml.Node, path ...string) string {

@@ -151,13 +151,19 @@ func TestStructuralFromFiles(t *testing.T) {
 	raw("int_f.yaml", "id: int_f\nsubject: https://s/\ntitle: t\nstability: firm\nserves: []\nsource: {author: a, harness: claude}\ntimestamp: 2026-09-04T00:00:00Z\nacknowledgements: []\n")
 	raw("int_m.yaml", "id: int_other\nsubject: https://s/\ntitle: t\nstability: tentative\nserves: []\nsource: {author: a}\ntimestamp: 2026-09-04T00:00:00Z\nacknowledgements: []\n")
 	raw("int_bad.yaml", "- nope\n")
+	raw("int_fu.yaml", "id: int_fu\nsubject: https://s/\ntitle: t\nstability: firm\nfirmed_under: int_notpolicy\nserves: []\nsource: {author: a, harness: claude}\ntimestamp: 2026-09-04T00:00:00Z\nacknowledgements: []\n")
+	raw("int_notpolicy.yaml", "id: int_notpolicy\nsubject: https://s/\ntitle: t\nstability: tentative\nwindow: {calendar: 2026-W37}\nserves: []\nsource: {author: a}\ntimestamp: 2026-09-04T00:00:00Z\nacknowledgements: []\n")
+	raw("int_ok.yaml", "id: int_ok\nsubject: https://s/\ntitle: t\nstability: firm\nfirmed_under: int_pol\nserves: []\nsource: {author: a, harness: claude}\ntimestamp: 2026-09-04T00:00:00Z\nacknowledgements: []\n")
+	raw("int_pol.yaml", "id: int_pol\nsubject: https://s/\ntitle: p\nstability: tentative\nserves: []\nauto_firm: {max_duration: PT30M}\nsource: {author: a}\ntimestamp: 2026-09-04T00:00:00Z\nacknowledgements: []\n")
+	raw("int_cond.yaml", "id: int_cond\nsubject: https://s/\ntitle: t\nstability: tentative\nwindow: {calendar: 2026-W37}\nauto_select: {max_duration: PT30M}\nserves: []\nsource: {author: a}\ntimestamp: 2026-09-04T00:00:00Z\nacknowledgements: []\n")
+	raw("int_cad.yaml", "id: int_cad\nsubject: https://s/\ntitle: t\nstability: tentative\nwindow: {clock: 09:00/12:00}\ncadence: FREQ=WEEKLY;BYDAY=TU\nserves: []\nsource: {author: a}\ntimestamp: 2026-09-04T00:00:00Z\nacknowledgements: []\n")
 	raw("int_r.yaml", "acknowledgements: []\ntimestamp: 2026-09-04T00:00:00Z\nsource: {author: a}\nserves: []\nstability: tentative\ntitle: reversed\nsubject: https://s/\nid: int_r\n")
 	r := run(t, ws)
 	byID := map[string][]string{}
 	for _, f := range r.Findings {
 		byID[f.ID] = append(byID[f.ID], f.Code)
 	}
-	want := map[string]string{"int_k": "invalid", "int_q": "unparseable", "int_c": "unparseable", "int_h": "no_author", "int_m": "id_mismatch"}
+	want := map[string]string{"int_k": "invalid", "int_q": "unparseable", "int_c": "unparseable", "int_h": "no_author", "int_m": "id_mismatch", "int_fu": "firmed_under_target", "int_cond": "policy_not_terminus", "int_cad": "cadence_anchor"}
 	for id, code := range want {
 		ok := false
 		for _, c := range byID[id] {
@@ -169,11 +175,19 @@ func TestStructuralFromFiles(t *testing.T) {
 			t.Errorf("%s: want %s, got %v", id, code, byID[id])
 		}
 	}
-	if len(byID["int_r"]) != 0 {
-		t.Errorf("reordered file reported: %v", byID["int_r"])
+	if len(byID["int_r"]) != 1 || byID["int_r"][0] != "missing_version" {
+		t.Errorf("reordered file: want only missing_version, got %v", byID["int_r"])
 	}
-	if !has(r, SeverityWarning, "harness_firm") {
-		t.Error("harness-firmed intention not warned")
+	for _, c := range byID["int_ok"] {
+		if c != "missing_version" {
+			t.Errorf("authorised firming reported: %v", byID["int_ok"])
+		}
+	}
+	if !has(r, SeverityWarning, "missing_version") {
+		t.Error("missing version not warned")
+	}
+	if !has(r, SeverityError, "harness_firm") {
+		t.Error("harness-firmed intention without firmed_under not an error")
 	}
 	if !has(r, SeverityError, "unreadable") {
 		t.Error("unreadable file not reported")

@@ -85,7 +85,7 @@ func (a *app) versionOfCmd() *cobra.Command {
 }
 
 func (a *app) boundsCmd() *cobra.Command {
-	var calendar, clock, timezone, weekStart, hemisphere, now, horizonStart, horizonEnd string
+	var calendar, clock, timezone, hemisphere, now, horizonStart, horizonEnd string
 	cmd := &cobra.Command{
 		Use:   "bounds [<id>]",
 		Short: "Compute the clock-time bounds of an object's window, or of an ad hoc --calendar/--clock window; writes nothing",
@@ -106,13 +106,6 @@ func (a *app) boundsCmd() *cobra.Command {
 					return usageErr("--timezone %q is not a known IANA zone", timezone)
 				}
 				ctx.Location = loc
-			}
-			if weekStart != "" {
-				d, err := temporal.ParseWeekday(weekStart)
-				if err != nil {
-					return usageErr("--week-start: %v", err)
-				}
-				ctx.WeekStart = d
 			}
 			if hemisphere != "" {
 				h, err := temporal.ParseHemisphere(hemisphere)
@@ -192,7 +185,7 @@ func (a *app) boundsCmd() *cobra.Command {
 				}
 				list = append(list, m)
 			}
-			out := map[string]any{"window": win.String(), "timezone": ctx.Location.String(), "week_start": temporal.WeekdayName(ctx.WeekStart), "hemisphere": string(ctx.Hemisphere), "intervals": list, "count": len(list)}
+			out := map[string]any{"window": win.String(), "timezone": ctx.Location.String(), "hemisphere": string(ctx.Hemisphere), "intervals": list, "count": len(list)}
 			if id != "" {
 				out["id"] = id
 			}
@@ -200,7 +193,7 @@ func (a *app) boundsCmd() *cobra.Command {
 				a.warnings = append(a.warnings, "the relational anchor contributes nothing here: it needs its target's placement, which a resolver supplies")
 			}
 			return a.emit(out, func(w io.Writer) {
-				fmt.Fprintf(w, "%s in %s (week starts %s)\n", win, ctx.Location, temporal.WeekdayName(ctx.WeekStart))
+				fmt.Fprintf(w, "%s in %s (%s hemisphere)\n", win, ctx.Location, ctx.Hemisphere)
 				for _, m := range list {
 					s, e := "..", ".."
 					if m["start"] != nil {
@@ -217,7 +210,6 @@ func (a *app) boundsCmd() *cobra.Command {
 	cmd.Flags().StringVar(&calendar, "calendar", "", "calendar anchor to bound (EDTF or deictic)")
 	cmd.Flags().StringVar(&clock, "clock", "", "clock anchor to apply")
 	cmd.Flags().StringVar(&timezone, "timezone", "", "override resolver.timezone")
-	cmd.Flags().StringVar(&weekStart, "week-start", "", "override resolver.week_start")
 	cmd.Flags().StringVar(&hemisphere, "hemisphere", "", "override resolver.hemisphere")
 	cmd.Flags().StringVar(&now, "now", "", "the current time as RFC 3339, for deictic terms")
 	cmd.Flags().StringVar(&horizonStart, "horizon-start", "", "clamp an open lower bound to this RFC 3339 instant")
