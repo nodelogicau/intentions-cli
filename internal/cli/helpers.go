@@ -306,6 +306,9 @@ func writeObject(ws *store.Workspace, obj model.Object) error {
 	return ws.WriteObject(obj)
 }
 
+// projectionVersion is the computed version of an object.
+func projectionVersion(obj model.Object) (string, error) { return projection.Version(obj) }
+
 // objectResult is the common JSON shape for a written or shown object.
 func objectResult(obj model.Object) (map[string]any, error) {
 	m, err := model.ToMap(obj)

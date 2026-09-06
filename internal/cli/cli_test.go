@@ -984,3 +984,192 @@ func TestSkillShowAndInstall(t *testing.T) {
 		t.Error("expected a duplicate-location warning")
 	}
 }
+
+// --- resolution loop ---------------------------------------------------------
+
+const rnow = "2026-09-10T00:00:00Z"
+
+func TestResolutionLoop(t *testing.T) {
+	ws := initWS(t)
+	av := func(args ...string) result {
+		full := append([]string{"availability", "add", "--now", rnow, "--subject", ada}, args...)
+		return mustOK(t, run(t, ws, "", full...), "availability add")
+	}
+	add := func(args ...string) result {
+		full := append([]string{"intention", "add", "--now", rnow}, args...)
+		return mustOK(t, run(t, ws, "", full...), "intention add")
+	}
+	av("--title", "Tuesday mornings", "--duration", "PT3H", "--calendar", "2026-09/2026-12", "--clock", "09:00/12:00", "--conditional", "deep-work", "--cadence", "FREQ=WEEKLY;BYDAY=TU")
+	av("--title", "Weekday afternoons", "--duration", "PT4H", "--calendar", "2026-09/2026-12", "--clock", "13:00/17:00", "--conditional", "meeting", "--cadence", "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR")
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", "https://example.com/rooms/3", "--duration", "PT8H", "--calendar", "2026-09/2026-12", "--clock", "08:00/18:00", "--cadence", "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"), "room")
+
+	// Resolve: rank-1 candidates inside Tuesday morning, 15-minute grid, limit keeps the count.
+	a := add("--title", "Draft the budget narrative", "--duration", "PT90M", "--calendar", "2026-W38", "--activity", "deep-work")
+	r := mustOK(t, run(t, ws, "", "resolve", a.str("id"), "--limit", "4", "--now", rnow), "resolve")
+	cands := r.json["candidates"].([]any)
+	if len(cands) != 4 || int(r.json["candidates_considered"].(float64)) != 7 || cands[0].(map[string]any)["start"] != "2026-09-15T09:00:00+10:00" || cands[0].(map[string]any)["rank"].(float64) != 1 {
+		t.Fatalf("resolve: %v", r.json)
+	}
+	if fi, _ := os.ReadDir(filepath.Join(ws, "resolutions")); len(fi) != 0 {
+		t.Error("resolve wrote a record")
+	}
+	// Refusals: no duration; placed without --replace later.
+	noDur := add("--title", "No duration", "--calendar", "2026-W38")
+	if r := run(t, ws, "", "resolve", noDur.str("id"), "--now", rnow); r.code != 2 || !strings.Contains(errMsg(r), "duration") {
+		t.Errorf("no duration: %d %s", r.code, errMsg(r))
+	}
+	// Select by a person.
+	s := mustOK(t, run(t, ws, "", "select", a.str("id"), "--candidate", "1", "--now", rnow), "select")
+	rec := s.json["resolution"].(map[string]any)
+	if rec["selector"] != "person" || rec["intention"] != a.str("id") || rec["candidates_considered"].(float64) != 7 || len(rec["supply"].([]any)) != 1 {
+		t.Errorf("record: %v", rec)
+	}
+	if s.json["intention"].(map[string]any)["placement"].(map[string]any)["start"] != "2026-09-15T09:00:00+10:00" {
+		t.Errorf("placement: %v", s.json["intention"])
+	}
+	body := readFile(t, ws, "resolutions/"+rec["id"].(string)+".yaml")
+	if !strings.HasPrefix(body, "id: res_") || !strings.Contains(body, "\ntimestamp: 2026-09-10T00:00:00Z\nsupply:\n  - avl_") {
+		t.Errorf("record file:\n%s", body)
+	}
+	if r := run(t, ws, "", "select", a.str("id"), "--candidate", "2", "--now", rnow); r.code != 2 || !strings.Contains(errMsg(r), "--replace") {
+		t.Errorf("placed without replace: %d %s", r.code, errMsg(r))
+	}
+	// Capacity: the 3h morning holds 90m + 1h; a second 90m no longer fits there.
+	b := add("--title", "Read the board pack", "--duration", "PT1H", "--calendar", "2026-W38", "--activity", "deep-work")
+	sb := mustOK(t, run(t, ws, "", "select", b.str("id"), "--candidate", "1", "--now", rnow), "select b")
+	if sb.json["candidate"].(map[string]any)["rank"].(float64) != 1 || sb.json["candidate"].(map[string]any)["start"] != "2026-09-15T10:30:00+10:00" {
+		t.Errorf("capacity-aware placement: %v", sb.json["candidate"])
+	}
+	c := add("--title", "One more", "--duration", "PT90M", "--calendar", "2026-09-15", "--activity", "deep-work")
+	rc := mustOK(t, run(t, ws, "", "resolve", c.str("id"), "--now", rnow), "resolve c")
+	if len(rc.json["candidates"].([]any)) != 0 || !strings.Contains(rc.str("reason"), "capacity") {
+		t.Errorf("capacity exhausted: %v", rc.json)
+	}
+	// Parties create a commitment with everyone tentative.
+	m := add("--title", "Review in room 3", "--duration", "PT1H", "--calendar", "2026-W38", "--activity", "meeting", "--party", "https://example.com/rooms/3")
+	sm := mustOK(t, run(t, ws, "", "select", m.str("id"), "--candidate", "1", "--now", rnow), "select meeting")
+	cmt := sm.json["commitment"].(map[string]any)
+	parties := cmt["parties"].([]any)
+	if len(parties) != 2 || parties[0].(map[string]any)["status"] != "tentative" || cmt["origin"].(map[string]any)["resolution"] != sm.json["resolution"].(map[string]any)["id"] || cmt["intention"] != m.str("id") {
+		t.Errorf("commitment: %v", cmt)
+	}
+	if len(sm.json["flags"].([]any)) != 0 {
+		t.Errorf("fresh selection flagged: %v", sm.json["flags"])
+	}
+	// Displacement: a 2h intention in a 2h window over the tentative commitment.
+	cmtStart := cmt["placement"].(map[string]any)["start"].(string) // 2026-09-14T13:00:00+10:00
+	day, hour := cmtStart[:10], cmtStart[11:16]
+	d := add("--title", "Displacer", "--duration", "PT2H", "--calendar", day, "--clock", hour+"/15:00", "--activity", "meeting")
+	rd := mustOK(t, run(t, ws, "", "resolve", d.str("id"), "--now", rnow), "resolve displacer")
+	top := rd.json["candidates"].([]any)[0].(map[string]any)
+	if top["rank"].(float64) != 2 || top["displaces"].([]any)[0] != cmt["id"] {
+		t.Errorf("displacing candidate: %v", top)
+	}
+	sd := mustOK(t, run(t, ws, "", "select", d.str("id"), "--candidate", "1", "--now", rnow), "select displacer")
+	if sd.json["resolution"].(map[string]any)["displaced"].([]any)[0] != cmt["id"] || len(sd.json["flags"].([]any)) != 2 {
+		t.Errorf("displacement recorded and flagged: %v %v", sd.json["resolution"], sd.json["flags"])
+	}
+	after := mustOK(t, run(t, ws, "", "show", cmt["id"].(string)), "show displaced")
+	if after.obj()["placement"].(map[string]any)["start"] != cmtStart || after.obj()["parties"].([]any)[0].(map[string]any)["status"] != "tentative" {
+		t.Error("displaced commitment was changed")
+	}
+	// Check on demand, scoped and with --fail-on-flags.
+	ck := mustOK(t, run(t, ws, "", "check", "--now", rnow), "check")
+	if int(ck.json["count"].(float64)) != 2 {
+		t.Errorf("check count: %v", ck.json)
+	}
+	if r := run(t, ws, "", "check", d.str("id"), "--fail-on-flags", "--now", rnow); r.code != 4 || int(r.json["count"].(float64)) != 2 {
+		t.Errorf("scoped check: %d %v", r.code, r.json)
+	}
+	// Acknowledge on the displacer suppresses its flag; the counterpart keeps its own.
+	if r := run(t, ws, "", "acknowledge", d.str("id"), "--kind", "overlap"); r.code != 2 {
+		t.Errorf("unknown kind: %d", r.code)
+	}
+	if r := run(t, ws, "", "acknowledge", d.str("id"), "--kind", "window-clash", "--now", rnow); r.code != 2 || !strings.Contains(errMsg(r), "counterpart") {
+		t.Errorf("missing counterpart: %d %s", r.code, errMsg(r))
+	}
+	dv := mustOK(t, run(t, ws, "", "version-of", d.str("id")), "version-of d")
+	ack := mustOK(t, run(t, ws, "", "acknowledge", d.str("id"), "--kind", "window-clash", "--counterpart", cmt["id"].(string), "--reason", "The review can move", "--now", rnow), "acknowledge")
+	entry := ack.json["acknowledgement"].(map[string]any)
+	cv := mustOK(t, run(t, ws, "", "version-of", cmt["id"].(string)), "version-of")
+	if entry["counterpart_version"] != cv.str("version") || ack.str("version") != dv.str("version") || len(ack.json["flags"].([]any)) != 0 {
+		t.Errorf("acknowledgement: %v flags %v", entry, ack.json["flags"])
+	}
+	ck = mustOK(t, run(t, ws, "", "check", "--now", rnow), "check after ack")
+	if int(ck.json["count"].(float64)) != 1 || ck.json["flags"].([]any)[0].(map[string]any)["subject"] != cmt["id"] {
+		t.Errorf("suppression: %v", ck.json)
+	}
+	// A prose edit on the counterpart's intention keeps the suppression; show carries flags.
+	mustOK(t, run(t, ws, "", "intention", "edit", m.str("id"), "--description", "prose", "--now", rnow), "prose edit")
+	if r := mustOK(t, run(t, ws, "", "intention", "show", d.str("id"), "--now", rnow), "show"); len(r.json["flags"].([]any)) != 0 {
+		t.Errorf("prose edit lapsed: %v", r.json["flags"])
+	}
+	// Replace: a new record, the old placement reported.
+	rep := mustOK(t, run(t, ws, "", "select", a.str("id"), "--candidate", "2", "--replace", "--now", rnow), "replace")
+	if rep.json["replaced"].(map[string]any)["start"] != "2026-09-15T09:00:00+10:00" {
+		t.Errorf("replace: %v", rep.json["replaced"])
+	}
+	if fi, _ := os.ReadDir(filepath.Join(ws, "resolutions")); len(fi) != 5 {
+		t.Errorf("records: %d", len(fi))
+	}
+	// Policy selection by a harness; refused for a person and for a non-covering policy.
+	p := add("--title", "Small things", "--auto-select", "max_duration=PT30M")
+	q := add("--title", "Quick", "--duration", "PT15M", "--calendar", "2026-W39", "--activity", "meeting")
+	if r := run(t, ws, "", "select", q.str("id"), "--policy", p.str("id"), "--now", rnow); r.code != 2 {
+		t.Errorf("person with policy: %d", r.code)
+	}
+	sq := mustOK(t, run(t, ws, "", "select", q.str("id"), "--policy", p.str("id"), "--harness", "claude", "--now", rnow), "policy select")
+	if sq.json["resolution"].(map[string]any)["selector"] != p.str("id") || sq.json["resolution"].(map[string]any)["source"].(map[string]any)["harness"] != "claude" {
+		t.Errorf("policy record: %v", sq.json["resolution"])
+	}
+	long := add("--title", "Long", "--duration", "PT2H", "--calendar", "2026-W39", "--activity", "meeting")
+	if r := run(t, ws, "", "select", long.str("id"), "--policy", p.str("id"), "--harness", "claude", "--now", rnow); r.code != 2 || !strings.Contains(errMsg(r), "max_duration") {
+		t.Errorf("policy not covering: %d %s", r.code, errMsg(r))
+	}
+	// Generate: instances, idempotent, resolve generates first.
+	rec2 := add("--title", "Weekly 1:1", "--duration", "PT30M", "--calendar", "2026-09/2026-12", "--clock", "14:00/15:00", "--cadence", "FREQ=WEEKLY;BYDAY=TU")
+	g := mustOK(t, run(t, ws, "", "generate", "--horizon", "P2W", "--now", rnow), "generate")
+	if int(g.json["count"].(float64)) != 2 || g.json["created"].([]any)[0].(map[string]any)["occurrence"] != "2026-09-15" {
+		t.Errorf("generate: %v", g.json)
+	}
+	g2 := mustOK(t, run(t, ws, "", "generate", "--horizon", "P2W", "--now", rnow), "generate again")
+	if int(g2.json["count"].(float64)) != 0 || len(g2.json["skipped"].([]any)) != 2 {
+		t.Errorf("idempotent: %v", g2.json)
+	}
+	li := mustOK(t, run(t, ws, "", "intention", "list", "--instances-of", rec2.str("id")), "instances")
+	if int(li.json["count"].(float64)) != 2 {
+		t.Errorf("instances: %v", li.json["count"])
+	}
+	later := add("--title", "Later", "--duration", "PT1H", "--calendar", "2026-W40", "--activity", "deep-work")
+	rl := mustOK(t, run(t, ws, "", "resolve", later.str("id"), "--now", rnow), "resolve generates")
+	if len(rl.json["generated"].([]any)) != 1 {
+		t.Errorf("resolve generated: %v", rl.json["generated"])
+	}
+	// Placed and unplaced filters; validate stays clean; index matches.
+	pl := mustOK(t, run(t, ws, "", "intention", "list", "--placed"), "placed")
+	up := mustOK(t, run(t, ws, "", "intention", "list", "--unplaced"), "unplaced")
+	if int(pl.json["count"].(float64)) != 5 || int(up.json["count"].(float64)) < 5 {
+		t.Errorf("placed %v unplaced %v", pl.json["count"], up.json["count"])
+	}
+	mustOK(t, run(t, ws, "", "validate"), "validate")
+	mustOK(t, run(t, ws, "", "index", "--check"), "index check")
+}
+
+func TestValidationForResolution(t *testing.T) {
+	ws := initWS(t)
+	rec := addIntention(t, ws, "--title", "Weekly", "--duration", "PT30M", "--calendar", "2026-09/2026-09-20", "--cadence", "FREQ=WEEKLY;BYDAY=TU")
+	// An instance outside the recurring window, a placement outside its window, a selector that is not a policy.
+	_ = os.WriteFile(filepath.Join(ws, "intentions", "int_inst.yaml"), []byte("id: int_inst\nsubject: "+ada+"\ntitle: t\nstability: tentative\nserves:\n  - {id: "+rec.str("id")+", role: instance-of}\noccurrence: 2027-03-02\nwindow: {calendar: 2027-03-02}\nsource: {author: a}\ntimestamp: 2026-09-04T00:00:00Z\nacknowledgements: []\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(ws, "intentions", "int_out.yaml"), []byte("id: int_out\nsubject: "+ada+"\ntitle: t\nstability: tentative\nserves: []\nwindow: {calendar: 2026-W37}\nplacement: {start: 2026-09-21T10:00:00+10:00, duration: PT1H}\nsource: {author: a}\ntimestamp: 2026-09-04T00:00:00Z\nacknowledgements: []\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(ws, "resolutions", "res_bad.yaml"), []byte("id: res_bad\nintention: int_out\nplacement: {start: 2026-09-21T10:00:00+10:00, duration: PT1H}\nselector: "+rec.str("id")+"\nsource: {author: a}\ntimestamp: 2026-09-04T00:00:00Z\n"), 0o644)
+	r := run(t, ws, "", "validate")
+	got := map[string]bool{}
+	for _, f := range r.json["findings"].([]any) {
+		got[f.(map[string]any)["code"].(string)] = true
+	}
+	for _, code := range []string{"occurrence_outside_window", "placement_outside_window", "selector_not_policy"} {
+		if !got[code] {
+			t.Errorf("missing %s: %v", code, got)
+		}
+	}
+}

@@ -14,8 +14,8 @@ You are drafting a person's plans, which they review through git pull requests.
 `intentions` stores what they mean to do as YAML files; you draft, it keeps the
 format honest. An intention is **a duration and a window, not a slot**: ninety
 minutes on the budget, sometime this week, before the board pack goes out. Never
-invent a start time; the window is the person's, and clock time arrives only at
-resolution, which this version does not yet do.
+invent a start time; the window is the person's, and clock time arrives only
+when `resolve` ranks candidates and the person selects one.
 
 Always pass `--json` and parse the result. Never prompt, never edit the YAML
 files by hand, never delete a file, never touch `index.yaml`.
@@ -35,6 +35,12 @@ intentions validate --json                   # is the workspace sound (exit 4 = 
 intentions intention add …          # a new intention, tentative
 intentions availability add …       # capacity the person told you about
 intentions intention edit …         # fill the plan in as it becomes definite
+intentions resolve <id> --json      # ranked candidates; nothing is chosen
+      │
+      ▼  put the candidates to the person
+      │
+intentions select <id> --candidate N   # their choice, recorded as the act
+intentions check --json             # what fails to hang together, as flags
 intentions validate --json          # check again before you hand over
 ```
 
@@ -91,6 +97,12 @@ modifiers inside double quotes, so `"$id:in-order-to"` silently corrupts the id.
 | Change capacity terms | `intentions availability supersede <id> [changed flags] --json` — never `edit` for window, duration, conditional or location |
 | Withdraw | `intentions intention retire <id> --kind fulfilled\|abandoned\|superseded [--superseded-by <id>] --reason "<why>" --json`; `intentions availability retire <id> --kind retracted\|superseded …` |
 | What a window means | `intentions bounds <id> --json` or `intentions bounds --calendar this-week --clock 09:00/12:00 --json`; writes nothing |
+| Generate instances | `intentions generate [--horizon P2W] [--recurring <id>] --json` → `{created, skipped}`; idempotent, run before you plan a period |
+| Rank placements | `intentions resolve <id> [--limit N] --json` → `{candidates: [{rank, start, end, displaces, supply}], candidates_considered, reason}`; writes nothing but instances |
+| Record the choice | `intentions select <id> --candidate N --json` → `{resolution, intention, commitment?, flags}`; `--replace` to move a placed one |
+| Select under a policy | `intentions select <id> --policy <terminus id> --json` — harness only, top rank-1 candidate only; refused otherwise |
+| What clashes | `intentions check [<id>]... --json` → `{flags: [{kind, subject, counterpart, counterpart_version, detail}]}`; six kinds, never decisions |
+| Proceed anyway | `intentions acknowledge <id> --kind <kind> --counterpart <id> --reason "<why>" --json` — only on the person's word; lapses when the counterpart changes |
 | Health check | `intentions validate --json`; `intentions index --check --json` |
 
 Exit codes: `0` ok · `1` runtime · `2` usage or a write the format refuses · `3` not found · `4` check failed · `5` no workspace.
@@ -104,8 +116,8 @@ On failure stderr carries `{"error": {"code", "message"}}`; a refused write says
   of September), a quarter `2026-35`, a season `2026-21` (neutral) or
   `2026-29` (Southern). Deictic terms are resolved to the named granule when
   you write, so the file means the same week a month later. `--clock` is time
-  of day and lives nowhere else. Do not write a placement; nothing you have
-  can compute one.
+  of day and lives nowhere else. Never write a placement by hand; `select`
+  writes it, and only after `resolve` has ranked the candidates.
 - **Say what it is for.** `--serves <id>:in-order-to` links a means to an
   end; `--serves <id>:for-the-sake-of` links to a terminus, an intention with
   no window, no duration and no serves of its own, such as *being someone who
@@ -132,6 +144,29 @@ On failure stderr carries `{"error": {"code", "message"}}`; a refused write says
   settling, a title fix: `intention edit`. Prose edits leave the version
   unchanged; the result's `projection_changed` tells you whether the
   scheduling projection moved.
+
+## Rules for resolution
+
+- **Resolve, then ask.** `resolve` ranks; it does not place. Put the
+  candidates to the person in their words (Tuesday at nine, for ninety
+  minutes) and record what they chose with `select --candidate N`. The record
+  says `selector: person` because it was.
+- **A policy is the only way you select alone.** `select --policy` works
+  when the person holds a terminus with `auto_select` covering the intention
+  and a rank-1 candidate exists. It is refused otherwise, and refusal is not
+  an invitation to pick a candidate yourself.
+- **Displacement is a flag, not a fix.** A rank-2 or rank-3 candidate
+  overlaps something. If the person chooses it anyway, the record lists what
+  was displaced, `check` shows `window-clash` on both, and nothing else
+  moves. Do not retire or re-place the displaced object to make the flag go
+  away; tell the person.
+- **Acknowledge only what the person has seen.** `acknowledge` records that
+  they looked at a specific flag against a specific state of its counterpart.
+  It lapses when the counterpart's projection changes, so it is never a way to
+  silence a flag for good.
+- **Generate before you plan a period.** Instances of recurring intentions
+  exist only once generated; `resolve` generates over its own range, but a
+  review of the coming weeks wants `generate` first.
 
 ## Rules for availability
 

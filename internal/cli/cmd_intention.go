@@ -326,12 +326,18 @@ func (a *app) intentionEditCmd() *cobra.Command {
 			if err := writeObject(ws, &o); err != nil {
 				return err
 			}
+			g.Add(&o)
 			out, err := objectResult(&o)
 			if err != nil {
 				return err
 			}
 			out["previous_version"] = prev
 			out["projection_changed"] = prev != o.Version
+			if e, err := a.env(ws, g, act, resolverFlags{}); err == nil {
+				if flags, err := flagsOn(e, o.ID); err == nil {
+					out["flags"] = flags
+				}
+			}
 			if f.policy != "" && o.Stability == "firm" {
 				out["policy"] = f.policy
 			}
@@ -466,9 +472,10 @@ func (a *app) intentionRetireCmd() *cobra.Command {
 }
 
 func (a *app) intentionShowCmd() *cobra.Command {
-	return &cobra.Command{
+	var nowFlag string
+	cmd := &cobra.Command{
 		Use:   "show <id>",
-		Short: "Show an intention with its computed version and resolved serves targets",
+		Short: "Show an intention with its computed version, resolved serves targets, and current flags",
 		Args:  cobra.ExactArgs(1),
 		RunE: a.run(func(cmd *cobra.Command, args []string) error {
 			ws, err := a.openWorkspace()
@@ -506,17 +513,31 @@ func (a *app) intentionShowCmd() *cobra.Command {
 			if ld := g.Loaded[o.ID]; ld != nil && len(ld.Problems) > 0 {
 				out["problems"] = ld.Problems
 			}
+			e, err := a.env(ws, g, actFlags{now: nowFlag}, resolverFlags{})
+			if err != nil {
+				return err
+			}
+			flags, err := flagsOn(e, o.ID)
+			if err != nil {
+				return err
+			}
+			out["flags"] = flags
 			return a.emit(out, func(w io.Writer) {
 				data, _ := model.Encode(o)
 				fmt.Fprint(w, string(data))
+				for _, f := range flags {
+					fmt.Fprintf(w, "# flag %s %s: %s\n", f.Kind, f.Counterpart, f.Detail)
+				}
 			})
 		}),
 	}
+	cmd.Flags().StringVar(&nowFlag, "now", "", "the current time as RFC 3339, for the check")
+	return cmd
 }
 
 func (a *app) intentionListCmd() *cobra.Command {
-	var subject, activity, stability string
-	var recurring, retired bool
+	var subject, activity, stability, instancesOf string
+	var recurring, retired, placed, unplaced bool
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List intentions, active by default",
@@ -547,6 +568,15 @@ func (a *app) intentionListCmd() *cobra.Command {
 				if recurring && !o.IsRecurring() {
 					continue
 				}
+				if placed && o.Placement == nil {
+					continue
+				}
+				if unplaced && o.Placement != nil {
+					continue
+				}
+				if instancesOf != "" && o.InstanceOf() != instancesOf {
+					continue
+				}
 				items = append(items, o)
 			}
 			list := make([]map[string]any, 0, len(items))
@@ -566,6 +596,12 @@ func (a *app) intentionListCmd() *cobra.Command {
 					if o.Retired != nil {
 						flags += " retired:" + o.Retired.Kind
 					}
+					if o.Placement != nil {
+						flags += " placed:" + o.Placement.Start.Raw
+					}
+					if o.Occurrence != "" {
+						flags += " occurrence:" + o.Occurrence
+					}
 					fmt.Fprintf(w, "%s  %-9s %-6s %-22s %s%s\n", o.ID, o.Stability, durationText(o.Duration), oneLine(windowText(o.Window), 22), oneLine(o.Title, 60), flags)
 				}
 				if len(items) == 0 {
@@ -578,6 +614,9 @@ func (a *app) intentionListCmd() *cobra.Command {
 	cmd.Flags().StringVar(&activity, "activity", "", "filter by activity term")
 	cmd.Flags().StringVar(&stability, "stability", "", "filter by stability")
 	cmd.Flags().BoolVar(&recurring, "recurring", false, "only recurring intentions (with a cadence)")
+	cmd.Flags().BoolVar(&placed, "placed", false, "only intentions with a placement")
+	cmd.Flags().BoolVar(&unplaced, "unplaced", false, "only intentions without a placement")
+	cmd.Flags().StringVar(&instancesOf, "instances-of", "", "only instances of this recurring intention")
 	cmd.Flags().BoolVar(&retired, "retired", false, "list retired intentions instead of active ones")
 	return cmd
 }

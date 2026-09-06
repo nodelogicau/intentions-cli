@@ -8,8 +8,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/nodelogicau/intentions-cli/internal/consistency"
 	"github.com/nodelogicau/intentions-cli/internal/model"
 	"github.com/nodelogicau/intentions-cli/internal/projection"
+	"github.com/nodelogicau/intentions-cli/internal/resolve"
 	"github.com/nodelogicau/intentions-cli/internal/store"
 	"github.com/nodelogicau/intentions-cli/internal/temporal"
 )
@@ -125,6 +127,21 @@ func effectiveValidUntil(ws *store.Workspace, o *model.Availability, ctx tempora
 	return time.Time{}, "unbounded"
 }
 
+// availabilityFlags runs the check for flags naming the availability as a
+// counterpart, after a write, when a graph is at hand.
+func (a *app) availabilityFlags(ws *store.Workspace, g *store.Graph, o *model.Availability, now time.Time) []consistency.Flag {
+	if g == nil {
+		return nil
+	}
+	g.Add(o)
+	e := resolve.NewEnv(ws, g, now)
+	flags, err := consistency.Check(e, []string{o.ID})
+	if err != nil {
+		return nil
+	}
+	return flags
+}
+
 func (a *app) availabilityResult(ws *store.Workspace, o *model.Availability, ctx temporal.Context) (map[string]any, error) {
 	out, err := objectResult(o)
 	if err != nil {
@@ -190,6 +207,7 @@ func (a *app) availabilityAddCmd() *cobra.Command {
 				return err
 			}
 			out["created"] = true
+			out["flags"] = a.availabilityFlags(ws, g, o, ctx.Now)
 			return a.emit(out, func(w io.Writer) {
 				fmt.Fprintf(w, "Created %s (%s)\n  %s\n", o.ID, o.Version, out["path"])
 			})
@@ -253,6 +271,7 @@ func (a *app) availabilityEditCmd() *cobra.Command {
 				return err
 			}
 			out["previous_version"] = prev
+			out["flags"] = a.availabilityFlags(ws, g, &o, now)
 			return a.emit(out, func(w io.Writer) {
 				fmt.Fprintf(w, "Edited %s (%s)\n", o.ID, o.Version)
 			})
@@ -335,6 +354,7 @@ func (a *app) availabilityRenewCmd() *cobra.Command {
 				return err
 			}
 			out["previous_version"] = prev
+			out["flags"] = a.availabilityFlags(ws, g, &o, ctx.Now)
 			return a.emit(out, func(w io.Writer) {
 				fmt.Fprintf(w, "Renewed %s until %s (%s -> %s)\n", o.ID, o.ValidUntil, prev, o.Version)
 			})
@@ -423,6 +443,8 @@ func (a *app) availabilitySupersedeCmd() *cobra.Command {
 			}
 			out["created"] = true
 			out["superseded"] = map[string]any{"id": old.ID, "version": retired.Version}
+			g.Add(&retired)
+			out["flags"] = a.availabilityFlags(ws, g, &n, ctx.Now)
 			return a.emit(out, func(w io.Writer) {
 				fmt.Fprintf(w, "Created %s (%s)\nRetired %s as superseded by it\n", n.ID, n.Version, old.ID)
 			})
@@ -481,8 +503,10 @@ func (a *app) availabilityRetireCmd() *cobra.Command {
 			}
 			out["previous_version"] = prev
 			out["retired"] = map[string]any{"kind": kind, "superseded_by": supersededBy, "reason": reason}
+			out["flags"] = a.availabilityFlags(ws, g, &o, now)
 			return a.emit(out, func(w io.Writer) {
 				fmt.Fprintf(w, "Retired %s as %s (%s -> %s)\n", o.ID, kind, prev, o.Version)
+				printFlags(w, out["flags"].([]consistency.Flag))
 			})
 		}),
 	}

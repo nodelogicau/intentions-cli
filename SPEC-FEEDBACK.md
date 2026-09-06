@@ -17,6 +17,11 @@ settled the same day** in
 each item. Nine were adopted as proposed; bold entries are where the draft
 decided differently and v0.2.0 changed to follow it.
 
+Items 14 to 22 were raised on 2026-09-06 from the `add-resolution` change
+(v0.4.0), which implements generation, resolution, selection, the consistency
+check and acknowledgement. Each is a rule the text did not state and the
+implementation had to invent; "we decided" is what v0.4.0 does.
+
 | # | Topic | Status |
 |---|---|---|
 | 1 | Duration normalisation in the projection | adopted, [#1](https://github.com/nodelogicau/intentions/issues/1) |
@@ -32,6 +37,15 @@ decided differently and v0.2.0 changed to follow it.
 | 11 | `validate` cannot tell a policy-authorised harness firming from an unauthorised one | adopted, [#11](https://github.com/nodelogicau/intentions/issues/11) |
 | 12 | The canonical form of a zero duration | adopted, [#12](https://github.com/nodelogicau/intentions/issues/12) |
 | 13 | The example objects disagree on list style | adopted, [#13](https://github.com/nodelogicau/intentions/issues/13) |
+| 14 | Resolution needs a bounded range: horizon and now | open |
+| 15 | Capacity depletes per occasion | open |
+| 16 | What a placement rests on is recomputed; propose `supply` on the record | open |
+| 17 | Candidate enumeration on a step grid | open |
+| 18 | Relational anchor bounds per relation | open |
+| 19 | `intention-inconsistency` is pairwise | open |
+| 20 | The resolver's scope comes from `resolver.scope` | open |
+| 21 | Instances copy `location` and the recurring intention's clock | open |
+| 22 | Re-resolving a placed intention | open |
 
 ---
 
@@ -260,3 +274,161 @@ is block style. Multi-line prose is a literal block scalar.
 examples.
 
 **Resolution (b3bb420):** Settled as proposed: block sequences for string lists, flow mappings for small records, literal block scalars for multi-line prose. Stated under Field order; the availability example's `conditional` is now a block sequence.
+
+## 14. Resolution needs a bounded range: horizon and now
+
+**The draft says:** resolution takes an intention with a window and produces
+candidate placements; the deixis rule says deixis is resolved at write time
+and bounds at resolution time.
+
+**The problem:** a window such as `../2026-12` or `2026-09/..` has an open
+side, and even a closed window that runs for months would enumerate
+candidates nobody wants. Nothing says how far ahead resolution looks or
+whether a candidate in the past may be offered.
+
+**We decided:** the resolution range starts at the later of the window's
+start and now, and ends at the earlier of the window's end and now plus
+`resolver.horizon` (a new optional key, default `P4W`). An open side
+contributes nothing. A window that has passed, or starts beyond the horizon,
+yields no candidates and a reason. Candidates before now are never offered.
+
+**Proposed text:** state the range rule under Resolution and add
+`resolver.horizon` to the workspace configuration.
+
+## 15. Capacity depletes per occasion
+
+**The draft says:** an availability's `duration` is "capacity offered per
+occasion" and "may be shorter than the window's clock interval".
+
+**The problem:** whether that capacity is consumed as placements land on the
+occasion is not stated. Read as a length limit only, two two-hour intentions
+may both be placed on one three-hour morning.
+
+**We decided:** an occasion offers its nominal duration (the max when
+ranged); a candidate may not exceed it, and the opaque unretired placements
+already resting on the occasion plus the candidate may not exceed it. Two
+two-hour intentions cannot both land on one three-hour Tuesday morning.
+
+**Proposed text:** say under Availability that capacity is consumed by the
+placements resting on an occasion.
+
+## 16. What a placement rests on is recomputed; propose `supply` on the record
+
+**The draft says:** `expired-ground` is "an availability the placement rests
+on has expired or been retired", and `condition-mismatch` and
+`location-mismatch` speak of "the supplying availability".
+
+**The problem:** nothing records which availability a placement rests on.
+The RESOLUTION record carries the placement and what it displaced, not what
+supplied it.
+
+**We decided:** at check time a placement rests on every occasion of each
+involved particular that contains it. No containing occasion is a
+`window-clash` without counterpart; containing occasions that all fail are
+reported by their failure (retired or expired as `expired-ground`,
+conditional as `condition-mismatch`, location as `location-mismatch`). The
+RESOLUTION record gains an implementation-added `supply` list naming the
+availabilities the placement was chosen against, written after `timestamp`
+and outside the projection.
+
+**Proposed text:** add `supply` to the RESOLUTION record, and state the
+"rests on" rule under Consistency.
+
+## 17. Candidate enumeration on a step grid
+
+**The draft says:** resolution "produces a ranked set of candidate
+placements".
+
+**The problem:** a window of a week with a three-hour clock interval admits
+infinitely many starts. Something must make the set finite, and two
+implementations should produce the same set.
+
+**We decided:** candidate starts lie on a grid of `resolver.step` (a new
+optional key, default `PT15M`) aligned to each supply interval's start, with
+the candidate spanning the intention's nominal duration. A ranged duration
+tries the nominal only. The full ranked set is computed;
+`candidates_considered` records its size and a caller limits what it sees.
+
+**Proposed text:** state the grid under Resolution and add `resolver.step`.
+
+## 18. Relational anchor bounds per relation
+
+**The draft says:** a relational anchor names a target, one of the four RFC
+9253 relations, and an optional `gap` of `{min, max}`; the dependent window
+holds the reference.
+
+**The problem:** what the relation constrains on the candidate, and what an
+absent `gap` or an absent `max` means, is not stated.
+
+**We decided:** `FINISHTOSTART` puts the candidate's start in
+`[target end + min, target end + max]`; `STARTTOSTART` the start in
+`[target start + min, target start + max]`; `FINISHTOFINISH` the end in
+`[target end + min, target end + max]`; `STARTTOFINISH` the end in
+`[target start + min, target start + max]`. An absent gap is a minimum of
+zero and no maximum; an absent `max` alone is unbounded above. A retired or
+cancelled target counts as unplaced, so the intention is blocked.
+
+**Proposed text:** a table under WINDOW's relational anchor.
+
+## 19. `intention-inconsistency` is pairwise
+
+**The draft says:** the flag means "two active intentions cannot both be
+placed within their windows given available supply".
+
+**The problem:** taken globally this is a feasibility problem; taken
+pairwise it is tractable. The text does not say which.
+
+**We decided:** pairwise, over active unplaced intentions of one subject
+with both duration and window whose ranges intersect: each has candidates
+alone, but no pair of candidates exists that do not overlap. The flag's
+detail says "pairwise". Anything global is out of scope.
+
+**Proposed text:** say "pairwise" in the flag's definition.
+
+## 20. The resolver's scope comes from `resolver.scope`
+
+**The draft says:** "only availability with scope at or wider than a
+resolver's own scope shall be visible to it".
+
+**The problem:** nothing in `intentions.yaml` or on the resolver says what
+its own scope is.
+
+**We decided:** a new optional key `resolver.scope`, default `personal`,
+overridable per call with `--scope`. In a personal workspace the default sees
+everything, which is what the draft's example implies.
+
+**Proposed text:** add `resolver.scope` to the workspace configuration.
+
+## 21. Instances copy `location` and the recurring intention's clock
+
+**The draft says:** an instance carries "a window derived from that
+occurrence, and the recurring intention's subject, duration, activity, and
+parties unless overridden".
+
+**The problem:** `location` is not in the copied list, and "derived from
+that occurrence" does not say whether the recurring intention's clock anchor
+survives. A place constraint that vanished on generation would surprise, and
+a Tuesday-mornings arrangement whose instances lost their mornings would too.
+
+**We decided:** an instance's window is `calendar: <occurrence day>` plus
+the recurring intention's `clock` when it has one, and `location` is copied
+with the rest.
+
+**Proposed text:** add `location` and the clock to the instance rule.
+
+## 22. Re-resolving a placed intention
+
+**The draft says:** resolution takes an "unplaced" intention, and a
+displaced intention "carries a window-clash flag until acknowledged or
+re-resolved".
+
+**The problem:** "re-resolved" has no rule: a placed intention cannot be
+resolved, and nothing clears a placement except cancelling a commitment.
+
+**We decided:** `select --replace` clears the previous placement and writes
+the new one in the same act, with a new RESOLUTION record; the previous
+record is left as it is. Without `--replace`, selecting a placed intention is
+refused.
+
+**Proposed text:** say under Resolution that a new selection may replace a
+placement, and that each selection is its own record.

@@ -346,6 +346,40 @@ func (g *Graph) Availabilities() []*model.Availability {
 	return out
 }
 
+// Commitments returns every commitment in id order.
+func (g *Graph) Commitments() []*model.Commitment {
+	var out []*model.Commitment
+	for _, id := range g.Order {
+		if o, ok := g.Objects[id].(*model.Commitment); ok {
+			out = append(out, o)
+		}
+	}
+	return out
+}
+
+// Resolutions returns every resolution record in id order.
+func (g *Graph) Resolutions() []*model.Resolution {
+	var out []*model.Resolution
+	for _, id := range g.Order {
+		if o, ok := g.Objects[id].(*model.Resolution); ok {
+			out = append(out, o)
+		}
+	}
+	return out
+}
+
+// Instances returns the intentions carrying instance-of the given recurring
+// intention, retired ones included, in id order.
+func (g *Graph) Instances(recurring string) []*model.Intention {
+	var out []*model.Intention
+	for _, in := range g.Intentions() {
+		if in.InstanceOf() == recurring {
+			out = append(out, in)
+		}
+	}
+	return out
+}
+
 // Add registers an object (used by write paths to check a proposed state).
 func (g *Graph) Add(obj model.Object) {
 	if _, exists := g.Objects[obj.GetID()]; !exists {

@@ -247,8 +247,12 @@ type Resolution struct {
 	Displaced            []string
 	Source               Source
 	Timestamp            time.Time
-	Version              string
-	Extras               []Extra
+	// Supply names the availabilities the placement was chosen against. It is
+	// an implementation-added field, written after the specified fields and
+	// outside the projection.
+	Supply  []string
+	Version string
+	Extras  []Extra
 }
 
 // Object is any file-backed object or record.

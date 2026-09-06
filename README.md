@@ -19,7 +19,9 @@ people through git:
   exactly what changed
 - every object says who wrote it, and a harness may draft but may not make an
   intention firm without a policy the person holds
-- the binary does no scheduling of its own yet: it stores, checks, and reports
+- the binary ranks and flags but never chooses: resolution produces candidates,
+  selection is the person's act or a policy they hold, and a clash is a flag
+  the person acknowledges or does not
 
 The specification is an early draft and this is its first reader.
 [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) records what implementing it forced this
@@ -27,15 +29,15 @@ tool to decide, for raising upstream.
 
 ## Status
 
-This is the foundation release. It ends where the format's computation begins:
-
 | Implemented | Deferred to follow-on changes |
 |---|---|
-| Workspace: `init`, discovery, `intentions.yaml` | `generate` instances of recurring intentions |
-| Intentions: add, edit, firm, retire, show, list | `resolve` and `select` (candidates, placements, RESOLUTION records) |
-| Availability: add, edit, renew, supersede, retire, show, list | The consistency check and its flags; `acknowledge` |
-| The temporal engine: durations, EDTF, clock anchors, cadence, bounds | Commitment writing; iCalendar and JSCalendar import and export |
-| Projection versioning (`sha256:` of RFC 8785 canonical JSON) | MCP server |
+| Workspace: `init`, discovery, `intentions.yaml` | Commitment `accept`, `decline`, `cancel` |
+| Intentions: add, edit, firm, retire, show, list | iCalendar and JSCalendar import and export; iTIP |
+| Availability: add, edit, renew, supersede, retire, show, list | MCP server |
+| The temporal engine: durations, EDTF, clock anchors, cadence, bounds | Presence, federation |
+| Projection versioning (`sha256:` of RFC 8785 canonical JSON) | |
+| `generate`, `resolve`, `select`: instances, ranked candidates, the recorded act, commitments for parties | |
+| `check` and `acknowledge`: the six flag kinds, suppression, lapse | |
 | `validate` over every object type, `index`, `show`, `bounds` | |
 | Agent skill, installer, Homebrew cask | |
 
@@ -84,10 +86,16 @@ intentions availability add --subject https://example.com/people/ada \
     --calendar 2026-09/2026-12 --clock 09:00/12:00 \
     --conditional deep-work --cadence "FREQ=WEEKLY;BYDAY=TU"
 
-# 4. See what a window means in clock time (nothing is written)
-intentions bounds int_01a0…
+# 4. Rank candidate placements; nothing is chosen
+intentions resolve int_01a0…
+#     1  rank 1  2026-09-15T09:00:00+10:00 / 2026-09-15T10:30:00+10:00
+#     2  rank 1  2026-09-15T09:15:00+10:00 / 2026-09-15T10:45:00+10:00
 
-# 5. Check the workspace, and keep the index honest
+# 5. Select one, on the person's word: the RESOLUTION record and the placement are written
+intentions select int_01a0… --candidate 1
+
+# 6. See what fails to hang together, and keep the index honest
+intentions check
 intentions validate
 intentions index --check
 ```
@@ -115,6 +123,11 @@ intentions intention add --title "Read the board pack" --json
 | `availability supersede <id>` | Create a new availability with changed terms and retire this one as superseded |
 | `availability retire <id>` | `--kind retracted\|superseded [--superseded-by id]` |
 | `availability show <id>`, `availability list` | Show with `effective_valid_until`; list with filters |
+| `generate [--horizon] [--recurring <id>]` | Materialise instances of recurring intentions; idempotent on `(recurring, occurrence)` |
+| `resolve <id> [--limit] [--step] [--scope]` | Ranked candidate placements for an intention; writes nothing but the instances it generates |
+| `select <id> (--candidate N \| --policy <id>) [--replace]` | The recorded act: RESOLUTION record, placement, and a commitment when there are parties |
+| `check [<id>]... [--fail-on-flags]` | The consistency check: six flag kinds, suppressed by acknowledgement; writes nothing |
+| `acknowledge <id> --kind <k> [--counterpart <id>] [--reason]` | Record that the person has seen a flag against the counterpart's current version |
 | `show <id>` | Show any object, including commitments and resolutions written by other tools |
 | `version-of <id> [--projection]` | The computed version, and the canonical JSON it hashes |
 | `bounds [<id>] [--calendar] [--clock]` | Clock-time bounds of a window in the resolver context, with overrides |
@@ -148,6 +161,23 @@ makes the intention recurring and needs a `--calendar` anchor to expand within.
 A **terminus** is an intention with no window, no duration and no `serves`
 entries: a held self-understanding, or a **policy** when it carries
 `--auto-select` or `--auto-firm`. Conditions are admitted on termini only.
+
+### Resolution
+
+`resolve` takes an intention's duration and window, intersects the eligible
+availability of the subject and every party (unretired, unexpired, conditional
+admitting the activity, location sharing a URI, scope visible), enumerates
+candidates on a `resolver.step` grid within each occasion's remaining
+capacity, and ranks them: rank 1 displaces nothing, rank 2 only tentative
+things, rank 3 something firm or accepted; then by preference, then earliest.
+Overlap with a transparent commitment is free. The range runs from now to the
+earlier of the window's end and `resolver.horizon`.
+
+`select` never chooses for a person: `--candidate N` records their choice,
+`--policy` lets a harness take the top rank-1 candidate under an `auto_select`
+policy the person holds. Anything displaced is listed on the record and left
+alone; `check` shows it as a `window-clash` on both until the person
+acknowledges it or re-resolves.
 
 ## Agent skill
 

@@ -429,3 +429,117 @@ func TestValidUntil(t *testing.T) {
 		t.Error("open end accepted")
 	}
 }
+
+func TestIntervalArithmetic(t *testing.T) {
+	at := func(h int) time.Time { return time.Date(2026, 9, 15, h, 0, 0, 0, time.UTC) }
+	a := Interval{Start: at(9), End: at(12)}
+	b := Interval{Start: at(11), End: at(14)}
+	c := Interval{Start: at(12), End: at(13)}
+	if !a.Overlaps(b) || a.Overlaps(c) || !a.Contains(Interval{Start: at(10), End: at(11)}) || a.Contains(b) {
+		t.Error("overlap/contains")
+	}
+	if iv, ok := a.Intersect(b); !ok || iv.Start != at(11) || iv.End != at(12) {
+		t.Errorf("intersect: %v %v", iv, ok)
+	}
+	m := Merge([]Interval{b, a, c})
+	if len(m) != 1 || m[0].Start != at(9) || m[0].End != at(14) {
+		t.Errorf("merge: %v", m)
+	}
+	x := IntersectSets([]Interval{a, {Start: at(15), End: at(17)}}, []Interval{{Start: at(10), End: at(16)}})
+	if len(x) != 2 || x[0].End != at(12) || x[1].Start != at(15) {
+		t.Errorf("intersect sets: %v", x)
+	}
+	open := Interval{OpenStart: true, End: at(12)}
+	if !open.Overlaps(a) || !open.Contains(a) || open.Contains(b) {
+		t.Error("open interval")
+	}
+}
+
+func TestResolutionRangeAndOccasions(t *testing.T) {
+	ctx := melbourne(t)
+	ctx.Now = time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC)
+	h := Duration{Weeks: 4}
+	open, _ := ParseCalendar("../2026-12")
+	r, reason := ResolutionRange(Window{Calendar: &open}, ctx, h)
+	if reason != "" || !r.Start.Equal(ctx.Now) || r.End.Format("2006-01-02") != "2026-10-08" {
+		t.Errorf("open deadline: %v %q", r, reason)
+	}
+	past, _ := ParseCalendar("2026-W30")
+	if _, reason := ResolutionRange(Window{Calendar: &past}, ctx, h); reason == "" {
+		t.Error("past window accepted")
+	}
+	wk, _ := ParseCalendar("2026-W38")
+	r, _ = ResolutionRange(Window{Calendar: &wk}, ctx, h)
+	if r.Start.Format(time.RFC3339) != "2026-09-14T00:00:00+10:00" || r.End.Format(time.RFC3339) != "2026-09-21T00:00:00+10:00" {
+		t.Errorf("closed week: %s", r)
+	}
+	far, _ := ParseCalendar("2027-03")
+	if _, reason := ResolutionRange(Window{Calendar: &far}, ctx, h); reason == "" {
+		t.Error("window beyond the horizon accepted")
+	}
+	long, _ := ParseCalendar("2026-09/2027-03")
+	r, _ = ResolutionRange(Window{Calendar: &long}, ctx, h)
+	if r.End.Format("2006-01-02") != "2026-10-08" {
+		t.Errorf("horizon caps a long closed window: %s", r)
+	}
+	// Half-past window: start clamps to now.
+	cur, _ := ParseCalendar("2026-W37")
+	r, _ = ResolutionRange(Window{Calendar: &cur}, ctx, h)
+	if !r.Start.Equal(ctx.Now) {
+		t.Errorf("clamped start: %s", r)
+	}
+	// No calendar: now for the horizon.
+	k, _ := ParseClock("09:00/12:00")
+	r, _ = ResolutionRange(Window{Clock: &k}, ctx, h)
+	if !r.Start.Equal(ctx.Now) || r.End.Format("2006-01-02") != "2026-10-08" {
+		t.Errorf("no calendar: %s", r)
+	}
+	// Occasions: recurring Tuesday mornings within a two-week range.
+	cal, _ := ParseCalendar("2026-09/2026-12")
+	cad, _ := ParseCadence("FREQ=WEEKLY;BYDAY=TU")
+	rng := Interval{Start: time.Date(2026, 9, 10, 0, 0, 0, 0, ctx.Location), End: time.Date(2026, 9, 24, 0, 0, 0, 0, ctx.Location)}
+	occ, err := Occasions(Window{Calendar: &cal, Clock: &k}, &cad, ctx, rng)
+	if err != nil || len(occ) != 2 || occ[0].Start.Format(time.RFC3339) != "2026-09-15T09:00:00+10:00" || occ[1].Start.Format(time.RFC3339) != "2026-09-22T09:00:00+10:00" {
+		t.Errorf("occasions: %v %v", occ, err)
+	}
+	// One-off with clock, clamped.
+	occ, _ = Occasions(Window{Calendar: &wk, Clock: &k}, nil, ctx, Interval{Start: rng.Start, End: time.Date(2026, 9, 16, 0, 0, 0, 0, ctx.Location)})
+	if len(occ) != 2 || occ[0].Start.Day() != 14 {
+		t.Errorf("clamped occasions: %v", occ)
+	}
+	// Midnight-crossing occasion.
+	late, _ := ParseClock("22:00/02:00")
+	fri, _ := ParseCadence("FREQ=WEEKLY;BYDAY=FR")
+	occ, _ = Occasions(Window{Calendar: &cal, Clock: &late}, &fri, ctx, rng)
+	if len(occ) != 2 || occ[0].End.Format(time.RFC3339) != "2026-09-12T02:00:00+10:00" {
+		t.Errorf("midnight occasion: %v", occ)
+	}
+}
+
+func TestRelativeBounds(t *testing.T) {
+	at := func(d, h int) time.Time { return time.Date(2026, 9, d, h, 0, 0, 0, time.UTC) }
+	target := Interval{Start: at(15, 10), End: at(15, 11)}
+	r, _ := ParseRelative("int_A:FINISHTOSTART:P0D:P3D")
+	c := RelativeBounds(r, target)
+	if c.OnEnd || !c.Min.Equal(at(15, 11)) || !c.HasMax || !c.Max.Equal(at(18, 11)) {
+		t.Errorf("finishtostart: %+v", c)
+	}
+	if !c.Admits(Interval{Start: at(16, 9), End: at(16, 10)}) || c.Admits(Interval{Start: at(15, 10), End: at(15, 11)}) || c.Admits(Interval{Start: at(19, 9), End: at(19, 10)}) {
+		t.Error("admits")
+	}
+	r, _ = ParseRelative("int_A:FINISHTOFINISH")
+	c = RelativeBounds(r, target)
+	if !c.OnEnd || c.HasMax || !c.Min.Equal(at(15, 11)) || !c.Admits(Interval{Start: at(20, 9), End: at(20, 10)}) {
+		t.Errorf("finishtofinish: %+v", c)
+	}
+	r, _ = ParseRelative("int_A:STARTTOSTART:PT1H:PT2H")
+	c = RelativeBounds(r, target)
+	if c.OnEnd || !c.Min.Equal(at(15, 11)) || !c.Max.Equal(at(15, 12)) {
+		t.Errorf("starttostart: %+v", c)
+	}
+	r, _ = ParseRelative("int_A:STARTTOFINISH:PT30M")
+	c = RelativeBounds(r, target)
+	if !c.OnEnd || !c.Min.Equal(at(15, 10).Add(30*time.Minute)) {
+		t.Errorf("starttofinish: %+v", c)
+	}
+}

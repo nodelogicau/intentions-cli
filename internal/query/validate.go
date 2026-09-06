@@ -8,10 +8,12 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/nodelogicau/intentions-cli/internal/model"
 	"github.com/nodelogicau/intentions-cli/internal/projection"
 	"github.com/nodelogicau/intentions-cli/internal/store"
+	"github.com/nodelogicau/intentions-cli/internal/temporal"
 )
 
 // Severity of a finding.
@@ -270,8 +272,15 @@ func StronglyConnected(g *store.Graph) [][]string {
 }
 
 func (v *validator) instances() {
+	ctx := v.ws.Config.Context(time.Now())
 	seen := map[string][]string{}
 	for _, in := range v.g.Intentions() {
+		// A placement must lie within its own window's calendar bounds.
+		if in.Placement != nil && in.Window != nil && in.Window.Calendar != nil {
+			if ivs, err := temporal.Bounds(temporal.Window{Calendar: in.Window.Calendar}, ctx); err == nil && len(ivs) == 1 && !ivs[0].Contains(in.Placement.Bounds(ctx)) {
+				v.add(SeverityError, "placement_outside_window", in.ID, "placement %s lies outside the window %s", in.Placement.Start.Raw, in.Window.Calendar)
+			}
+		}
 		if in.Retired != nil || in.Occurrence == "" {
 			continue
 		}
@@ -279,8 +288,39 @@ func (v *validator) instances() {
 		if standing == "" {
 			continue
 		}
+		// The occurrence must lie within the recurring intention's calendar anchor.
+		if recObj, ok := v.g.Get(standing); ok {
+			if rec, ok := recObj.(*model.Intention); ok && rec.Window != nil && rec.Window.Calendar != nil {
+				if day, err := temporal.ParseGranule(in.Occurrence); err == nil {
+					d := day
+					occ := temporal.Calendar{Start: &d, End: &d}
+					recIvs, e1 := temporal.Bounds(temporal.Window{Calendar: rec.Window.Calendar}, ctx)
+					occIvs, e2 := temporal.Bounds(temporal.Window{Calendar: &occ}, ctx)
+					if e1 == nil && e2 == nil && len(recIvs) == 1 && len(occIvs) == 1 && !recIvs[0].Contains(occIvs[0]) {
+						v.add(SeverityError, "occurrence_outside_window", in.ID, "occurrence %s lies outside the recurring intention's window %s", in.Occurrence, rec.Window.Calendar)
+					}
+				}
+			}
+		}
 		key := standing + "@" + in.Occurrence
 		seen[key] = append(seen[key], in.ID)
+	}
+	for _, r := range v.g.Resolutions() {
+		if r.Selector == "" || r.Selector == "person" {
+			continue
+		}
+		subject := ""
+		if obj, ok := v.g.Get(r.Intention); ok {
+			if in, ok := obj.(*model.Intention); ok {
+				subject = in.Subject
+			}
+		}
+		p, err := model.LookupPolicy(v.g, r.Selector, subject)
+		if err != nil {
+			v.add(SeverityError, "selector_not_policy", r.ID, "selector: %v", err)
+		} else if p.AutoSelect == nil {
+			v.add(SeverityError, "selector_not_policy", r.ID, "selector %s carries no auto_select condition", r.Selector)
+		}
 	}
 	for key, ids := range seen {
 		if len(ids) > 1 {

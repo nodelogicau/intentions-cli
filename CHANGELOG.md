@@ -3,6 +3,36 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] - 2026-09-06
+
+The format starts computing. Nine rules the draft did not state are recorded
+as SPEC-FEEDBACK items 14 to 22.
+
+### Added
+
+- `generate`: instances of recurring intentions over a horizon, idempotent on
+  `(recurring, occurrence)`; a retired instance is not regenerated.
+- `resolve <id>`: ranked candidate placements against the availability of the
+  subject and every party, on a `resolver.step` grid, within capacity, ranked
+  by reconsideration cost then preference. Writes only the instances it
+  generates over its range. Reports blocked targets and missing supply.
+- `select <id>`: the recorded act. `--candidate N` for a person, `--policy`
+  for a harness under `auto_select` with a rank-1 candidate. Writes the
+  RESOLUTION record (with an implementation-added `supply` list), the
+  placement, and a COMMITMENT with every party tentative when there are
+  parties. `--replace` re-resolves a placed intention.
+- `check`: the consistency check with its six flag kinds, suppression by
+  acknowledgement, and `--fail-on-flags`.
+- `acknowledge <id>`: appends an acknowledgement carrying the counterpart's
+  current version.
+- `intention show` carries the object's flags; `list` gains `--placed`,
+  `--unplaced`, `--instances-of`. Writes run the check for what they touched.
+- `validate` errors for a placement outside its window, an instance outside
+  its recurring intention's window, and a resolution `selector` that is not a
+  policy.
+- Optional `resolver.step`, `resolver.horizon`, `resolver.scope`; `init`
+  writes the first two.
+
 ## [0.3.0] - 2026-09-06
 
 ### Added
@@ -70,6 +100,7 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
+[0.4.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.2.1...v0.3.0
 [0.2.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/nodelogicau/intentions-cli/releases/tag/v0.1.0

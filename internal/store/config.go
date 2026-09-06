@@ -32,6 +32,9 @@ type Config struct {
 	Resolver struct {
 		Timezone   string `json:"timezone"`
 		Hemisphere string `json:"hemisphere,omitempty"`
+		Step       string `json:"step,omitempty"`    // candidate grid; absent means PT15M
+		Horizon    string `json:"horizon,omitempty"` // how far ahead resolution looks; absent means P4W
+		Scope      string `json:"scope,omitempty"`   // the resolver's own scope; absent means personal
 	} `json:"resolver"`
 	// UnknownResolverKeys are keys under resolver this implementation does
 	// not know (a stale week_start, say): ignored, reported at info level.
@@ -56,6 +59,8 @@ func NewConfig() Config {
 	c.Format = model.Format
 	c.Hash = "sha256"
 	c.Resolver.Timezone = "UTC"
+	c.Resolver.Step = "PT15M"
+	c.Resolver.Horizon = "P4W"
 	c.Availability.DefaultHorizon = "P13W"
 	c.Generation.Horizon = "P4W"
 	return c
@@ -76,7 +81,10 @@ func ParseConfig(data []byte) (Config, error) {
 	c.Hash = getPath(root, "hash")
 	c.Resolver.Timezone = getPath(root, "resolver", "timezone")
 	c.Resolver.Hemisphere = getPath(root, "resolver", "hemisphere")
-	c.UnknownResolverKeys = unknownKeys(root, []string{"timezone", "hemisphere"}, "resolver")
+	c.Resolver.Step = getPath(root, "resolver", "step")
+	c.Resolver.Horizon = getPath(root, "resolver", "horizon")
+	c.Resolver.Scope = getPath(root, "resolver", "scope")
+	c.UnknownResolverKeys = unknownKeys(root, []string{"timezone", "hemisphere", "step", "horizon", "scope"}, "resolver")
 	c.Availability.DefaultHorizon = getPath(root, "availability", "default_horizon")
 	c.Generation.Horizon = getPath(root, "generation", "horizon")
 	c.Defaults.Subject = getPath(root, "defaults", "subject")
@@ -102,6 +110,19 @@ func (c Config) Validate() error {
 	}
 	if _, err := temporal.ParseHemisphere(c.Resolver.Hemisphere); err != nil {
 		return fmt.Errorf("%s: resolver.hemisphere: %v", ConfigFile, err)
+	}
+	if c.Resolver.Step != "" {
+		if d, err := temporal.ParseDuration(c.Resolver.Step); err != nil || d.IsZero() || !d.HasTimePart() || d.Years+d.Months+d.Weeks+d.Days != 0 {
+			return fmt.Errorf("%s: resolver.step %q must be a positive time-of-day duration such as PT15M", ConfigFile, c.Resolver.Step)
+		}
+	}
+	if c.Resolver.Horizon != "" {
+		if _, err := temporal.ParseDuration(c.Resolver.Horizon); err != nil {
+			return fmt.Errorf("%s: resolver.horizon: %v", ConfigFile, err)
+		}
+	}
+	if c.Resolver.Scope != "" && !oneOfScope(c.Resolver.Scope) {
+		return fmt.Errorf("%s: resolver.scope %q must be personal, organisation, or public", ConfigFile, c.Resolver.Scope)
 	}
 	if _, err := temporal.ParseDuration(c.Availability.DefaultHorizon); err != nil {
 		return fmt.Errorf("%s: availability.default_horizon: %v", ConfigFile, err)
@@ -134,6 +155,47 @@ func (c Config) DefaultHorizon() temporal.Duration {
 	return d
 }
 
+// GenerationHorizon returns generation.horizon parsed.
+func (c Config) GenerationHorizon() temporal.Duration {
+	d, _ := temporal.ParseDuration(c.Generation.Horizon)
+	return d
+}
+
+// Step returns resolver.step parsed, PT15M when absent.
+func (c Config) Step() temporal.Duration {
+	if c.Resolver.Step == "" {
+		return temporal.Duration{Minutes: 15}
+	}
+	d, _ := temporal.ParseDuration(c.Resolver.Step)
+	return d
+}
+
+// ResolverHorizon returns resolver.horizon parsed, P4W when absent.
+func (c Config) ResolverHorizon() temporal.Duration {
+	if c.Resolver.Horizon == "" {
+		return temporal.Duration{Weeks: 4}
+	}
+	d, _ := temporal.ParseDuration(c.Resolver.Horizon)
+	return d
+}
+
+// ResolverScope returns resolver.scope, personal when absent.
+func (c Config) ResolverScope() string {
+	if c.Resolver.Scope == "" {
+		return "personal"
+	}
+	return c.Resolver.Scope
+}
+
+func oneOfScope(s string) bool {
+	for _, x := range model.Scopes {
+		if x == s {
+			return true
+		}
+	}
+	return false
+}
+
 // Marshal renders the configuration, preserving unknown keys from the file
 // it was read from and writing known keys in canonical order otherwise.
 func (c Config) Marshal() ([]byte, error) {
@@ -148,6 +210,15 @@ func (c Config) Marshal() ([]byte, error) {
 	setPath(root, c.Resolver.Timezone, "resolver", "timezone")
 	if c.Resolver.Hemisphere != "" {
 		setPath(root, c.Resolver.Hemisphere, "resolver", "hemisphere")
+	}
+	if c.Resolver.Step != "" {
+		setPath(root, c.Resolver.Step, "resolver", "step")
+	}
+	if c.Resolver.Horizon != "" {
+		setPath(root, c.Resolver.Horizon, "resolver", "horizon")
+	}
+	if c.Resolver.Scope != "" {
+		setPath(root, c.Resolver.Scope, "resolver", "scope")
 	}
 	setPath(root, c.Availability.DefaultHorizon, "availability", "default_horizon")
 	setPath(root, c.Generation.Horizon, "generation", "horizon")
