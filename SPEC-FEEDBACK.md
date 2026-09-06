@@ -37,15 +37,15 @@ implementation had to invent; "we decided" is what v0.4.0 does.
 | 11 | `validate` cannot tell a policy-authorised harness firming from an unauthorised one | adopted, [#11](https://github.com/nodelogicau/intentions/issues/11) |
 | 12 | The canonical form of a zero duration | adopted, [#12](https://github.com/nodelogicau/intentions/issues/12) |
 | 13 | The example objects disagree on list style | adopted, [#13](https://github.com/nodelogicau/intentions/issues/13) |
-| 14 | Resolution needs a bounded range: horizon and now | open |
-| 15 | Capacity depletes per occasion | open |
-| 16 | What a placement rests on is recomputed; propose `supply` on the record | open |
-| 17 | Candidate enumeration on a step grid | open |
-| 18 | Relational anchor bounds per relation | open |
-| 19 | `intention-inconsistency` is pairwise | open |
-| 20 | The resolver's scope comes from `resolver.scope` | open |
-| 21 | Instances copy `location` and the recurring intention's clock | open |
-| 22 | Re-resolving a placed intention | open |
+| 14 | Resolution needs a bounded range: horizon and now | open, [#14](https://github.com/nodelogicau/intentions/issues/14) |
+| 15 | Capacity depletes per occasion | open, [#15](https://github.com/nodelogicau/intentions/issues/15) |
+| 16 | What a placement rests on is recomputed; propose `supply` on the record | open, [#16](https://github.com/nodelogicau/intentions/issues/16) |
+| 17 | Candidate enumeration on a step grid | open, [#17](https://github.com/nodelogicau/intentions/issues/17) |
+| 18 | Relational anchor bounds per relation | open, [#18](https://github.com/nodelogicau/intentions/issues/18) |
+| 19 | `intention-inconsistency` is pairwise | open, [#19](https://github.com/nodelogicau/intentions/issues/19) |
+| 20 | The resolver's scope comes from `resolver.scope` | open, [#20](https://github.com/nodelogicau/intentions/issues/20) |
+| 21 | Instances copy `location` and the recurring intention's clock | open, [#21](https://github.com/nodelogicau/intentions/issues/21) |
+| 22 | Re-resolving a placed intention | open, [#22](https://github.com/nodelogicau/intentions/issues/22) |
 
 ---
 
@@ -275,7 +275,7 @@ examples.
 
 **Resolution (b3bb420):** Settled as proposed: block sequences for string lists, flow mappings for small records, literal block scalars for multi-line prose. Stated under Field order; the availability example's `conditional` is now a block sequence.
 
-## 14. Resolution needs a bounded range: horizon and now
+## 14. Resolution needs a bounded range: horizon and now ([#14](https://github.com/nodelogicau/intentions/issues/14))
 
 **The draft says:** resolution takes an intention with a window and produces
 candidate placements; the deixis rule says deixis is resolved at write time
@@ -295,7 +295,7 @@ yields no candidates and a reason. Candidates before now are never offered.
 **Proposed text:** state the range rule under Resolution and add
 `resolver.horizon` to the workspace configuration.
 
-## 15. Capacity depletes per occasion
+## 15. Capacity depletes per occasion ([#15](https://github.com/nodelogicau/intentions/issues/15))
 
 **The draft says:** an availability's `duration` is "capacity offered per
 occasion" and "may be shorter than the window's clock interval".
@@ -312,7 +312,7 @@ two-hour intentions cannot both land on one three-hour Tuesday morning.
 **Proposed text:** say under Availability that capacity is consumed by the
 placements resting on an occasion.
 
-## 16. What a placement rests on is recomputed; propose `supply` on the record
+## 16. What a placement rests on is recomputed; propose `supply` on the record ([#16](https://github.com/nodelogicau/intentions/issues/16))
 
 **The draft says:** `expired-ground` is "an availability the placement rests
 on has expired or been retired", and `condition-mismatch` and
@@ -334,7 +334,7 @@ and outside the projection.
 **Proposed text:** add `supply` to the RESOLUTION record, and state the
 "rests on" rule under Consistency.
 
-## 17. Candidate enumeration on a step grid
+## 17. Candidate enumeration on a step grid ([#17](https://github.com/nodelogicau/intentions/issues/17))
 
 **The draft says:** resolution "produces a ranked set of candidate
 placements".
@@ -351,7 +351,7 @@ tries the nominal only. The full ranked set is computed;
 
 **Proposed text:** state the grid under Resolution and add `resolver.step`.
 
-## 18. Relational anchor bounds per relation
+## 18. Relational anchor bounds per relation ([#18](https://github.com/nodelogicau/intentions/issues/18))
 
 **The draft says:** a relational anchor names a target, one of the four RFC
 9253 relations, and an optional `gap` of `{min, max}`; the dependent window
@@ -370,7 +370,7 @@ cancelled target counts as unplaced, so the intention is blocked.
 
 **Proposed text:** a table under WINDOW's relational anchor.
 
-## 19. `intention-inconsistency` is pairwise
+## 19. `intention-inconsistency` is pairwise ([#19](https://github.com/nodelogicau/intentions/issues/19))
 
 **The draft says:** the flag means "two active intentions cannot both be
 placed within their windows given available supply".
@@ -385,7 +385,7 @@ detail says "pairwise". Anything global is out of scope.
 
 **Proposed text:** say "pairwise" in the flag's definition.
 
-## 20. The resolver's scope comes from `resolver.scope`
+## 20. The resolver's scope comes from `resolver.scope` ([#20](https://github.com/nodelogicau/intentions/issues/20))
 
 **The draft says:** "only availability with scope at or wider than a
 resolver's own scope shall be visible to it".
@@ -399,7 +399,7 @@ everything, which is what the draft's example implies.
 
 **Proposed text:** add `resolver.scope` to the workspace configuration.
 
-## 21. Instances copy `location` and the recurring intention's clock
+## 21. Instances copy `location` and the recurring intention's clock ([#21](https://github.com/nodelogicau/intentions/issues/21))
 
 **The draft says:** an instance carries "a window derived from that
 occurrence, and the recurring intention's subject, duration, activity, and
@@ -416,7 +416,7 @@ with the rest.
 
 **Proposed text:** add `location` and the clock to the instance rule.
 
-## 22. Re-resolving a placed intention
+## 22. Re-resolving a placed intention ([#22](https://github.com/nodelogicau/intentions/issues/22))
 
 **The draft says:** resolution takes an "unplaced" intention, and a
 displaced intention "carries a window-clash flag until acknowledged or
