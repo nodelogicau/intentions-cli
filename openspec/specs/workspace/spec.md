@@ -2,12 +2,12 @@
 
 ## Purpose
 
-Creating, configuring and discovering an Intentions workspace: `init`, the `intentions.yaml` marker, the directory layout, the `.intentions` pointer and the `workspace` verb.
+Creating, configuring and discovering an Intentions workspace: `init`, the `intentions.yaml` marker, the directory layout, the `.intentions` pointer, the `workspace` verb and the pointer-writing verb.
 
 ## Requirements
 
 ### Requirement: Workspace initialisation
-`intentions init [dir]` SHALL create `intentions.yaml`, the directories `intentions/`, `availability/`, `commitments/`, `resolutions/`, an empty `index.yaml`, and an `intentions.md` stub. It SHALL require an author (`--author` or `INTENTIONS_AUTHOR`) and SHALL accept `--subject`, `--timezone`, `--hemisphere`, `--availability-horizon`, `--generation-horizon`. There SHALL be no `--week-start`. It SHALL refuse with exit code 1 when `intentions.yaml` already exists.
+`intentions init [dir] [--pointer]` SHALL create `intentions.yaml`, the directories `intentions/`, `availability/`, `commitments/`, `resolutions/`, an empty `index.yaml`, and an `intentions.md` stub. It SHALL require an author (`--author` or `INTENTIONS_AUTHOR`) and SHALL accept `--subject`, `--timezone`, `--hemisphere`, `--availability-horizon`, `--generation-horizon`. There SHALL be no `--week-start`. With `--pointer` and an explicit `dir` other than the current directory, it SHALL also write `./.intentions` containing the relative path to `dir`; `--pointer` without such a `dir` SHALL be a usage error. It SHALL refuse with exit code 1 when `intentions.yaml` already exists.
 
 #### Scenario: Minimal configuration written
 - **WHEN** `intentions init ./planning --author https://example.com/people/ada --subject https://example.com/people/ada --timezone Australia/Melbourne --hemisphere south` is run
@@ -28,6 +28,14 @@ Creating, configuring and discovering an Intentions workspace: `init`, the `inte
 #### Scenario: Week start flag gone
 - **WHEN** `init ./x --author a --week-start sunday` is run
 - **THEN** the command exits with code 2 naming an unknown flag
+
+#### Scenario: Init with pointer
+- **WHEN** `intentions init ./planning --pointer --author a` is run at a repository root
+- **THEN** `./.intentions` contains `planning` and `intentions workspace` run from the root resolves to `./planning` through the pointer
+
+#### Scenario: Pointer without a directory
+- **WHEN** `intentions init --pointer --author a` is run with no `dir`
+- **THEN** the command exits with code 2
 
 ### Requirement: Configuration file contents
 `intentions.yaml` SHALL declare `format`, `hash`, `resolver.timezone`, `availability.default_horizon`, `generation.horizon`, and `defaults.source.author`. It MAY declare `resolver.hemisphere` (`north` or `south`, absent means `north`), `resolver.step` (an ISO 8601 duration, the candidate grid, absent means `PT15M`), `resolver.horizon` (an ISO 8601 duration, how far ahead resolution looks, absent means `P4W`), `resolver.scope` (`personal`, `organisation` or `public`, absent means `personal`), and `defaults.subject`. It SHALL NOT declare `resolver.week_start`. Keys this implementation does not know SHALL be preserved when the file is rewritten; an unknown key under `resolver` SHALL be ignored and reported by `validate` at info level. Every command SHALL fail with a usage error if `format` is not `intentions/0.1` or `hash` is not `sha256`.
@@ -73,6 +81,27 @@ Discovery SHALL locate the workspace by, in order: `--workspace`; `INTENTIONS_WO
 #### Scenario: Report discovery
 - **WHEN** `intentions workspace --json` runs inside a workspace found by walking up
 - **THEN** stdout carries `root`, `found_by: "marker"`, and `config`
+
+### Requirement: Write a pointer to an existing workspace
+`intentions workspace pointer [workspace-dir] [--at <dir>] [--force]` SHALL write a `.intentions` pointer in `--at` (default: the current directory) naming a workspace that already exists, so that the workspace resolves from that directory and below. With no argument it SHALL name the workspace that would be used now, by the ordinary precedence. The target SHALL be written relative when the workspace lies at or below the pointer's directory and absolute otherwise, and the result SHALL report which; with `--json` as `{"pointer", "root", "target", "relative"}`.
+
+It SHALL be a usage error when the pointer directory is the workspace itself, when that directory already contains `intentions.yaml`, or when `--at` is not a directory. Writing a pointer that already names the same target SHALL succeed unchanged; one naming a different target SHALL fail with exit code 1 and leave the file untouched unless `--force` is given.
+
+#### Scenario: Pointer at a repository root
+- **WHEN** `intentions workspace pointer ./planning` is run at a repository root
+- **THEN** `./.intentions` contains `planning`, the result reports `relative: true`, and a verb run from a subdirectory resolves through the pointer
+
+#### Scenario: Workspace outside the tree
+- **WHEN** the workspace lies outside the pointer's directory
+- **THEN** the target is absolute, the result reports `relative: false`, and the text output says the pointer is machine-specific
+
+#### Scenario: Existing pointer to a different workspace
+- **WHEN** `.intentions` already names another workspace
+- **THEN** the command exits with code 1, the file is unchanged, and the message mentions `--force`
+
+#### Scenario: Pointer beside a marker
+- **WHEN** the pointer directory already contains `intentions.yaml`
+- **THEN** the command exits with code 2 saying the marker wins over a pointer at the same level
 
 ### Requirement: Conventions file is not read by tools
 `intentions.md` SHALL be created by `init` as a short stub and SHALL NOT be read by any verb.
