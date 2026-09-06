@@ -18,4 +18,4 @@
 ## 4. Docs and release
 
 - [x] 4.1 SPEC-FEEDBACK item 24 records the settlement; CHANGELOG 0.9.0; skill rules for commitments
-- [ ] 4.2 Tag `v0.9.0` and verify the release
+- [x] 4.2 Tag `v0.9.0` and verify the release
