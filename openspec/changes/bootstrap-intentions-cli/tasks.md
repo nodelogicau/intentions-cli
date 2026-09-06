@@ -76,4 +76,4 @@
 - [x] 8.1 README: relationship to the spec and to particulars-cli, install from source, quick start (init, intention add, availability add, validate, index), verb reference, exit codes, environment variables, what is deferred to follow-on changes
 - [x] 8.2 `docs/review-workflow.md`: agent branch to PR to merge, sample GitHub Action running `validate` and `index --check`
 - [x] 8.3 Write `SPEC-FEEDBACK.md` from the design's Spec Feedback list in the particulars-cli format, and raise each item as an issue on `nodelogicau/intentions`
-- [ ] 8.4 Tag `v0.1.0`, verify release artifacts run on macOS arm64 and Linux amd64
+- [x] 8.4 Tag `v0.1.0`, verify release artifacts run on macOS arm64 and Linux amd64
