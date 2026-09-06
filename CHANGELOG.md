@@ -3,6 +3,38 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.0] - 2026-09-07
+
+Aligns with the upstream settlement of SPEC-FEEDBACK item 24 (spec commit
+`2b14e6b`), which went the other way from what 0.8.0 guessed.
+
+### Changed
+
+- **Occupancy is per party.** A commitment occupies a particular's time,
+  consuming their capacity and standing to be displaced, exactly where that
+  party's own entry is `tentative` or `accepted`. One party's decline changes
+  nothing for the others, whose commitment still stands.
+- **Capacity follows suit, with one exception.** Where a commitment fulfils an
+  intention, that intention's placement consumes the subject's capacity
+  whatever their party entry says, and the two still count once. A subject who
+  declines their own arrangement frees nothing while the placement stands;
+  only `cancel` frees it.
+- **The ranking rungs read the resolving subject's own entry**, never another
+  party's. A commitment that does not occupy the subject, whether declined or
+  transparent, is not listed in `displaces` and does not raise a rank.
+
+### Added
+
+- A seventh flag kind, `party-declined`, reported when a commitment has a
+  party at `declined` while the intention it fulfils is still placed. It is
+  raised on both objects, each naming the other, with the detail naming the
+  declining party and whether they are the subject. An imported commitment
+  names no intention and never raises it. The flag decides nothing: the
+  person cancels, re-resolves, or acknowledges and goes ahead without them.
+
+No file format change: every existing file is still valid and its version
+unchanged.
+
 ## [0.8.0] - 2026-09-07
 
 The interpersonal object gets its acts. `select` has written commitments since
@@ -181,6 +213,7 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
+[0.9.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.5.0...v0.6.0

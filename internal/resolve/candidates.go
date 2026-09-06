@@ -210,8 +210,14 @@ func (e Env) covers(cand temporal.Interval, involved []string, supplies map[stri
 }
 
 // rankAgainst assigns the reconsideration cost: 1 displaces nothing, 2 only
-// tentative, 3 something firm or accepted. Displaced ids are sorted.
+// tentative, 3 something firm or accepted. Where a rung names a commitment's
+// status it means the resolving subject's own party entry, never another
+// party's; involved[0] is that subject. Displaced ids are sorted.
 func rankAgainst(cand temporal.Interval, involved []string, placed []Placed, exclude string) (int, []string) {
+	subject := ""
+	if len(involved) > 0 {
+		subject = involved[0]
+	}
 	rank := 1
 	var ids []string
 	for _, p := range placed {
@@ -229,7 +235,7 @@ func rankAgainst(cand temporal.Interval, involved []string, placed []Placed, exc
 			continue
 		}
 		ids = append(ids, p.ID)
-		if p.Firm {
+		if p.FirmFor(subject) {
 			rank = 3
 		} else if rank < 2 {
 			rank = 2

@@ -69,11 +69,23 @@ type Placed struct {
 	ID          string
 	Type        model.Type
 	Interval    temporal.Interval
-	Particulars []string
-	Firm        bool // firm intention or accepted commitment
+	Particulars []string          // whose time this occupies
+	Firm        bool              // a firm intention; a commitment uses Statuses
+	Statuses    map[string]string // a commitment's party statuses by URI
 	Activity    string
 	Location    string
 	Object      model.Object
+}
+
+// FirmFor reports what reconsidering this placement would cost the named
+// particular: a firm intention costs everyone the same, while a commitment
+// costs that party a commitment of will only where their own entry is
+// accepted. Another party's acceptance is not this party's cost.
+func (p Placed) FirmFor(uri string) bool {
+	if p.Statuses == nil {
+		return p.Firm
+	}
+	return p.Statuses[uri] == "accepted"
 }
 
 // PlacedObjects returns every unretired placed intention and every unretired
@@ -81,33 +93,59 @@ type Placed struct {
 // Transparent commitments occupy no time and are never included.
 func (e Env) PlacedObjects() []Placed {
 	var out []Placed
-	// A commitment fulfilling an intention is the same occupancy as the
-	// intention it fulfils: keep the commitment, whose party status carries
-	// the reconsideration cost, and drop the intention.
-	fulfilled := map[string]bool{}
+	// A commitment occupies a party's time exactly where that party's own
+	// entry is tentative or accepted: a decline frees the decliner and
+	// nobody else. Where it fulfils an intention, the pair counts once
+	// against each particular, so the statuses are recorded here and the
+	// intention below claims only what the commitment does not.
+	fulfils := map[string]map[string]string{}
 	for _, c := range e.G.Commitments() {
-		if c.Retired == nil && c.Placement != nil && c.Intention != "" {
-			fulfilled[c.Intention] = true
+		if c.Retired == nil && c.Placement != nil && c.Intention != "" && !c.IsTransparent() {
+			statuses := map[string]string{}
+			for _, p := range c.Parties {
+				statuses[p.URI] = p.Status
+			}
+			fulfils[c.Intention] = statuses
 		}
 	}
 	for _, in := range e.G.Intentions() {
-		if in.Retired != nil || in.Placement == nil || fulfilled[in.ID] {
+		if in.Retired != nil || in.Placement == nil {
+			continue
+		}
+		parts := append([]string{in.Subject}, in.Parties...)
+		if statuses, ok := fulfils[in.ID]; ok {
+			// The commitment covers everyone it occupies. The subject's own
+			// placement stands whatever they answered, so a declining subject
+			// keeps consuming through it; any other decliner is freed.
+			var own []string
+			for _, uri := range parts {
+				status, listed := statuses[uri]
+				if !listed || (status == "declined" && uri == in.Subject) {
+					own = append(own, uri)
+				}
+			}
+			parts = own
+		}
+		if len(parts) == 0 {
 			continue
 		}
 		out = append(out, Placed{ID: in.ID, Type: model.TypeIntention, Interval: in.Placement.Bounds(e.Ctx),
-			Particulars: append([]string{in.Subject}, in.Parties...), Firm: in.Stability == "firm", Activity: in.Activity, Location: in.Placement.Location, Object: in})
+			Particulars: parts, Firm: in.Stability == "firm", Activity: in.Activity, Location: in.Placement.Location, Object: in})
 	}
 	for _, c := range e.G.Commitments() {
 		if c.Retired != nil || c.Placement == nil || c.IsTransparent() {
 			continue
 		}
 		var parts []string
-		firm := false
+		statuses := map[string]string{}
 		for _, p := range c.Parties {
-			parts = append(parts, p.URI)
-			if p.Status == "accepted" {
-				firm = true
+			statuses[p.URI] = p.Status
+			if p.Status != "declined" {
+				parts = append(parts, p.URI)
 			}
+		}
+		if len(parts) == 0 {
+			continue // occupies nobody
 		}
 		activity := ""
 		if c.Intention != "" {
@@ -117,7 +155,7 @@ func (e Env) PlacedObjects() []Placed {
 				}
 			}
 		}
-		out = append(out, Placed{ID: c.ID, Type: model.TypeCommitment, Interval: c.Placement.Bounds(e.Ctx), Particulars: parts, Firm: firm, Activity: activity, Location: c.Placement.Location, Object: c})
+		out = append(out, Placed{ID: c.ID, Type: model.TypeCommitment, Interval: c.Placement.Bounds(e.Ctx), Particulars: parts, Statuses: statuses, Activity: activity, Location: c.Placement.Location, Object: c})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out

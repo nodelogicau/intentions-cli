@@ -219,7 +219,7 @@ func (s *Server) checkTool(ctx context.Context, req *sdk.CallToolRequest, in che
 
 type acknowledgeIn struct {
 	ID          string    `json:"id" jsonschema:"the intention or commitment the flag was reported on"`
-	Kind        string    `json:"kind" jsonschema:"window-clash | condition-mismatch | location-mismatch | expired-ground | intention-inconsistency | cycle"`
+	Kind        string    `json:"kind" jsonschema:"window-clash | condition-mismatch | location-mismatch | expired-ground | intention-inconsistency | party-declined | cycle"`
 	Counterpart string    `json:"counterpart,omitempty" jsonschema:"the other object the flag named"`
 	Reason      string    `json:"reason,omitempty" jsonschema:"why the person is proceeding anyway"`
 	Now         string    `json:"now,omitempty"`

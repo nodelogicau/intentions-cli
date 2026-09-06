@@ -480,10 +480,21 @@ so it is no longer resolvable, though the person has decided this placement
 will not happen. And the subject declining is not the same situation as a
 counterparty declining, though the field records them identically.
 
-**We decided:** v0.8.0 records the answer and changes nothing else. A declined
-commitment still occupies its parties' time and its intention stays placed;
-only `cancel` frees either. That never frees time the other parties still
-believe is booked, at the cost of an explicit cancellation.
+**We decided:** v0.8.0 recorded the answer and changed nothing else.
+
+**Resolution (`2b14e6b`):** Settled as the other reading, refined per party,
+and not as we shipped. Occupancy follows a party's own entry: a commitment
+occupies a party exactly where they are `tentative` or `accepted`, so each
+decline frees only the decliner. Our objection does not hold, because nothing
+is hidden from the others: their commitment still stands and still occupies
+their own time. The two origins then differ. An import names no intention, so
+declining it frees the hour and disagrees with nothing. A commitment from a
+resolution leaves the intention placed and still occupying, so a decline frees
+nothing and is a disagreement between two objects: the seventh flag kind,
+`party-declined`, on both, naming the declining party. It also settled
+something the issue did not ask: the ranking rungs said "an accepted
+commitment" as though a commitment had one status, and now read the resolving
+subject's own entry. Implemented in v0.9.0.
 
 **Proposed text:** state under Commitment what `declined` entails: either a
 declined party's own time is free while the commitment stands, said also where

@@ -1512,3 +1512,185 @@ func TestCommitmentShowAndList(t *testing.T) {
 		t.Errorf("show an intention: %d %s", r.code, errMsg(r))
 	}
 }
+
+// writeImport hand-writes an imported commitment: there is no import verb
+// yet, and an import is the only commitment with no intention behind it.
+func writeImport(t *testing.T, ws, id, start, duration, status string, extra string) string {
+	t.Helper()
+	body := "id: " + id + "\nparties:\n  - uri: " + ada + "\n    status: " + status +
+		"\nplacement:\n  start: " + start + "\n  duration: " + duration +
+		"\norigin: import\ntitle: Imported\n" + extra +
+		"source:\n  author: " + ada + "\ntimestamp: " + rnow + "\nacknowledgements: []\n"
+	if err := os.WriteFile(filepath.Join(ws, "commitments", id+".yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mustOK(t, run(t, ws, "", "index"), "reindex after import")
+	return id
+}
+
+// TestPartyOccupancyIsPerParty covers capacity: a decline frees the decliner
+// and nobody else, and the subject's own decline frees nothing while their
+// intention's placement stands.
+func TestPartyOccupancyIsPerParty(t *testing.T) {
+	ws, cmt, in := commitmentFixture(t)
+	// The fixture placed a one-hour meeting at 13:00 on 2026-09-14, leaving
+	// three of ada's four meeting hours that day.
+	fits := func(what string, dur string) bool {
+		t.Helper()
+		x := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", what, "--duration", dur, "--calendar", "2026-09-14", "--activity", "meeting"), "add "+what)
+		r := mustOK(t, run(t, ws, "", "resolve", x.str("id"), "--now", rnow), "resolve "+what)
+		mustOK(t, run(t, ws, "", "intention", "retire", x.str("id"), "--kind", "abandoned", "--now", rnow), "tidy "+what)
+		return len(r.json["candidates"].([]any)) > 0
+	}
+	if fits("four hours", "PT4H") {
+		t.Fatal("the placed hour should already have consumed capacity")
+	}
+	if !fits("three hours", "PT3H") {
+		t.Fatal("three of four hours should remain")
+	}
+	// The subject declines their own arrangement: the intention's placement
+	// still consumes the hour, so nothing is freed.
+	mustOK(t, run(t, ws, "", "commitment", "decline", cmt, "--now", rnow), "subject declines")
+	if fits("four hours after decline", "PT4H") {
+		t.Error("a subject's decline freed an hour their own placement still occupies")
+	}
+	// Cancelling clears the placement, and only then is the hour free.
+	mustOK(t, run(t, ws, "", "commitment", "cancel", cmt, "--now", rnow), "cancel")
+	mustOK(t, run(t, ws, "", "intention", "retire", in, "--kind", "abandoned", "--now", rnow), "retire freed intention")
+	if !fits("four hours after cancel", "PT4H") {
+		t.Error("cancelling did not free the hour")
+	}
+}
+
+// TestDeclinedImportFreesTheHour covers the other origin: an import names no
+// intention, so declining it frees the decliner's time outright.
+func TestDeclinedImportFreesTheHour(t *testing.T) {
+	ws := initWS(t)
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--duration", "PT4H", "--calendar", "2026-09/2026-12", "--clock", "13:00/17:00", "--conditional", "meeting", "--cadence", "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"), "supply")
+	fits := func(what, dur string) bool {
+		t.Helper()
+		x := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", what, "--duration", dur, "--calendar", "2026-09-14", "--activity", "meeting"), "add")
+		r := mustOK(t, run(t, ws, "", "resolve", x.str("id"), "--now", rnow), "resolve")
+		mustOK(t, run(t, ws, "", "intention", "retire", x.str("id"), "--kind", "abandoned", "--now", rnow), "tidy")
+		return len(r.json["candidates"].([]any)) > 0
+	}
+	id := writeImport(t, ws, "cmt_01a07700-0000-7000-8000-00000000ab01", "2026-09-14T13:00:00+10:00", "PT1H", "tentative", "")
+	if fits("four hours", "PT4H") {
+		t.Fatal("a tentative import should consume the hour")
+	}
+	mustOK(t, run(t, ws, "", "commitment", "decline", id, "--now", rnow), "decline the import")
+	if !fits("four hours after decline", "PT4H") {
+		t.Error("declining an import did not free the hour")
+	}
+	// And nothing is flagged, because no plan disagrees with it.
+	c := mustOK(t, run(t, ws, "", "check", "--now", rnow), "check")
+	for _, f := range c.json["flags"].([]any) {
+		if f.(map[string]any)["kind"] == "party-declined" {
+			t.Errorf("an import raised party-declined: %v", f)
+		}
+	}
+}
+
+// TestRankReadsTheResolvingSubject covers the ladder: the rungs read the
+// subject's own entry, and a commitment that does not occupy them is neither
+// displaced nor allowed to raise a rank.
+func TestRankReadsTheResolvingSubject(t *testing.T) {
+	ws, cmt, _ := commitmentFixture(t)
+	rankAt13 := func(what string) (float64, []any) {
+		t.Helper()
+		x := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", what, "--duration", "PT1H", "--calendar", "2026-09-14", "--clock", "13:00/14:00", "--activity", "meeting"), "add")
+		r := mustOK(t, run(t, ws, "", "resolve", x.str("id"), "--now", rnow), "resolve")
+		mustOK(t, run(t, ws, "", "intention", "retire", x.str("id"), "--kind", "abandoned", "--now", rnow), "tidy")
+		cands := r.json["candidates"].([]any)
+		if len(cands) == 0 {
+			t.Fatalf("%s: no candidate to rank: %v", what, r.json)
+		}
+		c := cands[0].(map[string]any)
+		return c["rank"].(float64), c["displaces"].([]any)
+	}
+	// The subject is tentative on the commitment: rung 2.
+	if rank, disp := rankAt13("against tentative"); rank != 2 || len(disp) == 0 {
+		t.Errorf("tentative subject: rank %v displaces %v", rank, disp)
+	}
+	// The room accepts; the subject is still tentative, so the rung is still 2.
+	mustOK(t, run(t, ws, "", "commitment", "accept", cmt, "--party", room, "--now", rnow), "room accepts")
+	if rank, _ := rankAt13("counterparty accepted"); rank != 2 {
+		t.Errorf("another party's acceptance raised the subject's rung: %v", rank)
+	}
+	// The subject accepts: rung 3.
+	mustOK(t, run(t, ws, "", "commitment", "accept", cmt, "--now", rnow), "subject accepts")
+	if rank, _ := rankAt13("subject accepted"); rank != 3 {
+		t.Errorf("subject accepted: rank %v", rank)
+	}
+}
+
+func TestDeclinedImportIsNotDisplaced(t *testing.T) {
+	ws := initWS(t)
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--duration", "PT4H", "--calendar", "2026-09/2026-12", "--clock", "13:00/17:00", "--conditional", "meeting", "--cadence", "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"), "supply")
+	id := writeImport(t, ws, "cmt_01a07700-0000-7000-8000-00000000ab02", "2026-09-14T13:00:00+10:00", "PT1H", "declined", "")
+	x := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Over the declined hour", "--duration", "PT1H", "--calendar", "2026-09-14", "--clock", "13:00/14:00", "--activity", "meeting"), "add")
+	r := mustOK(t, run(t, ws, "", "resolve", x.str("id"), "--now", rnow), "resolve")
+	c := r.json["candidates"].([]any)[0].(map[string]any)
+	if c["rank"].(float64) != 1 || len(c["displaces"].([]any)) != 0 {
+		t.Errorf("a declined commitment was displaced: rank %v displaces %v", c["rank"], c["displaces"])
+	}
+	_ = id
+}
+
+// TestPartyDeclinedFlag covers the seventh kind.
+func TestPartyDeclinedFlag(t *testing.T) {
+	ws, cmt, in := commitmentFixture(t)
+	find := func(r result, subject string) map[string]any {
+		t.Helper()
+		for _, f := range r.json["flags"].([]any) {
+			f := f.(map[string]any)
+			if f["kind"] == "party-declined" && f["subject"] == subject {
+				return f
+			}
+		}
+		return nil
+	}
+	// No decline, no flag.
+	if find(mustOK(t, run(t, ws, "", "check", "--now", rnow), "check"), cmt) != nil {
+		t.Fatal("flagged with nothing declined")
+	}
+	// The subject declines their own placed plan: on both objects.
+	mustOK(t, run(t, ws, "", "commitment", "decline", cmt, "--now", rnow), "subject declines")
+	c := mustOK(t, run(t, ws, "", "check", "--now", rnow), "check")
+	onCmt, onInt := find(c, cmt), find(c, in)
+	if onCmt == nil || onInt == nil {
+		t.Fatalf("flag missing on one side: %v", c.json["flags"])
+	}
+	if onCmt["counterpart"] != in || onInt["counterpart"] != cmt {
+		t.Errorf("counterparts: %v %v", onCmt, onInt)
+	}
+	if !strings.Contains(onCmt["detail"].(string), "the subject") {
+		t.Errorf("detail should name the subject: %q", onCmt["detail"])
+	}
+	// Acknowledging suppresses it; the placement and the status stand.
+	mustOK(t, run(t, ws, "", "acknowledge", in, "--kind", "party-declined", "--counterpart", cmt, "--reason", "going ahead anyway", "--now", rnow), "acknowledge")
+	if find(mustOK(t, run(t, ws, "", "check", "--now", rnow), "check"), in) != nil {
+		t.Error("acknowledgement did not suppress the flag")
+	}
+	if find(mustOK(t, run(t, ws, "", "check", "--now", rnow), "check"), cmt) == nil {
+		t.Error("acknowledging one side silenced the other")
+	}
+	// A reversal changes the commitment's projection: the acknowledgement
+	// lapses, and the flag is gone anyway because nobody is declined.
+	mustOK(t, run(t, ws, "", "commitment", "accept", cmt, "--now", rnow), "reverse")
+	after := mustOK(t, run(t, ws, "", "check", "--now", rnow), "check")
+	if find(after, in) != nil || find(after, cmt) != nil {
+		t.Errorf("flag survived the reversal: %v", after.json["flags"])
+	}
+	// A counterparty's decline reads differently.
+	mustOK(t, run(t, ws, "", "commitment", "decline", cmt, "--party", room, "--now", rnow), "room declines")
+	f := find(mustOK(t, run(t, ws, "", "check", "--now", rnow), "check"), cmt)
+	if f == nil || !strings.Contains(f["detail"].(string), "a counterparty") {
+		t.Errorf("counterparty detail: %v", f)
+	}
+	// Cancelling clears the placement, so the disagreement is gone.
+	mustOK(t, run(t, ws, "", "commitment", "cancel", cmt, "--now", rnow), "cancel")
+	if find(mustOK(t, run(t, ws, "", "check", "--now", rnow), "check"), cmt) != nil {
+		t.Error("flag survived cancellation")
+	}
+}

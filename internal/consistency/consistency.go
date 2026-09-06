@@ -23,11 +23,12 @@ const (
 	LocationMismatch       = "location-mismatch"
 	ExpiredGround          = "expired-ground"
 	IntentionInconsistency = "intention-inconsistency"
+	PartyDeclined          = "party-declined"
 	Cycle                  = "cycle"
 )
 
-// Kinds lists the six flag kinds.
-var Kinds = []string{WindowClash, ConditionMismatch, LocationMismatch, ExpiredGround, IntentionInconsistency, Cycle}
+// Kinds lists the seven flag kinds.
+var Kinds = []string{WindowClash, ConditionMismatch, LocationMismatch, ExpiredGround, IntentionInconsistency, PartyDeclined, Cycle}
 
 // ValidKind reports whether k is a flag kind.
 func ValidKind(k string) bool {
@@ -64,6 +65,7 @@ func Check(e resolve.Env, ids []string) ([]Flag, error) {
 		}
 		flags = append(flags, fs...)
 	}
+	flags = append(flags, declines(e)...)
 	inc, err := inconsistencies(e)
 	if err != nil {
 		return nil, err
@@ -97,6 +99,42 @@ func Check(e resolve.Env, ids []string) ([]Flag, error) {
 		flags = []Flag{}
 	}
 	return flags, nil
+}
+
+// declines reports party-declined: a party has said no while the intention
+// the commitment fulfils is still placed, so the person has refused a thing
+// they still intend at that hour. An imported commitment names no intention
+// and disagrees with nothing. The flag decides nothing; the person cancels,
+// replaces, or acknowledges and goes ahead without them.
+func declines(e resolve.Env) []Flag {
+	var out []Flag
+	for _, c := range e.G.Commitments() {
+		if c.Retired != nil || c.Intention == "" {
+			continue
+		}
+		obj, ok := e.G.Get(c.Intention)
+		if !ok {
+			continue
+		}
+		in, ok := obj.(*model.Intention)
+		if !ok || in.Retired != nil || in.Placement == nil {
+			continue
+		}
+		cv, iv := versionOf(e, c.ID), versionOf(e, in.ID)
+		for _, p := range c.Parties {
+			if p.Status != "declined" {
+				continue
+			}
+			who := "a counterparty"
+			if p.URI == in.Subject {
+				who = "the subject"
+			}
+			detail := fmt.Sprintf("%s (%s) has declined while %s is still placed at %s", p.URI, who, in.ID, in.Placement.Start.Raw)
+			out = append(out, Flag{Kind: PartyDeclined, Subject: c.ID, Counterpart: in.ID, CounterpartVersion: iv, Detail: detail})
+			out = append(out, Flag{Kind: PartyDeclined, Subject: in.ID, Counterpart: c.ID, CounterpartVersion: cv, Detail: detail})
+		}
+	}
+	return out
 }
 
 func versionOf(e resolve.Env, id string) string {

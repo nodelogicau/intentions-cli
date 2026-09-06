@@ -38,7 +38,7 @@ tool to decide, for raising upstream.
 | The temporal engine: durations, EDTF, clock anchors, cadence, bounds | |
 | Projection versioning (`sha256:` of RFC 8785 canonical JSON) | |
 | `generate`, `resolve`, `select`: instances, ranked candidates, the recorded act, commitments for parties | |
-| `check` and `acknowledge`: the six flag kinds, suppression, lapse | |
+| `check` and `acknowledge`: the seven flag kinds, suppression, lapse | |
 | `validate` over every object type, `index`, `show`, `bounds` | |
 | `unresolved`: what still awaits a placement, and why | |
 | MCP server (`serve --mcp`) and Claude Desktop bundle | |
@@ -134,7 +134,7 @@ intentions intention add --title "Read the board pack" --json
 | `commitment accept\|decline <id> [--party <uri>]` | Record that a party has accepted or declined; only ever on the person's word |
 | `commitment cancel <id> [--reason]` | Cancel it and clear the placement of the intention it was for, so that intention may be resolved again |
 | `commitment show <id>`, `commitment list` | Show one with its intention and flags; list active (or `--cancelled`) by party, status or intention |
-| `check [<id>]... [--fail-on-flags]` | The consistency check: six flag kinds, suppressed by acknowledgement; writes nothing |
+| `check [<id>]... [--fail-on-flags]` | The consistency check: seven flag kinds, suppressed by acknowledgement; writes nothing |
 | `acknowledge <id> --kind <k> [--counterpart <id>] [--reason]` | Record that the person has seen a flag against the counterpart's current version |
 | `show <id>` | Show any object, including commitments and resolutions written by other tools |
 | `version-of <id> [--projection]` | The computed version, and the canonical JSON it hashes |

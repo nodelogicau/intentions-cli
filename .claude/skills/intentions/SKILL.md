@@ -112,7 +112,7 @@ modifiers inside double quotes, so `"$id:in-order-to"` silently corrupts the id.
 | Answer a commitment | `intentions commitment accept\|decline <id> [--party <uri>] --json` — only when the person has said so; no policy authorises it |
 | Cancel a commitment | `intentions commitment cancel <id> [--reason "<why>"] --json` → the intention it was for loses its placement and may be resolved again |
 | What is outstanding | `intentions commitment list [--party <uri>] [--status tentative] --json` |
-| What clashes | `intentions check [<id>]... --json` → `{flags: [{kind, subject, counterpart, counterpart_version, detail}]}`; six kinds, never decisions |
+| What clashes | `intentions check [<id>]... --json` → `{flags: [{kind, subject, counterpart, counterpart_version, detail}]}`; seven kinds, never decisions |
 | Proceed anyway | `intentions acknowledge <id> --kind <kind> --counterpart <id> --reason "<why>" --json` — only on the person's word; lapses when the counterpart changes |
 | Health check | `intentions validate --json`; `intentions index --check --json` |
 
@@ -211,8 +211,16 @@ intention has parties, with everyone at `tentative`.
   `cancelled`, the only kind it admits, and clears the placement of the
   intention it was for. That intention keeps its window and returns to
   `unresolved`, so offer to resolve it again.
-- **Declining is not cancelling.** A declined commitment still stands and still
-  occupies the time until someone cancels it.
+- **Declining frees the decliner, and only them.** A party who has declined is
+  no longer occupied by the commitment; every other party still is, and their
+  commitment still stands. Declining is not cancelling: the commitment remains
+  until someone cancels it.
+- **A decline against a standing plan is flagged.** When the intention a
+  commitment fulfils is still placed, any decline raises `party-declined` on
+  both objects. The subject's own decline frees nothing, because their
+  placement still occupies the hour. Put the choice to the person: cancel,
+  re-resolve with `select --replace`, or acknowledge and go ahead without the
+  party who declined.
 
 ## Retirement
 
