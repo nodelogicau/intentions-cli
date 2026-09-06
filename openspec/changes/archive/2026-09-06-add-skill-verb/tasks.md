@@ -10,4 +10,4 @@
 - [x] 2.1 `make skill` target building with `VERSION=dev`; commit the installed copy at `.claude/skills/intentions/SKILL.md`
 - [x] 2.2 CI step `skill install --check` on the test job (not on Windows)
 - [x] 2.3 README Agent skill section and verb row; CHANGELOG 0.3.0
-- [ ] 2.4 Tag `v0.3.0` and verify the release
+- [x] 2.4 Tag `v0.3.0` and verify the release
