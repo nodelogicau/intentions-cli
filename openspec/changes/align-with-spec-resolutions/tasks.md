@@ -33,4 +33,4 @@
 - [x] 5.1 SPEC-FEEDBACK.md: add a **Resolution:** paragraph under each of the thirteen items quoting the upstream decision and naming b3bb420; status table says adopted or decided differently; bold items 5, 6, 8, 9 as where v0.2.0 changed
 - [x] 5.2 README: `firmed_under`, `--recurring`, seasons 25–32, no week start, `version` second; update the review-workflow doc's note on harness firmings
 - [x] 5.3 CHANGELOG.md in Keep a Changelog form: v0.2.0 with the behaviour changes and the three breaking ones; v0.1.0 as the initial release
-- [ ] 5.4 Tag `v0.2.0` and verify the release artifacts
+- [x] 5.4 Tag `v0.2.0` and verify the release artifacts
