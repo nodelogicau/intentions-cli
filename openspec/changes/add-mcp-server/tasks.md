@@ -21,4 +21,4 @@
 
 - [x] 4.1 `docs/mcp.md`: skill-versus-server guidance, client configurations, the tool table, attribution, reviewing what a Desktop conversation wrote
 - [x] 4.2 README section and verb row; skill mentions `serve --mcp`; CHANGELOG 0.5.0; SPEC-FEEDBACK item 23 raised as an issue and linked
-- [ ] 4.3 Tag `v0.5.0`, verify the release including the `.mcpb`
+- [x] 4.3 Tag `v0.5.0`, verify the release including the `.mcpb`
