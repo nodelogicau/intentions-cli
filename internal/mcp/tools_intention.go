@@ -60,6 +60,9 @@ func (s *Server) registerTools() {
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "select", Annotations: additive,
 		Description: "The recorded act of selection. `candidate` is the person's choice (1-based into the full ranked set). `policy` is the only way a harness selects alone: a terminus of the subject carrying auto_select that covers the intention, and only when a rank-1 candidate exists. Writes the RESOLUTION record, the placement, and a commitment with every party tentative when there are parties. Displaced objects are listed and never changed. `replace` re-resolves a placed intention."},
 		s.selectTool)
+	sdk.AddTool(s.srv, &sdk.Tool{Name: "unresolved", Annotations: readOnly,
+		Description: "Every active intention still without a placement and what stands in its way, soonest deadline first: ready (candidate count, best rank), blocked (on a relational target with no placement), no_candidates (the resolver's reason), incomplete (duration or window missing), unresolvable (a serves cycle). A dry resolution; writes nothing. Run generate first so instances of recurring intentions exist. Results equal `intentions unresolved --json`."},
+		s.unresolvedTool)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "check", Annotations: readOnly,
 		Description: "The consistency check: window-clash, condition-mismatch, location-mismatch, expired-ground, intention-inconsistency, cycle. Flags are computed, never stored, never decisions; one already acknowledged against the counterpart's current version is suppressed. Optionally scoped to ids."},
 		s.checkTool)

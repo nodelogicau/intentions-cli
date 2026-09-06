@@ -28,6 +28,7 @@ Before you write anything about the person's time:
 intentions workspace --json                  # which workspace, found how (exit 5 = none)
 intentions intention list --json             # what they already mean to do
 intentions availability list --json          # what capacity they have declared
+intentions unresolved --json                 # what still needs a placement, and why
 intentions validate --json                   # is the workspace sound (exit 4 = errors)
       │
       ▼  reason about it yourself
@@ -103,6 +104,7 @@ modifiers inside double quotes, so `"$id:in-order-to"` silently corrupts the id.
 | Rank placements | `intentions resolve <id> [--limit N] --json` → `{candidates: [{rank, start, end, displaces, supply}], candidates_considered, reason}`; writes nothing but instances |
 | Record the choice | `intentions select <id> --candidate N --json` → `{resolution, intention, commitment?, flags}`; `--replace` to move a placed one |
 | Select under a policy | `intentions select <id> --policy <terminus id> --json` — harness only, top rank-1 candidate only; refused otherwise |
+| What awaits placement | `intentions unresolved [--subject <uri>] --json` → `{entries: [{id, title, status, reason?, blocked_on?, candidates, best_rank?, deadline?}], count, counts}`; `ready` means candidates exist, `blocked` names the target to place first, `incomplete` needs an edit |
 | What clashes | `intentions check [<id>]... --json` → `{flags: [{kind, subject, counterpart, counterpart_version, detail}]}`; six kinds, never decisions |
 | Proceed anyway | `intentions acknowledge <id> --kind <kind> --counterpart <id> --reason "<why>" --json` — only on the person's word; lapses when the counterpart changes |
 | Health check | `intentions validate --json`; `intentions index --check --json` |

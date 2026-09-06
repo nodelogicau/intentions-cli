@@ -126,6 +126,7 @@ intentions intention add --title "Read the board pack" --json
 | `generate [--horizon] [--recurring <id>]` | Materialise instances of recurring intentions; idempotent on `(recurring, occurrence)` |
 | `resolve <id> [--limit] [--step] [--scope]` | Ranked candidate placements for an intention; writes nothing but the instances it generates |
 | `select <id> (--candidate N \| --policy <id>) [--replace]` | The recorded act: RESOLUTION record, placement, and a commitment when there are parties |
+| `unresolved [--subject <uri>]` | Every active intention without a placement and what stands in its way: `ready`, `blocked`, `no_candidates`, `incomplete`, `unresolvable`; soonest deadline first |
 | `check [<id>]... [--fail-on-flags]` | The consistency check: six flag kinds, suppressed by acknowledgement; writes nothing |
 | `acknowledge <id> --kind <k> [--counterpart <id>] [--reason]` | Record that the person has seen a flag against the counterpart's current version |
 | `show <id>` | Show any object, including commitments and resolutions written by other tools |

@@ -3,6 +3,20 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.0] - 2026-09-06
+
+### Added
+
+- `unresolved [--subject <uri>]`: every active intention still without a
+  placement and what stands in its way, from a dry resolution that writes
+  nothing: `ready` (candidate count, best rank), `blocked` (on a relational
+  target with no placement), `no_candidates` (the resolver's reason),
+  `incomplete` (duration or window missing), `unresolvable` (a serves
+  cycle). Termini and recurring parents are not listed; their instances are.
+  Soonest deadline first.
+- `unresolved` MCP tool with the same result; the skill's loop runs it after
+  listing.
+
 ## [0.5.0] - 2026-09-06
 
 The same operations over the Model Context Protocol, for harnesses without a
@@ -128,6 +142,7 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
+[0.6.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.2.1...v0.3.0

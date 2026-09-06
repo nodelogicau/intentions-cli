@@ -1173,3 +1173,85 @@ func TestValidationForResolution(t *testing.T) {
 		}
 	}
 }
+
+func TestUnresolved(t *testing.T) {
+	ws := initWS(t)
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--duration", "PT3H", "--calendar", "2026-09/2026-12", "--clock", "09:00/12:00", "--conditional", "deep-work", "--cadence", "FREQ=WEEKLY;BYDAY=TU"), "availability")
+	add := func(args ...string) result {
+		full := append([]string{"intention", "add", "--now", rnow}, args...)
+		return mustOK(t, run(t, ws, "", full...), "intention add")
+	}
+	a := add("--title", "Ready", "--duration", "PT90M", "--calendar", "2026-W38", "--activity", "deep-work")
+	b := add("--title", "Blocked", "--duration", "PT1H", "--relative", a.str("id")+":FINISHTOSTART", "--activity", "deep-work")
+	c := add("--title", "Incomplete", "--calendar", "2026-W38")
+	past := add("--title", "Passed", "--duration", "PT1H", "--calendar", "2026-W30", "--activity", "deep-work")
+	add("--title", "Terminus")
+	retired := add("--title", "Retired", "--duration", "PT1H", "--calendar", "2026-W38")
+	mustOK(t, run(t, ws, "", "intention", "retire", retired.str("id"), "--kind", "abandoned", "--now", rnow), "retire")
+	rec := add("--title", "Weekly", "--duration", "PT1H", "--calendar", "2026-09/2026-12", "--cadence", "FREQ=WEEKLY;BYDAY=TU", "--activity", "deep-work")
+	mustOK(t, run(t, ws, "", "generate", "--horizon", "P2W", "--now", rnow), "generate")
+	other := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Someone else", "--subject", "https://example.com/people/bob", "--duration", "PT1H", "--calendar", "2026-W38"), "other")
+
+	r := mustOK(t, run(t, ws, "", "unresolved", "--now", rnow), "unresolved")
+	entries := r.json["entries"].([]any)
+	status := map[string]map[string]any{}
+	for _, e := range entries {
+		m := e.(map[string]any)
+		status[m["id"].(string)] = m
+	}
+	if len(entries) != 7 || int(r.json["count"].(float64)) != 7 {
+		t.Fatalf("entries: %d %v", len(entries), r.json["counts"])
+	}
+	if e := status[a.str("id")]; e["status"] != "ready" || e["candidates"].(float64) != 7 || e["best_rank"].(float64) != 1 || e["deadline"] == nil {
+		t.Errorf("ready: %v", e)
+	}
+	if e := status[b.str("id")]; e["status"] != "blocked" || e["blocked_on"] != a.str("id") {
+		t.Errorf("blocked: %v", e)
+	}
+	if e := status[c.str("id")]; e["status"] != "incomplete" || !strings.Contains(e["reason"].(string), "duration") {
+		t.Errorf("incomplete: %v", e)
+	}
+	if e := status[past.str("id")]; e["status"] != "no_candidates" || !strings.Contains(e["reason"].(string), "before now") {
+		t.Errorf("passed: %v", e)
+	}
+	if e := status[other.str("id")]; e["status"] != "no_candidates" || !strings.Contains(e["reason"].(string), "no eligible supply") {
+		t.Errorf("no supply: %v", e)
+	}
+	if _, ok := status[rec.str("id")]; ok || status[retired.str("id")] != nil {
+		t.Error("recurring parent or retired listed")
+	}
+	instances := 0
+	for id := range status {
+		if status[id]["title"] == "Weekly" {
+			instances++
+		}
+	}
+	if instances != 2 {
+		t.Errorf("instances listed: %d", instances)
+	}
+	// Order: the Tuesday instances (deadlines on their days) before W38's end; incomplete or passed last.
+	first, last := entries[0].(map[string]any), entries[len(entries)-1].(map[string]any)
+	if first["title"] != "Weekly" || last["status"] != "incomplete" && last["status"] != "no_candidates" {
+		t.Errorf("order: first %v last %v", first["title"], last["status"])
+	}
+	counts := r.json["counts"].(map[string]any)
+	if counts["ready"].(float64) != 3 || counts["blocked"].(float64) != 1 || counts["incomplete"].(float64) != 1 || counts["no_candidates"].(float64) != 2 {
+		t.Errorf("counts: %v", counts)
+	}
+	// Subject filter, and a placed intention drops out.
+	if r := mustOK(t, run(t, ws, "", "unresolved", "--subject", "https://example.com/people/bob", "--now", rnow), "subject"); int(r.json["count"].(float64)) != 1 {
+		t.Errorf("subject filter: %v", r.json)
+	}
+	mustOK(t, run(t, ws, "", "select", a.str("id"), "--candidate", "1", "--now", rnow), "select")
+	r = mustOK(t, run(t, ws, "", "unresolved", "--now", rnow), "after select")
+	if int(r.json["count"].(float64)) != 6 || r.json["counts"].(map[string]any)["blocked"] != nil {
+		t.Errorf("after placing A: %v", r.json["counts"])
+	}
+	tx := text(t, ws, "unresolved", "--now", rnow)
+	if !strings.Contains(tx.stdout, "6 unresolved") || !strings.Contains(tx.stdout, "  incomplete\n  no duration") {
+		t.Errorf("text:\n%s", tx.stdout)
+	}
+	if fi, _ := os.ReadDir(filepath.Join(ws, "resolutions")); len(fi) != 1 {
+		t.Error("unresolved wrote a record")
+	}
+}

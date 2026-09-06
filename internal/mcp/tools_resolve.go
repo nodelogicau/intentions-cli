@@ -376,3 +376,30 @@ func (s *Server) boundsTool(ctx context.Context, req *sdk.CallToolRequest, in bo
 	}
 	return okResult(fmt.Sprintf("%d intervals for %s in %s", len(list), win, tctx.Location)), out, nil
 }
+
+type unresolvedIn struct {
+	Subject string `json:"subject,omitempty" jsonschema:"only intentions of this subject"`
+	Scope   string `json:"scope,omitempty"`
+	Now     string `json:"now,omitempty"`
+}
+
+func (s *Server) unresolvedTool(ctx context.Context, req *sdk.CallToolRequest, in unresolvedIn) (*sdk.CallToolResult, any, error) {
+	g, err := s.load()
+	if err != nil {
+		return errResult(err), nil, nil
+	}
+	at, err := now(in.Now)
+	if err != nil {
+		return errResult(err), nil, nil
+	}
+	e, err := s.env(g, at, "", in.Scope)
+	if err != nil {
+		return errResult(err), nil, nil
+	}
+	entries, err := resolve.Unresolved(e, resolve.UnresolvedOptions{Subject: in.Subject})
+	if err != nil {
+		return errResult(err), nil, nil
+	}
+	out := resolve.UnresolvedResult(entries)
+	return okResult(fmt.Sprintf("%d unresolved: %v", len(entries), out["counts"])), out, nil
+}

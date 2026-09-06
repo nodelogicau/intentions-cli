@@ -137,7 +137,7 @@ func TestInstructionsPromptAndTools(t *testing.T) {
 	for _, tl := range tools.Tools {
 		names[tl.Name] = tl
 	}
-	want := []string{"workspace_status", "intention_add", "intention_edit", "intention_firm", "intention_retire", "intention_show", "intention_list", "availability_add", "availability_renew", "availability_supersede", "availability_retire", "availability_list", "generate", "resolve", "select", "check", "acknowledge", "bounds", "validate"}
+	want := []string{"workspace_status", "intention_add", "intention_edit", "intention_firm", "intention_retire", "intention_show", "intention_list", "availability_add", "availability_renew", "availability_supersede", "availability_retire", "availability_list", "generate", "resolve", "select", "unresolved", "check", "acknowledge", "bounds", "validate"}
 	if len(names) != len(want) {
 		t.Errorf("%d tools, want %d", len(names), len(want))
 	}
@@ -328,6 +328,14 @@ func TestResolutionLoop(t *testing.T) {
 	}
 	if g2 := h.ok("generate", map[string]any{"horizon": "P3W"}); int(g2["count"].(float64)) != 0 || len(list(g2, "skipped")) != 3 {
 		t.Errorf("generate idempotent: %v", g2)
+	}
+	h.ok("intention_add", map[string]any{"title": "Pending", "duration": "PT1H", "window": map[string]any{"calendar": "2026-W38"}, "activity": "meeting"})
+	un := h.ok("unresolved", map[string]any{})
+	if int(un["count"].(float64)) != 4 || un["counts"].(map[string]any)["ready"].(float64) != 1 || un["counts"].(map[string]any)["no_candidates"].(float64) != 3 {
+		t.Errorf("unresolved: %v", un["counts"])
+	}
+	if un := h.ok("unresolved", map[string]any{"subject": room}); int(un["count"].(float64)) != 0 {
+		t.Errorf("unresolved subject filter: %v", un)
 	}
 	bd := h.ok("bounds", map[string]any{"calendar": "2026-W38", "clock": "09:00/12:00"})
 	if int(bd["count"].(float64)) != 7 || bd["timezone"] != "Australia/Melbourne" {

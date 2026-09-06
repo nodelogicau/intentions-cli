@@ -474,3 +474,63 @@ func (a *app) acknowledgeCmd() *cobra.Command {
 	addActFlags(cmd, &act)
 	return cmd
 }
+
+func (a *app) unresolvedCmd() *cobra.Command {
+	var act actFlags
+	var rf resolverFlags
+	var subject string
+	cmd := &cobra.Command{
+		Use:   "unresolved [--subject <uri>]",
+		Short: "Every active intention still without a placement, and what stands in its way; writes nothing",
+		Long: `Lists each unretired intention that has no placement and could take one: not a
+terminus, not a recurring intention (its instances are what get placed; run
+generate first so they exist). Each entry carries a status from a dry
+resolution: ready (with the candidate count and best rank), blocked (on a
+relational target with no placement), no_candidates (with the resolver's
+reason), incomplete (duration or window missing), or unresolvable (a serves
+cycle). Soonest deadline first.`,
+		Args: cobra.NoArgs,
+		RunE: a.run(func(cmd *cobra.Command, args []string) error {
+			ws, err := a.openWorkspace()
+			if err != nil {
+				return err
+			}
+			g, err := loadGraph(ws)
+			if err != nil {
+				return err
+			}
+			e, err := a.env(ws, g, act, rf)
+			if err != nil {
+				return err
+			}
+			entries, err := resolve.Unresolved(e, resolve.UnresolvedOptions{Subject: subject})
+			if err != nil {
+				return err
+			}
+			return a.emit(resolve.UnresolvedResult(entries), func(w io.Writer) {
+				printUnresolved(w, entries)
+			})
+		}),
+	}
+	cmd.Flags().StringVar(&subject, "subject", "", "only intentions of this subject")
+	addResolverFlags(cmd, &rf)
+	addActFlags(cmd, &act)
+	return cmd
+}
+
+func printUnresolved(w io.Writer, entries []resolve.UnresolvedEntry) {
+	for _, e := range entries {
+		fmt.Fprintf(w, "%s  %s  %s\n", e.ID, e.Title, e.Status)
+		switch e.Status {
+		case resolve.StatusReady:
+			fmt.Fprintf(w, "  %d candidates, best rank %d", e.Candidates, e.BestRank)
+			if e.Deadline != "" {
+				fmt.Fprintf(w, ", by %s", e.Deadline)
+			}
+			fmt.Fprintln(w)
+		default:
+			fmt.Fprintf(w, "  %s\n", e.Reason)
+		}
+	}
+	fmt.Fprintf(w, "%d unresolved\n", len(entries))
+}
