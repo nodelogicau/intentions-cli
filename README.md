@@ -43,9 +43,15 @@ This is the foundation release. It ends where the format's computation begins:
 ```sh
 # macOS — Homebrew cask, from the same tap as particulars
 brew install nodelogicau/tap/intentions
+
+# Linux or macOS, including CI and agent sandboxes — verifies the release checksum
+curl -sSL https://raw.githubusercontent.com/nodelogicau/intentions-cli/main/install.sh | sh
 ```
 
-Release binaries for macOS, Linux and Windows are published on tags at the
+The script never prompts. It installs to `/usr/local/bin` when it can (directly,
+or via passwordless `sudo`), otherwise to `~/.local/bin`, and says where. Knobs:
+`INTENTIONS_VERSION=v0.2.1` pins a release, `INTENTIONS_INSTALL_DIR=…` picks the
+directory. Windows: download the `.zip` from the
 [releases page](https://github.com/nodelogicau/intentions-cli/releases).
 
 From source (Go 1.26+):

@@ -62,15 +62,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install intentions
-        run: |
-          curl -sSL -o intentions.tar.gz \
-            https://github.com/nodelogicau/intentions-cli/releases/latest/download/intentions_linux_amd64.tar.gz
-          tar -xzf intentions.tar.gz intentions
-          install -m 0755 intentions "$RUNNER_TEMP/intentions"
+        env:
+          INTENTIONS_INSTALL_DIR: ${{ runner.temp }}/bin
+        run: curl -sSL https://raw.githubusercontent.com/nodelogicau/intentions-cli/main/install.sh | sh
       - name: Validate the workspace
-        run: "$RUNNER_TEMP/intentions" validate --workspace .
+        run: "$RUNNER_TEMP/bin/intentions" validate --workspace .
       - name: Index matches the files
-        run: "$RUNNER_TEMP/intentions" index --check --workspace .
+        run: "$RUNNER_TEMP/bin/intentions" index --check --workspace .
 ```
 
 `validate` exits 4 on any error and lists warnings and info without failing;
