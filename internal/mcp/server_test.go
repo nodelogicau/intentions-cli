@@ -137,7 +137,7 @@ func TestInstructionsPromptAndTools(t *testing.T) {
 	for _, tl := range tools.Tools {
 		names[tl.Name] = tl
 	}
-	want := []string{"workspace_status", "intention_add", "intention_edit", "intention_firm", "intention_retire", "intention_show", "intention_list", "availability_add", "availability_renew", "availability_supersede", "availability_retire", "availability_list", "generate", "resolve", "select", "unresolved", "check", "acknowledge", "bounds", "validate"}
+	want := []string{"workspace_status", "intention_add", "intention_edit", "intention_firm", "intention_retire", "intention_show", "intention_list", "availability_add", "availability_renew", "availability_supersede", "availability_retire", "availability_list", "commitment_accept", "commitment_decline", "commitment_cancel", "commitment_show", "commitment_list", "generate", "resolve", "select", "unresolved", "check", "acknowledge", "bounds", "validate"}
 	if len(names) != len(want) {
 		t.Errorf("%d tools, want %d", len(names), len(want))
 	}
@@ -386,5 +386,57 @@ func TestConcurrentWrites(t *testing.T) {
 	}
 	if v := h.ok("validate", map[string]any{}); v["ok"] != true {
 		t.Errorf("validate: %v", v)
+	}
+}
+
+func TestCommitmentTools(t *testing.T) {
+	h := newHarness(t, "claude-ai", Options{})
+	h.ok("availability_add", map[string]any{"subject": ada, "duration": "PT4H", "window": map[string]any{"calendar": "2026-09/2026-12", "clock": "13:00/17:00"}, "conditional": []string{"meeting"}, "cadence": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"})
+	h.ok("availability_add", map[string]any{"subject": room, "duration": "PT8H", "window": map[string]any{"calendar": "2026-09/2026-12", "clock": "08:00/18:00"}, "cadence": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"})
+	in := h.ok("intention_add", map[string]any{"title": "Review in room 3", "duration": "PT1H", "window": map[string]any{"calendar": "2026-W38"}, "activity": "meeting", "parties": []string{room}})
+	sel := h.ok("select", map[string]any{"id": str(in, "id"), "candidate": 1})
+	cmt := sel["commitment"].(map[string]any)["id"].(string)
+
+	a := h.ok("commitment_accept", map[string]any{"id": cmt})
+	if a["party"] != ada || a["status"] != "accepted" || a["previous_version"] == a["version"] {
+		t.Fatalf("accept: %v", a)
+	}
+	if a["source"].(map[string]any)["harness"] != "claude-ai" {
+		t.Errorf("the relaying harness is recorded: %v", a["source"])
+	}
+	h.fail("commitment_accept", map[string]any{"id": cmt}, "refused")
+	h.fail("commitment_decline", map[string]any{"id": cmt, "party": "https://example.com/people/bob"}, "refused")
+	h.ok("commitment_decline", map[string]any{"id": cmt})
+
+	sh := h.ok("commitment_show", map[string]any{"id": cmt})
+	if sh["intention_resolved"].(map[string]any)["id"] != str(in, "id") || sh["flags"] == nil {
+		t.Errorf("show: %v", sh)
+	}
+	if l := h.ok("commitment_list", map[string]any{"status": "tentative", "party": room}); int(l["count"].(float64)) != 1 {
+		t.Errorf("list: %v", l)
+	}
+	h.fail("commitment_list", map[string]any{"status": "maybe"}, "usage")
+
+	// Cancelling frees the intention, which returns to unresolved.
+	c := h.ok("commitment_cancel", map[string]any{"id": cmt, "reason": "the room fell through"})
+	if c["freed"].(map[string]any)["id"] != str(in, "id") || obj(c)["retired"].(map[string]any)["kind"] != "cancelled" {
+		t.Fatalf("cancel: %v", c)
+	}
+	if obj(c["freed"].(map[string]any))["placement"] != nil {
+		t.Error("freed intention still placed")
+	}
+	found := false
+	for _, e := range list(h.ok("unresolved", map[string]any{}), "entries") {
+		if e.(map[string]any)["id"] == str(in, "id") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("freed intention absent from unresolved")
+	}
+	h.fail("commitment_cancel", map[string]any{"id": cmt}, "refused")
+	h.fail("commitment_show", map[string]any{"id": str(in, "id")}, "usage")
+	if l := h.ok("commitment_list", map[string]any{"cancelled": true}); int(l["count"].(float64)) != 1 {
+		t.Errorf("cancelled list: %v", l)
 	}
 }

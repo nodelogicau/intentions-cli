@@ -95,6 +95,9 @@ type Party struct {
 // Party statuses.
 var PartyStatuses = []string{"tentative", "accepted", "declined"}
 
+// ValidPartyStatus reports whether s is an admitted party status.
+func ValidPartyStatus(s string) bool { return oneOf(s, PartyStatuses) }
+
 // Retired is the single retirement record. Canonical order: kind, reason,
 // superseded_by, source, timestamp.
 type Retired struct {

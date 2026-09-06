@@ -96,7 +96,7 @@ func (s *Server) instructions() string {
 		fmt.Fprintf(&b, ", whose default subject is %s", subj)
 	}
 	b.WriteString(". Everything you write lands as YAML files there for a person to review, typically through a git pull request; nothing is committed for you.\n\n")
-	b.WriteString("Tool names are this implementation's (the Intentions Format names none): intention_*, availability_*, generate, resolve, select, unresolved, check, acknowledge, bounds, validate, workspace_status. Every result equals the corresponding CLI verb's --json output.\n")
+	b.WriteString("Tool names are this implementation's (the Intentions Format names none): intention_*, availability_*, commitment_*, generate, resolve, select, unresolved, check, acknowledge, bounds, validate, workspace_status. Every result equals the corresponding CLI verb's --json output.\n")
 	b.Write(skill.Body())
 	if content, err := os.ReadFile(filepath.Join(s.ws.Root, store.ConventionsFile)); err == nil && len(strings.TrimSpace(string(content))) > 0 {
 		b.WriteString("\n\n## Workspace conventions (" + store.ConventionsFile + ")\n\n")

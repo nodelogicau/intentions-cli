@@ -31,14 +31,17 @@ tool to decide, for raising upstream.
 
 | Implemented | Deferred to follow-on changes |
 |---|---|
-| Workspace: `init`, discovery, `intentions.yaml` | Commitment `accept`, `decline`, `cancel` |
-| Intentions: add, edit, firm, retire, show, list | iCalendar and JSCalendar import and export; iTIP |
-| Availability: add, edit, renew, supersede, retire, show, list | MCP server |
-| The temporal engine: durations, EDTF, clock anchors, cadence, bounds | Presence, federation |
+| Workspace: `init`, discovery, `intentions.yaml`, `workspace pointer` | iCalendar and JSCalendar import and export; iTIP |
+| Intentions: add, edit, firm, retire, show, list | Presence, federation |
+| Availability: add, edit, renew, supersede, retire, show, list | |
+| Commitments: accept, decline, cancel, show, list | |
+| The temporal engine: durations, EDTF, clock anchors, cadence, bounds | |
 | Projection versioning (`sha256:` of RFC 8785 canonical JSON) | |
 | `generate`, `resolve`, `select`: instances, ranked candidates, the recorded act, commitments for parties | |
 | `check` and `acknowledge`: the six flag kinds, suppression, lapse | |
 | `validate` over every object type, `index`, `show`, `bounds` | |
+| `unresolved`: what still awaits a placement, and why | |
+| MCP server (`serve --mcp`) and Claude Desktop bundle | |
 | Agent skill, installer, Homebrew cask | |
 
 ## Install
@@ -128,6 +131,9 @@ intentions intention add --title "Read the board pack" --json
 | `resolve <id> [--limit] [--step] [--scope]` | Ranked candidate placements for an intention; writes nothing but the instances it generates |
 | `select <id> (--candidate N \| --policy <id>) [--replace]` | The recorded act: RESOLUTION record, placement, and a commitment when there are parties |
 | `unresolved [--subject <uri>]` | Every active intention without a placement and what stands in its way: `ready`, `blocked`, `no_candidates`, `incomplete`, `unresolvable`; soonest deadline first |
+| `commitment accept\|decline <id> [--party <uri>]` | Record that a party has accepted or declined; only ever on the person's word |
+| `commitment cancel <id> [--reason]` | Cancel it and clear the placement of the intention it was for, so that intention may be resolved again |
+| `commitment show <id>`, `commitment list` | Show one with its intention and flags; list active (or `--cancelled`) by party, status or intention |
 | `check [<id>]... [--fail-on-flags]` | The consistency check: six flag kinds, suppressed by acknowledgement; writes nothing |
 | `acknowledge <id> --kind <k> [--counterpart <id>] [--reason]` | Record that the person has seen a flag against the counterpart's current version |
 | `show <id>` | Show any object, including commitments and resolutions written by other tools |

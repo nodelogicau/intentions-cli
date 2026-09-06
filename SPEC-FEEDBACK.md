@@ -457,3 +457,28 @@ implementation's, not the format's. See [docs/mcp.md](docs/mcp.md#tools).
 these names and parameters, with the status DKF gives its tool names: an
 implementation MAY expose them under other names, but one that exposes these
 SHOULD keep their semantics, so that skills and prompts transfer.
+
+## 24. What a declined party means ([#24](https://github.com/nodelogicau/intentions/issues/24))
+
+**The draft says:** a party's status is one of `tentative`, `accepted`,
+`declined`, changed only by that party's own act; cancellation is a separate
+`retired` record that clears the intention's placement.
+
+**The problem:** nothing says what `declined` means for the rest of the
+model. An unretired commitment occupies its parties' time, so a declined one
+keeps blocking the person's calendar and costing later resolutions a
+displacement, for a thing they have refused. Its intention also stays placed,
+so it is no longer resolvable, though the person has decided this placement
+will not happen. And the subject declining is not the same situation as a
+counterparty declining, though the field records them identically.
+
+**We decided:** v0.8.0 records the answer and changes nothing else. A declined
+commitment still occupies its parties' time and its intention stays placed;
+only `cancel` frees either. That never frees time the other parties still
+believe is booked, at the cost of an explicit cancellation.
+
+**Proposed text:** state under Commitment what `declined` entails: either a
+declined party's own time is free while the commitment stands, said also where
+Resolution defines occupancy and naming whose decline frees whose time, or
+declining is purely a record and cancellation is the only act that frees
+anything, in which case say a decline by the subject SHOULD prompt one.

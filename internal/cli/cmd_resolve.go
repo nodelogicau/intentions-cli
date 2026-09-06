@@ -9,6 +9,7 @@ import (
 
 	"github.com/nodelogicau/intentions-cli/internal/consistency"
 	"github.com/nodelogicau/intentions-cli/internal/model"
+	"github.com/nodelogicau/intentions-cli/internal/projection"
 	"github.com/nodelogicau/intentions-cli/internal/render"
 	"github.com/nodelogicau/intentions-cli/internal/resolve"
 	"github.com/nodelogicau/intentions-cli/internal/store"
@@ -533,4 +534,331 @@ func printUnresolved(w io.Writer, entries []resolve.UnresolvedEntry) {
 		}
 	}
 	fmt.Fprintf(w, "%d unresolved\n", len(entries))
+}
+
+func (a *app) commitmentCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "commitment",
+		Short: "Answer, cancel, show and list commitments",
+	}
+	cmd.AddCommand(a.commitmentAnswerCmd("accept"), a.commitmentAnswerCmd("decline"), a.commitmentCancelCmd(), a.commitmentShowCmd(), a.commitmentListCmd())
+	return cmd
+}
+
+// commitmentAnswerCmd builds accept and decline, which differ only in the
+// status they record.
+func (a *app) commitmentAnswerCmd(verb string) *cobra.Command {
+	status := map[string]string{"accept": "accepted", "decline": "declined"}[verb]
+	var act actFlags
+	var rf resolverFlags
+	var party string
+	cmd := &cobra.Command{
+		Use:   verb + " <id> [--party <uri>]",
+		Short: "Record that a party has " + status + " this commitment",
+		Long: `Sets one party's status to ` + status + ` and changes nothing else. The party
+defaults to defaults.subject, the workspace owner, the only entry a local act
+may speak for; a workspace with no default subject must pass --party.
+
+A party's status is a fact about their will. No policy authorises this act and
+nothing infers it: record it only on the person's word. Answering for another
+party is an iTIP reply, which arrives by import.`,
+		Args: cobra.ExactArgs(1),
+		RunE: a.run(func(cmd *cobra.Command, args []string) error {
+			ws, err := a.openWorkspace()
+			if err != nil {
+				return err
+			}
+			g, err := loadGraph(ws)
+			if err != nil {
+				return err
+			}
+			c, err := getCommitment(g, args[0])
+			if err != nil {
+				return err
+			}
+			src := resolveSource(ws, act)
+			if err := requireAuthor(src); err != nil {
+				return err
+			}
+			i, err := model.CheckAnswer(c, party, status, ws.Config.Defaults.Subject)
+			if err != nil {
+				return err
+			}
+			prev, err := projection.Version(c)
+			if err != nil {
+				return err
+			}
+			o := *c
+			o.Parties = append([]model.Party(nil), c.Parties...)
+			o.Parties[i].Status = status
+			if err := writeObject(ws, &o); err != nil {
+				return err
+			}
+			g.Add(&o)
+			out, err := objectResult(&o)
+			if err != nil {
+				return err
+			}
+			out["previous_version"] = prev
+			out["party"] = o.Parties[i].URI
+			out["status"] = status
+			out["source"] = src
+			e, err := a.env(ws, g, act, rf)
+			if err != nil {
+				return err
+			}
+			flags, err := flagsOn(e, o.ID)
+			if err != nil {
+				return err
+			}
+			out["flags"] = flags
+			return a.emit(out, func(w io.Writer) {
+				fmt.Fprintf(w, "%s is %s on %s (%s -> %s)\n", o.Parties[i].URI, status, o.ID, prev, o.Version)
+				printFlags(w, flags)
+			})
+		}),
+	}
+	cmd.Flags().StringVar(&party, "party", "", "the party answering (default: defaults.subject)")
+	addResolverFlags(cmd, &rf)
+	addActFlags(cmd, &act)
+	return cmd
+}
+
+func (a *app) commitmentCancelCmd() *cobra.Command {
+	var act actFlags
+	var reason string
+	cmd := &cobra.Command{
+		Use:   "cancel <id> [--reason <text>]",
+		Short: "Cancel a commitment and free the intention it was for",
+		Long: `Appends a retired record with kind cancelled, the only kind a commitment
+admits and a terminal one. When the commitment names an intention that is
+still placed, that placement is cleared in the same act: the intention keeps
+its window, duration and stability, is not retired, and is eligible for
+resolution again. The RESOLUTION record is left as history.`,
+		Args: cobra.ExactArgs(1),
+		RunE: a.run(func(cmd *cobra.Command, args []string) error {
+			ws, err := a.openWorkspace()
+			if err != nil {
+				return err
+			}
+			g, err := loadGraph(ws)
+			if err != nil {
+				return err
+			}
+			c, err := getCommitment(g, args[0])
+			if err != nil {
+				return err
+			}
+			src := resolveSource(ws, act)
+			if err := requireAuthor(src); err != nil {
+				return err
+			}
+			at, err := resolveNow(act)
+			if err != nil {
+				return err
+			}
+			ts, err := resolveTimestamp(act, at)
+			if err != nil {
+				return err
+			}
+			r := model.Retired{Kind: "cancelled", Reason: reason, Source: src, Timestamp: ts}
+			if err := model.CheckRetirement(g, c, r); err != nil {
+				return err
+			}
+			prev, err := projection.Version(c)
+			if err != nil {
+				return err
+			}
+			o := *c
+			o.Retired = &r
+			if err := writeObject(ws, &o); err != nil {
+				return err
+			}
+			g.Add(&o)
+			out, err := objectResult(&o)
+			if err != nil {
+				return err
+			}
+			out["previous_version"] = prev
+			out["cancelled"] = map[string]any{"reason": reason, "timestamp": temporal.FormatTimestamp(ts)}
+			// Free the intention it was for: the placement goes, nothing else.
+			if o.Intention != "" {
+				if in, ok := g.Get(o.Intention); ok {
+					if in, ok := in.(*model.Intention); ok && in.Retired == nil && in.Placement != nil {
+						freed := *in
+						freed.Placement = nil
+						if err := writeObject(ws, &freed); err != nil {
+							return err
+						}
+						g.Add(&freed)
+						fm, err := objectResult(&freed)
+						if err != nil {
+							return err
+						}
+						out["freed"] = fm
+					}
+				}
+			}
+			return a.emit(out, func(w io.Writer) {
+				fmt.Fprintf(w, "Cancelled %s\n", o.ID)
+				if _, ok := out["freed"]; ok {
+					fmt.Fprintf(w, "  %s is unplaced again and may be resolved\n", o.Intention)
+				}
+			})
+		}),
+	}
+	cmd.Flags().StringVar(&reason, "reason", "", "why it was cancelled")
+	addActFlags(cmd, &act)
+	return cmd
+}
+
+func (a *app) commitmentShowCmd() *cobra.Command {
+	var act actFlags
+	var rf resolverFlags
+	cmd := &cobra.Command{
+		Use:   "show <id>",
+		Short: "Show one commitment with its version, its intention and its flags",
+		Args:  cobra.ExactArgs(1),
+		RunE: a.run(func(cmd *cobra.Command, args []string) error {
+			ws, err := a.openWorkspace()
+			if err != nil {
+				return err
+			}
+			g, err := ws.Load()
+			if err != nil {
+				return err
+			}
+			c, err := getCommitment(g, args[0])
+			if err != nil {
+				return err
+			}
+			out, err := objectResult(c)
+			if err != nil {
+				return err
+			}
+			if c.Intention != "" {
+				entry := map[string]any{"id": c.Intention}
+				if in, ok := g.Get(c.Intention); ok {
+					if in, ok := in.(*model.Intention); ok {
+						entry["title"] = in.Title
+						entry["placed"] = in.Placement != nil
+						if in.Retired != nil {
+							entry["retired"] = in.Retired.Kind
+						}
+					}
+				} else {
+					entry["missing"] = true
+				}
+				out["intention_resolved"] = entry
+			}
+			e, err := a.env(ws, g, act, rf)
+			if err != nil {
+				return err
+			}
+			flags, err := flagsOn(e, c.ID)
+			if err != nil {
+				return err
+			}
+			out["flags"] = flags
+			return a.emit(out, func(w io.Writer) {
+				fmt.Fprintf(w, "%s  %s\n", c.ID, firstNonEmpty(c.Title, c.Intention))
+				if c.Placement != nil {
+					fmt.Fprintf(w, "  placement %s for %s\n", c.Placement.Start.Raw, c.Placement.Duration.String())
+				}
+				for _, p := range c.Parties {
+					fmt.Fprintf(w, "  %-10s %s\n", p.Status, p.URI)
+				}
+				if c.Retired != nil {
+					fmt.Fprintf(w, "  retired %s\n", c.Retired.Kind)
+				}
+				printFlags(w, flags)
+			})
+		}),
+	}
+	addResolverFlags(cmd, &rf)
+	addActFlags(cmd, &act)
+	return cmd
+}
+
+func (a *app) commitmentListCmd() *cobra.Command {
+	var party, status, intention string
+	var cancelled bool
+	cmd := &cobra.Command{
+		Use:   "list [--party <uri>] [--status <s>] [--intention <id>] [--cancelled]",
+		Short: "List commitments, active by default",
+		Args:  cobra.NoArgs,
+		RunE: a.run(func(cmd *cobra.Command, args []string) error {
+			ws, err := a.openWorkspace()
+			if err != nil {
+				return err
+			}
+			g, err := ws.Load()
+			if err != nil {
+				return err
+			}
+			if status != "" && !model.ValidPartyStatus(status) {
+				return usageErr("--status must be one of %s", strings.Join(model.PartyStatuses, ", "))
+			}
+			var items []*model.Commitment
+			for _, o := range g.Commitments() {
+				if (o.Retired != nil) != cancelled || (intention != "" && o.Intention != intention) {
+					continue
+				}
+				if party != "" || status != "" {
+					match := false
+					for _, p := range o.Parties {
+						if (party == "" || p.URI == party) && (status == "" || p.Status == status) {
+							match = true
+						}
+					}
+					if !match {
+						continue
+					}
+				}
+				items = append(items, o)
+			}
+			list := make([]map[string]any, 0, len(items))
+			for _, o := range items {
+				m, err := model.ToMap(o)
+				if err != nil {
+					return err
+				}
+				list = append(list, m)
+			}
+			return a.emit(map[string]any{"commitments": list, "count": len(list)}, func(w io.Writer) {
+				for _, o := range items {
+					start := ""
+					if o.Placement != nil {
+						start = o.Placement.Start.Raw
+					}
+					statuses := make([]string, 0, len(o.Parties))
+					for _, p := range o.Parties {
+						statuses = append(statuses, p.Status)
+					}
+					fmt.Fprintf(w, "%s  %-25s %-30s %s\n", o.ID, start, oneLine(firstNonEmpty(o.Title, o.Intention), 30), strings.Join(statuses, "/"))
+				}
+				if len(items) == 0 {
+					fmt.Fprintln(w, "(no commitments)")
+				}
+			})
+		}),
+	}
+	cmd.Flags().StringVar(&party, "party", "", "filter by a party URI")
+	cmd.Flags().StringVar(&status, "status", "", "filter by a party status: tentative, accepted, declined")
+	cmd.Flags().StringVar(&intention, "intention", "", "filter by the intention fulfilled")
+	cmd.Flags().BoolVar(&cancelled, "cancelled", false, "list cancelled commitments instead of active")
+	return cmd
+}
+
+// getCommitment resolves an id that must name a commitment.
+func getCommitment(g *store.Graph, id string) (*model.Commitment, error) {
+	obj, err := getObject(g, id)
+	if err != nil {
+		return nil, err
+	}
+	c, ok := obj.(*model.Commitment)
+	if !ok {
+		return nil, usageErr("%s is a %s, not a commitment", id, obj.GetType())
+	}
+	return c, nil
 }

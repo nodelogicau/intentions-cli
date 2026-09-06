@@ -3,6 +3,29 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.0] - 2026-09-07
+
+The interpersonal object gets its acts. `select` has written commitments since
+0.4.0; now a person can answer one.
+
+### Added
+
+- `commitment accept|decline <id> [--party <uri>]`: set one party's status.
+  The party defaults to `defaults.subject`. No policy authorises either act
+  and nothing infers one: a party's status is a fact about their will, so the
+  verb records what the person said, as `acknowledge` does. Setting a status
+  the party already holds is refused rather than written.
+- `commitment cancel <id> [--reason]`: append the terminal `cancelled`
+  retirement, the only kind a commitment admits, and clear the placement of
+  the intention it fulfils in the same act. That intention keeps its window,
+  duration and stability, is not retired, and returns to `unresolved`. The
+  resolution record is left as history.
+- `commitment show <id>` and `commitment list [--party] [--status]
+  [--intention] [--cancelled]`.
+- Five MCP tools mirroring them, taking the surface to twenty-five.
+- SPEC-FEEDBACK item 24: the format does not say what a declined party means
+  for occupancy, or whether the intention behind it should be freed.
+
 ## [0.7.0] - 2026-09-06
 
 ### Added
@@ -158,6 +181,7 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
+[0.8.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.4.0...v0.5.0

@@ -310,3 +310,36 @@ func ParsePolicy(s string) (*Policy, error) {
 	}
 	return p, nil
 }
+
+// CheckAnswer settles which party entry an accept or decline speaks for and
+// refuses the acts the format does not admit. A party's status is a deontic
+// fact about their will: nothing infers it, no policy authorises it, and only
+// the party's own entry may be set by a local act.
+func CheckAnswer(c *Commitment, party, status, subject string) (int, error) {
+	if err := CheckNotRetired(c); err != nil {
+		return -1, err
+	}
+	if !oneOf(status, PartyStatuses) {
+		return -1, refuse("party_status", "%q is not a party status; admitted statuses are %s", status, strings.Join(PartyStatuses, ", "))
+	}
+	if party == "" {
+		party = subject
+	}
+	if party == "" {
+		return -1, refuse("party", "which party is answering? this workspace declares no defaults.subject, so pass --party")
+	}
+	for i, p := range c.Parties {
+		if p.URI != party {
+			continue
+		}
+		if p.Status == status {
+			return -1, refuse("party_status", "%s is already %s on %s", party, status, c.ID)
+		}
+		return i, nil
+	}
+	uris := make([]string, 0, len(c.Parties))
+	for _, p := range c.Parties {
+		uris = append(uris, p.URI)
+	}
+	return -1, refuse("party", "%s is not a party to %s; its parties are %s. Answering for another party is an iTIP reply, which arrives by import", party, c.ID, strings.Join(uris, ", "))
+}

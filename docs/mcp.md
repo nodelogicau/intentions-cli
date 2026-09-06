@@ -12,7 +12,7 @@ decision. It comes down to whether your harness already has a shell.
 
 | | Always in context | When planning work happens |
 |---|---|---|
-| MCP server | ~11,000 tokens (20 tool schemas ≈ 7,400, instructions ≈ 3,600) | the same |
+| MCP server | ~12,500 tokens (25 tool schemas ≈ 8,400, instructions ≈ 4,100) | the same |
 | Skill + CLI | ~160 tokens (the skill's frontmatter description) | ~3,400 tokens (the body loads when triggered) |
 
 **Use the skill and the CLI in harnesses that have a shell**: Claude Code,
@@ -158,6 +158,10 @@ implementation's, one per CLI operation. Every optional field may be omitted;
 | `resolve` | `id`, `limit?`, `step?`, `scope?`, `now?` | `{intention, candidates, candidates_considered, generated, range?, reason?, blocked_on?, no_supply?, excluded?}` |
 | `select` | `id`, `candidate` **or** `policy`, `replace?`, `scope?`, `now?` | `{resolution, intention, candidate, commitment?, replaced?, flags, policy?}` |
 | `unresolved` | `subject?`, `scope?`, `now?` | `{entries: [{id, title, subject, activity?, duration?, window?, status, reason?, blocked_on?, candidates, best_rank?, range?, deadline?, timestamp}], count, counts}` |
+| `commitment_accept` / `commitment_decline` | `id`, `party?`, `source?` | `{…, previous_version, party, status, source, flags}` |
+| `commitment_cancel` | `id`, `reason?`, `timestamp?`, `source?` | `{…, previous_version, cancelled, freed?}` |
+| `commitment_show` | `id`, `now?` | `{…, intention_resolved, flags}` |
+| `commitment_list` | `party?`, `status?`, `intention?`, `cancelled?` | `{commitments, count}` |
 | `check` | `ids[]?`, `scope?`, `now?` | `{flags, count, counts}` |
 | `acknowledge` | `id`, `kind`, `counterpart?`, `reason?`, `now?` | `{…, acknowledgement, flags}` |
 | `bounds` | `id?`, `calendar?`, `clock?`, `timezone?`, `hemisphere?`, `now?` | `{window, timezone, hemisphere, intervals, count}` |

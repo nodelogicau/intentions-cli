@@ -51,6 +51,7 @@ func (s *Server) registerTools() {
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "availability_list", Annotations: readOnly,
 		Description: "Every availability (active by default), filtered by subject, conditional, scope, or retired, each with its effective validity horizon."},
 		s.availabilityList)
+	s.registerCommitmentTools()
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "generate", Annotations: additive,
 		Description: "Materialise instances of recurring intentions over a horizon (default generation.horizon from now). Idempotent on (recurring, occurrence); a retired instance is never regenerated. Run before planning a period."},
 		s.generate)

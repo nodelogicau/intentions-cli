@@ -1382,3 +1382,133 @@ func readFileAt(t *testing.T, path string) string {
 	}
 	return string(b)
 }
+
+// commitmentFixture builds a workspace holding one tentative commitment
+// between ada and the meeting room, and returns the ids.
+func commitmentFixture(t *testing.T) (ws, cmt, intention string) {
+	t.Helper()
+	ws = initWS(t)
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--duration", "PT4H", "--calendar", "2026-09/2026-12", "--clock", "13:00/17:00", "--conditional", "meeting", "--cadence", "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"), "ada supply")
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", room, "--duration", "PT8H", "--calendar", "2026-09/2026-12", "--clock", "08:00/18:00", "--cadence", "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"), "room supply")
+	m := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Review in room 3", "--duration", "PT1H", "--calendar", "2026-W38", "--activity", "meeting", "--party", room), "intention")
+	s := mustOK(t, run(t, ws, "", "select", m.str("id"), "--candidate", "1", "--now", rnow), "select")
+	return ws, s.json["commitment"].(map[string]any)["id"].(string), m.str("id")
+}
+
+const room = "https://example.com/rooms/3"
+
+func TestCommitmentAnswer(t *testing.T) {
+	ws, cmt, _ := commitmentFixture(t)
+	// The owner's own entry is the default.
+	r := mustOK(t, run(t, ws, "", "commitment", "accept", cmt, "--now", rnow), "accept")
+	if r.str("party") != ada || r.str("status") != "accepted" {
+		t.Fatalf("accept: %v", r.json)
+	}
+	parties := r.obj()["parties"].([]any)
+	got := map[string]string{}
+	for _, p := range parties {
+		p := p.(map[string]any)
+		got[p["uri"].(string)] = p["status"].(string)
+	}
+	if got[ada] != "accepted" || got[room] != "tentative" {
+		t.Errorf("only the answering party changes: %v", got)
+	}
+	if r.str("version") == r.str("previous_version") {
+		t.Error("a status change must change the version")
+	}
+	// Idempotence is refused, not written.
+	if r := run(t, ws, "", "commitment", "accept", cmt, "--now", rnow); r.code != 2 || !strings.Contains(errMsg(r), "already accepted") {
+		t.Errorf("re-accept: %d %s", r.code, errMsg(r))
+	}
+	// Declining is the same act with the other status.
+	d := mustOK(t, run(t, ws, "", "commitment", "decline", cmt, "--now", rnow), "decline")
+	if d.obj()["parties"].([]any)[0].(map[string]any)["status"] != "declined" && d.obj()["parties"].([]any)[1].(map[string]any)["status"] != "declined" {
+		t.Errorf("decline: %v", d.obj()["parties"])
+	}
+	// A party the commitment does not list.
+	if r := run(t, ws, "", "commitment", "accept", cmt, "--party", "https://example.com/people/bob", "--now", rnow); r.code != 2 || !strings.Contains(errMsg(r), "not a party") {
+		t.Errorf("stranger: %d %s", r.code, errMsg(r))
+	}
+	// Another party of the commitment may be answered for explicitly.
+	mustOK(t, run(t, ws, "", "commitment", "accept", cmt, "--party", room, "--now", rnow), "room accepts")
+	// A cancelled commitment refuses every answer.
+	mustOK(t, run(t, ws, "", "commitment", "cancel", cmt, "--now", rnow), "cancel")
+	if r := run(t, ws, "", "commitment", "accept", cmt, "--now", rnow); r.code != 2 || !strings.Contains(errMsg(r), "is retired (cancelled)") {
+		t.Errorf("answer after cancel: %d %s", r.code, errMsg(r))
+	}
+}
+
+func TestCommitmentCancelFreesTheIntention(t *testing.T) {
+	ws, cmt, in := commitmentFixture(t)
+	before := mustOK(t, run(t, ws, "", "show", in), "intention before")
+	if before.obj()["placement"] == nil {
+		t.Fatal("fixture intention is not placed")
+	}
+	r := mustOK(t, run(t, ws, "", "commitment", "cancel", cmt, "--reason", "the room fell through", "--now", rnow), "cancel")
+	if r.obj()["retired"].(map[string]any)["kind"] != "cancelled" || r.obj()["retired"].(map[string]any)["reason"] != "the room fell through" {
+		t.Errorf("retirement: %v", r.obj()["retired"])
+	}
+	freed := r.json["freed"].(map[string]any)
+	if freed["id"] != in {
+		t.Fatalf("freed: %v", freed)
+	}
+	after := mustOK(t, run(t, ws, "", "show", in), "intention after")
+	o := after.obj()
+	if o["placement"] != nil || o["retired"] != nil || o["window"].(map[string]any)["calendar"] != "2026-W38" || o["stability"] != "tentative" {
+		t.Errorf("freed intention: %v", o)
+	}
+	// It is resolvable again, and unresolved lists it.
+	u := mustOK(t, run(t, ws, "", "unresolved", "--now", rnow), "unresolved")
+	found := false
+	for _, e := range u.json["entries"].([]any) {
+		if e.(map[string]any)["id"] == in {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("freed intention absent from unresolved: %v", u.json)
+	}
+	mustOK(t, run(t, ws, "", "resolve", in, "--now", rnow), "resolve again")
+	// Cancellation is terminal, and the resolution record is untouched.
+	if r := run(t, ws, "", "commitment", "cancel", cmt, "--now", rnow); r.code != 2 || !strings.Contains(errMsg(r), "already retired") {
+		t.Errorf("re-cancel: %d %s", r.code, errMsg(r))
+	}
+	if fi, _ := os.ReadDir(filepath.Join(ws, "resolutions")); len(fi) != 1 {
+		t.Error("cancel touched the resolution record")
+	}
+}
+
+func TestCommitmentShowAndList(t *testing.T) {
+	ws, cmt, in := commitmentFixture(t)
+	s := mustOK(t, run(t, ws, "", "commitment", "show", cmt, "--now", rnow), "show")
+	if s.json["intention_resolved"].(map[string]any)["id"] != in || s.json["flags"] == nil {
+		t.Errorf("show: %v", s.json)
+	}
+	if l := mustOK(t, run(t, ws, "", "commitment", "list"), "list"); int(l.json["count"].(float64)) != 1 {
+		t.Errorf("list: %v", l.json)
+	}
+	if l := mustOK(t, run(t, ws, "", "commitment", "list", "--party", ada, "--status", "tentative"), "filter"); int(l.json["count"].(float64)) != 1 {
+		t.Errorf("party+status filter: %v", l.json)
+	}
+	mustOK(t, run(t, ws, "", "commitment", "accept", cmt, "--now", rnow), "accept")
+	if l := mustOK(t, run(t, ws, "", "commitment", "list", "--party", ada, "--status", "tentative"), "filter after accept"); int(l.json["count"].(float64)) != 0 {
+		t.Errorf("status filter after accept: %v", l.json)
+	}
+	if l := mustOK(t, run(t, ws, "", "commitment", "list", "--intention", in), "by intention"); int(l.json["count"].(float64)) != 1 {
+		t.Errorf("intention filter: %v", l.json)
+	}
+	if r := run(t, ws, "", "commitment", "list", "--status", "maybe"); r.code != 2 {
+		t.Errorf("bad status: %d", r.code)
+	}
+	// Cancelled ones are listed only on request.
+	mustOK(t, run(t, ws, "", "commitment", "cancel", cmt, "--now", rnow), "cancel")
+	if l := mustOK(t, run(t, ws, "", "commitment", "list"), "active"); int(l.json["count"].(float64)) != 0 {
+		t.Errorf("cancelled still active: %v", l.json)
+	}
+	if l := mustOK(t, run(t, ws, "", "commitment", "list", "--cancelled"), "cancelled"); int(l.json["count"].(float64)) != 1 {
+		t.Errorf("cancelled list: %v", l.json)
+	}
+	if r := run(t, ws, "", "commitment", "show", in); r.code != 2 || !strings.Contains(errMsg(r), "not a commitment") {
+		t.Errorf("show an intention: %d %s", r.code, errMsg(r))
+	}
+}

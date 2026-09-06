@@ -109,6 +109,9 @@ modifiers inside double quotes, so `"$id:in-order-to"` silently corrupts the id.
 | Record the choice | `intentions select <id> --candidate N --json` → `{resolution, intention, commitment?, flags}`; `--replace` to move a placed one |
 | Select under a policy | `intentions select <id> --policy <terminus id> --json` — harness only, top rank-1 candidate only; refused otherwise |
 | What awaits placement | `intentions unresolved [--subject <uri>] --json` → `{entries: [{id, title, status, reason?, blocked_on?, candidates, best_rank?, deadline?}], count, counts}`; `ready` means candidates exist, `blocked` names the target to place first, `incomplete` needs an edit |
+| Answer a commitment | `intentions commitment accept\|decline <id> [--party <uri>] --json` — only when the person has said so; no policy authorises it |
+| Cancel a commitment | `intentions commitment cancel <id> [--reason "<why>"] --json` → the intention it was for loses its placement and may be resolved again |
+| What is outstanding | `intentions commitment list [--party <uri>] [--status tentative] --json` |
 | What clashes | `intentions check [<id>]... --json` → `{flags: [{kind, subject, counterpart, counterpart_version, detail}]}`; six kinds, never decisions |
 | Proceed anyway | `intentions acknowledge <id> --kind <kind> --counterpart <id> --reason "<why>" --json` — only on the person's word; lapses when the counterpart changes |
 | Health check | `intentions validate --json`; `intentions index --check --json` |
@@ -191,6 +194,25 @@ On failure stderr carries `{"error": {"code", "message"}}`; a refused write says
   reconfirms; do not renew on their behalf.
 - **Scope is only ever widened.** Default `personal`; `organisation` when the
   person says others may plan against it; never `public` unless told.
+
+## Rules for commitments
+
+A commitment is the interpersonal object: `select` writes one whenever the
+intention has parties, with everyone at `tentative`.
+
+- **A party's status is theirs.** `accept` and `decline` record what the person
+  told you and nothing else. No policy authorises them, no flag implies them,
+  and a person sounding keen is not an acceptance. If you have not been told,
+  ask; do not answer for them.
+- **You answer for one party.** `--party` defaults to the workspace's subject,
+  the person you work for. Answering for anyone else is an iTIP reply, which
+  arrives by import, not by this verb.
+- **Cancel frees the intention.** `commitment cancel` retires the commitment as
+  `cancelled`, the only kind it admits, and clears the placement of the
+  intention it was for. That intention keeps its window and returns to
+  `unresolved`, so offer to resolve it again.
+- **Declining is not cancelling.** A declined commitment still stands and still
+  occupies the time until someone cancels it.
 
 ## Retirement
 
