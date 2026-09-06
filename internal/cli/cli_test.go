@@ -897,6 +897,7 @@ func TestSkillShowAndInstall(t *testing.T) {
 	_ = os.Chdir(work)
 	defer func() { _ = os.Chdir(cwd) }()
 	t.Setenv("HOME", filepath.Join(work, "home"))
+	t.Setenv("USERPROFILE", filepath.Join(work, "home")) // os.UserHomeDir on Windows
 
 	// show needs no workspace and renders the embedded skill.
 	show := text(t, "", "skill", "show")
