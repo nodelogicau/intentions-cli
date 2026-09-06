@@ -445,13 +445,21 @@ Format does not, so another MCP server for intentions would name and shape its
 tools differently, and a skill written against one would not work against the
 other.
 
-**We decided:** v0.5.0 exposes one MCP tool per operation, named after the
-verb (`intention_add` … `workspace_status`), with inputs typed after the
-format's own structures: a window is `{calendar, clock, relative}`, a duration
-a string or `{nominal, min, max}`, `serves` a list of `{id, role}`, and
-`select` takes a person's `candidate` or a harness's `policy`. Results equal
-the CLI's `--json`. The server tells the model these names are the
+**We decided:** one MCP tool per operation, named after the verb. As of
+v0.8.0 the set is twenty-five: six `intention_*`, five `availability_*`, five
+`commitment_*`, `generate`, `resolve`, `select`, `unresolved`, `check`,
+`acknowledge`, `bounds`, `validate` and `workspace_status`. Inputs are typed
+after the format's own structures: a window is `{calendar, clock, relative}`,
+a duration a string or `{nominal, min, max}`, `serves` a list of `{id, role}`,
+and `select` takes a person's `candidate` or a harness's `policy`. Results
+equal the CLI's `--json`. The server tells the model these names are the
 implementation's, not the format's. See [docs/mcp.md](docs/mcp.md#tools).
+
+Three carry semantics a second implementation would have to keep for a skill
+to transfer: `select` (a candidate or a policy, never both, while `resolve`
+chooses nothing), `intention_firm` (a harness needs a policy), and the two
+answering tools (no policy exists at all, because a party's status is a fact
+about their will). `unresolved` is the one tool with no verb in the draft.
 
 **Proposed text:** a non-normative "Reference tool set" appendix listing
 these names and parameters, with the status DKF gives its tool names: an
