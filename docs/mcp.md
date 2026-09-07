@@ -155,7 +155,7 @@ implementation's, one per CLI operation. Every optional field may be omitted;
 | `availability_retire` | `id`, `kind`, `superseded_by?`, `reason?` | `{…, retired}` |
 | `availability_list` | `subject?`, `conditional?`, `scope?`, `retired?`, `now?` | `{availability, count}` |
 | `generate` | `horizon?`, `recurring[]?`, `now?` | `{created, skipped, count, range}` |
-| `resolve` | `id`, `limit?`, `step?`, `scope?`, `now?` | `{intention, candidates, candidates_considered, generated, range?, reason?, blocked_on?, no_supply?, excluded?}` |
+| `resolve` | `id`, `limit?`, `step?`, `scope?`, `now?` | `{intention, candidates, candidates_considered, generated, range?, reason?, blocked_on?, no_supply?, presumed?, excluded?}` |
 | `select` | `id`, `candidate` **or** `policy`, `replace?`, `scope?`, `now?` | `{resolution, intention, candidate, commitment?, replaced?, flags, policy?}` |
 | `unresolved` | `subject?`, `scope?`, `now?` | `{entries: [{id, title, subject, activity?, duration?, window?, status, reason?, blocked_on?, candidates, best_rank?, range?, deadline?, timestamp}], count, counts}` |
 | `commitment_accept` / `commitment_decline` | `id`, `party?`, `source?` | `{…, previous_version, party, status, source, flags}` |

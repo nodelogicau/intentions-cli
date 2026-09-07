@@ -88,6 +88,20 @@ func (p Placed) FirmFor(uri string) bool {
 	return p.Statuses[uri] == "accepted"
 }
 
+// Tracks reports whether the workspace has anything to say about a
+// particular's time: it holds at least one availability whose subject is that
+// URI, in any state. A retired or expired record still counts, because it is
+// still the workspace speaking about them. Holding none is silence, not a
+// declaration that they are busy.
+func (e Env) Tracks(uri string) bool {
+	for _, av := range e.G.Availabilities() {
+		if av.Subject == uri {
+			return true
+		}
+	}
+	return false
+}
+
 // PlacedObjects returns every unretired placed intention and every unretired
 // opaque commitment, with their intervals in the environment's context.
 // Transparent commitments occupy no time and are never included.

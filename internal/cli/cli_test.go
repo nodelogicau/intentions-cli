@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1850,5 +1851,112 @@ func TestReplacementCarriesTheCommitment(t *testing.T) {
 	// Only one live commitment remains.
 	if l := mustOK(t, run(t, ws, "", "commitment", "list"), "list"); int(l.json["count"].(float64)) != 1 {
 		t.Errorf("live commitments: %v", l.json)
+	}
+}
+
+// --- align-with-untracked-parties ------------------------------------------
+
+const external = "mailto:someone@another-company.example"
+
+// TestUntrackedPartyResolves covers the supply half: a party the workspace
+// holds nothing for constrains nothing, and the record says so.
+func TestUntrackedPartyResolves(t *testing.T) {
+	ws := initWS(t)
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--duration", "PT4H", "--calendar", "2026-09/2026-12", "--clock", "13:00/17:00", "--conditional", "meeting", "--cadence", "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"), "supply")
+	a := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Call the supplier", "--duration", "PT1H", "--calendar", "2026-W38", "--activity", "meeting", "--party", external), "add")
+	r := mustOK(t, run(t, ws, "", "resolve", a.str("id"), "--now", rnow), "resolve")
+	if len(r.json["candidates"].([]any)) == 0 {
+		t.Fatalf("an untracked party blocked resolution: %v", r.json)
+	}
+	if r.json["no_supply"] != nil {
+		t.Errorf("untracked party reported as missing supply: %v", r.json["no_supply"])
+	}
+	if p, _ := r.json["presumed"].([]any); len(p) != 1 || p[0] != external {
+		t.Errorf("presumed: %v", r.json["presumed"])
+	}
+	// The record carries the presumption, and it is outside the projection.
+	s := mustOK(t, run(t, ws, "", "select", a.str("id"), "--candidate", "1", "--now", rnow), "select")
+	rec := s.json["resolution"].(map[string]any)
+	pres := rec["presumed"].([]any)
+	if len(pres) != 1 || pres[0] != external {
+		t.Fatalf("record presumed: %v", rec)
+	}
+	body := readFile(t, ws, "resolutions/"+rec["id"].(string)+".yaml")
+	if !strings.Contains(body, "presumed:\n  - "+external) {
+		t.Errorf("presumed not written after supply:\n%s", body)
+	}
+	before := rec["version"].(string)
+	v := mustOK(t, run(t, ws, "", "version-of", rec["id"].(string), "--projection"), "projection")
+	if strings.Contains(v.stdout, "presumed") {
+		t.Errorf("presumed entered the projection:\n%s", v.stdout)
+	}
+	if v.str("version") != before {
+		t.Errorf("version moved: %s vs %s", v.str("version"), before)
+	}
+	// The commitment carries the external party tentative, as any party.
+	cmt := s.json["commitment"].(map[string]any)
+	found := false
+	for _, p := range cmt["parties"].([]any) {
+		p := p.(map[string]any)
+		if p["uri"] == external && p["status"] == "tentative" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("commitment parties: %v", cmt["parties"])
+	}
+}
+
+// TestUntrackedPartyStillOccupies covers the occupancy half: the workspace
+// knows what it has already asked of them, so it cannot double-book them.
+func TestUntrackedPartyStillOccupies(t *testing.T) {
+	ws := initWS(t)
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--duration", "PT4H", "--calendar", "2026-09/2026-12", "--clock", "13:00/17:00", "--conditional", "meeting", "--cadence", "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"), "supply")
+	first := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "First call", "--duration", "PT1H", "--calendar", "2026-09-14", "--clock", "13:00/14:00", "--activity", "meeting", "--party", external), "add first")
+	s1 := mustOK(t, run(t, ws, "", "select", first.str("id"), "--candidate", "1", "--now", rnow), "select first")
+	cmt := s1.json["commitment"].(map[string]any)["id"].(string)
+	// A second meeting with the same external person at the same hour is
+	// displacement, not nothing.
+	second := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Second call", "--duration", "PT1H", "--calendar", "2026-09-14", "--clock", "13:00/14:00", "--activity", "meeting", "--party", external), "add second")
+	r := mustOK(t, run(t, ws, "", "resolve", second.str("id"), "--now", rnow), "resolve second")
+	c := r.json["candidates"].([]any)[0].(map[string]any)
+	if c["rank"].(float64) == 1 || !strings.Contains(fmt.Sprint(c["displaces"]), cmt) {
+		t.Fatalf("an untracked party was double-booked silently: %v", c)
+	}
+	// Declining frees them, per party.
+	mustOK(t, run(t, ws, "", "commitment", "decline", cmt, "--party", external, "--now", rnow), "external declines")
+	third := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Third call", "--duration", "PT1H", "--calendar", "2026-09-15", "--clock", "13:00/14:00", "--activity", "meeting", "--party", external), "add third")
+	r3 := mustOK(t, run(t, ws, "", "resolve", third.str("id"), "--now", rnow), "resolve third")
+	c3 := r3.json["candidates"].([]any)[0].(map[string]any)
+	if c3["rank"].(float64) != 1 {
+		t.Errorf("a declined untracked party should free the hour: %v", c3)
+	}
+}
+
+// TestTrackedPartyStillAnswers: once the workspace holds anything for a
+// party, an absence of eligible supply is their own answer.
+func TestTrackedPartyStillAnswers(t *testing.T) {
+	ws := initWS(t)
+	rob := "https://example.com/people/rob"
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--duration", "PT4H", "--calendar", "2026-09-14", "--clock", "13:00/17:00"), "ada")
+	a := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "With Rob", "--duration", "PT1H", "--calendar", "2026-09-14", "--party", rob), "add")
+	if r := mustOK(t, run(t, ws, "", "resolve", a.str("id"), "--now", rnow), "untracked"); len(r.json["candidates"].([]any)) == 0 {
+		t.Fatalf("untracked Rob should not block: %v", r.json)
+	}
+	// A record for another week makes him tracked, and now he answers.
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", rob, "--duration", "PT2H", "--calendar", "2026-W40", "--clock", "09:00/11:00"), "rob elsewhere")
+	r := mustOK(t, run(t, ws, "", "resolve", a.str("id"), "--now", rnow), "tracked")
+	if len(r.json["candidates"].([]any)) != 0 || !strings.Contains(r.str("reason"), rob) {
+		t.Errorf("a tracked party with nothing eligible should answer: %v", r.json)
+	}
+	if r.json["presumed"] != nil {
+		t.Errorf("a tracked party is not presumed: %v", r.json["presumed"])
+	}
+	// And a retired record still counts as tracked.
+	av := mustOK(t, run(t, ws, "", "availability", "list", "--subject", rob), "list").json["availability"].([]any)[0].(map[string]any)
+	mustOK(t, run(t, ws, "", "availability", "retire", av["id"].(string), "--kind", "retracted", "--now", rnow), "retire")
+	r2 := mustOK(t, run(t, ws, "", "resolve", a.str("id"), "--now", rnow), "still tracked")
+	if len(r2.json["candidates"].([]any)) != 0 || r2.json["presumed"] != nil {
+		t.Errorf("a retired record should still track: %v", r2.json)
 	}
 }

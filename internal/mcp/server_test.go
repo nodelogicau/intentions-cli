@@ -337,6 +337,21 @@ func TestResolutionLoop(t *testing.T) {
 	if un := h.ok("unresolved", map[string]any{"subject": room}); int(un["count"].(float64)) != 0 {
 		t.Errorf("unresolved subject filter: %v", un)
 	}
+	// An untracked party constrains no supply, and the record says whose
+	// time the placement assumes.
+	ext := "mailto:someone@another-company.example"
+	x := h.ok("intention_add", map[string]any{"title": "Call the supplier", "duration": "PT1H", "window": map[string]any{"calendar": "2026-W38"}, "activity": "meeting", "parties": []string{ext}})
+	rx := h.ok("resolve", map[string]any{"id": str(x, "id")})
+	if len(list(rx, "candidates")) == 0 || rx["no_supply"] != nil {
+		t.Fatalf("untracked party over MCP: %v", rx)
+	}
+	if p := list(rx, "presumed"); len(p) != 1 || p[0] != ext {
+		t.Errorf("presumed over MCP: %v", rx["presumed"])
+	}
+	sx := h.ok("select", map[string]any{"id": str(x, "id"), "candidate": 1})
+	if p, _ := sx["resolution"].(map[string]any)["presumed"].([]any); len(p) != 1 || p[0] != ext {
+		t.Errorf("record presumed over MCP: %v", sx["resolution"])
+	}
 	bd := h.ok("bounds", map[string]any{"calendar": "2026-W38", "clock": "09:00/12:00"})
 	if int(bd["count"].(float64)) != 7 || bd["timezone"] != "Australia/Melbourne" {
 		t.Errorf("bounds: %v", bd)
@@ -347,7 +362,7 @@ func TestResolutionLoop(t *testing.T) {
 		t.Errorf("validate: %v", v)
 	}
 	ws := h.ok("workspace_status", map[string]any{})
-	if str(ws, "root") != h.ws.Root || ws["counts"].(map[string]any)["intention"].(float64) < 8 || ws["counts"].(map[string]any)["resolution"].(float64) != 4 {
+	if str(ws, "root") != h.ws.Root || ws["counts"].(map[string]any)["intention"].(float64) < 8 || ws["counts"].(map[string]any)["resolution"].(float64) != 5 {
 		t.Errorf("status: %v", ws)
 	}
 }

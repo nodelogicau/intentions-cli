@@ -258,13 +258,56 @@ func TestResolveParties(t *testing.T) {
 			t.Errorf("supply ids: %v", c.Supply)
 		}
 	}
-	// Party held elsewhere.
+	// A party the workspace holds nothing for is untracked: it knows nothing
+	// of their capacity, so they constrain no supply and are presumed.
+	zoe := "https://example.com/people/zoe"
 	in2 := intention("Meet Zoe", "PT1H", "2026-W38", "")
-	in2.Parties = []string{"https://example.com/people/zoe"}
+	in2.Parties = []string{zoe}
 	f.write(in2)
 	res, _ = Resolve(f.env(), in2, Options{})
-	if len(res.NoSupply) != 1 || !strings.Contains(res.Reason, "zoe") {
-		t.Errorf("party elsewhere: %v %q", res.NoSupply, res.Reason)
+	if len(res.All()) == 0 {
+		t.Fatalf("an untracked party should not block resolution: %v %q", res.NoSupply, res.Reason)
+	}
+	if len(res.NoSupply) != 0 || len(res.Presumed) != 1 || res.Presumed[0] != zoe {
+		t.Errorf("untracked party: no_supply %v presumed %v", res.NoSupply, res.Presumed)
+	}
+	// Once the workspace holds anything for them, silence becomes an answer:
+	// a record that does not fit is their own answer, not a gap.
+	f.write(availability(zoe, "PT2H", "2026-W40", "09:00/11:00", ""))
+	res, _ = Resolve(f.env(), in2, Options{})
+	if len(res.All()) != 0 || len(res.NoSupply) != 1 || !strings.Contains(res.Reason, "zoe") {
+		t.Errorf("tracked party with nothing eligible: %v %q", res.NoSupply, res.Reason)
+	}
+	if len(res.Presumed) != 0 {
+		t.Errorf("a tracked party is not presumed: %v", res.Presumed)
+	}
+}
+
+// A retired record still counts as the workspace speaking about that party.
+func TestRetiredRecordStillTracks(t *testing.T) {
+	f := newFixture(t)
+	f.write(availability(ada, "PT8H", "2026-W38", "09:00/17:00", ""))
+	gone := availability(rob, "PT8H", "2026-W38", "09:00/17:00", "")
+	gone.Retired = &model.Retired{Kind: "retracted", Source: model.Source{Author: ada}, Timestamp: now}
+	f.write(gone)
+	in := intention("Meet Rob", "PT1H", "2026-W38", "")
+	in.Parties = []string{rob}
+	f.write(in)
+	res, _ := Resolve(f.env(), in, Options{})
+	if len(res.NoSupply) != 1 || len(res.Presumed) != 0 {
+		t.Errorf("a retired record should still track: no_supply %v presumed %v", res.NoSupply, res.Presumed)
+	}
+}
+
+// The subject is never presumed, even when they are also listed as a party.
+func TestSubjectIsNeverPresumed(t *testing.T) {
+	f := newFixture(t)
+	in := intention("Alone", "PT1H", "2026-W38", "")
+	in.Parties = []string{in.Subject}
+	f.write(in)
+	res, _ := Resolve(f.env(), in, Options{})
+	if len(res.All()) != 0 || len(res.Presumed) != 0 || len(res.NoSupply) != 1 || res.NoSupply[0] != in.Subject {
+		t.Errorf("subject with no records: candidates %d presumed %v no_supply %v", len(res.All()), res.Presumed, res.NoSupply)
 	}
 }
 

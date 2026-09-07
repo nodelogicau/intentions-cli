@@ -51,6 +51,9 @@ func Resolution(res resolve.Result, id string) map[string]any {
 	if len(res.NoSupply) > 0 {
 		out["no_supply"] = res.NoSupply
 	}
+	if len(res.Presumed) > 0 {
+		out["presumed"] = res.Presumed
+	}
 	if len(res.Excluded) > 0 {
 		out["excluded"] = res.Excluded
 	}

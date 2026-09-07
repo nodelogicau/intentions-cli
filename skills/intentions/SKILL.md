@@ -189,11 +189,23 @@ On failure stderr carries `{"error": {"code", "message"}}`; a refused write says
   resolution succeeds, and never widen a window, drop an activity or extend a
   horizon to force a fit. A plan resting on capacity the person never offered
   is worse than no plan, and they cannot see that it was invented.
-- **A party you do not track has no supply.** An intention naming someone
-  outside the workspace has no candidates until that person's availability is
-  recorded, and for an external party it never will be. Say so and ask how
-  they want to proceed; do not invent capacity for other people, whose time
-  is not the person's to declare.
+- **A party the workspace holds nothing for is unconstrained.** An intention
+  naming someone outside the workspace resolves against the person's own
+  supply, and the record carries `presumed` naming whose time it assumes
+  without evidence. Say that when you put the candidates: this time works for
+  them, and the other party has not been asked yet. What the workspace already
+  asked of that person still counts, so it will not offer two meetings with
+  them at once.
+- **Never invent capacity to make a resolution succeed.** An availability is
+  an assertion about that particular's capacity, and their time is not the
+  person's to declare. If an intention will not resolve, report what stands in
+  the way.
+- **Declaring capacity narrows it.** The moment a workspace holds any
+  availability for someone, retired or expired included, silence becomes an
+  answer: they are then schedulable only inside what they declared. So
+  recording a first availability for a party makes them strictly harder to
+  schedule with than recording none. That is the format working as intended,
+  not a bug; do not record capacity for someone just to have a record.
 
 ## Rules for availability
 

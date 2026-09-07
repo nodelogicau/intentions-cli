@@ -253,9 +253,13 @@ type Resolution struct {
 	// Supply names the availabilities the placement was chosen against. It is
 	// an implementation-added field, written after the specified fields and
 	// outside the projection.
-	Supply  []string
-	Version string
-	Extras  []Extra
+	Supply []string
+	// Presumed names the parties that contributed no supply because the
+	// workspace does not track them: whose time this placement assumes
+	// without evidence. Written after supply and outside the projection.
+	Presumed []string
+	Version  string
+	Extras   []Extra
 }
 
 // Object is any file-backed object or record.

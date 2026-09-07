@@ -64,7 +64,7 @@ harness driving this CLI against a real workspace
 | 22 | Re-resolving a placed intention | settled with an addition, adopted in v0.10.0, [#22](https://github.com/nodelogicau/intentions/issues/22) |
 | 23 | A reference tool set for harnesses | open, [#23](https://github.com/nodelogicau/intentions/issues/23) |
 | 24 | What a declined party means | **decided differently**, [#24](https://github.com/nodelogicau/intentions/issues/24) |
-| 25 | A party the workspace does not track | open, [#25](https://github.com/nodelogicau/intentions/issues/25) |
+| 25 | A party the workspace does not track | adopted with refinements, [#25](https://github.com/nodelogicau/intentions/issues/25) |
 
 ---
 
@@ -538,8 +538,26 @@ someone whose time is not the workspace owner's to declare
 Nothing in the format distinguishes "this party has offered no capacity that
 fits" from "this workspace does not track this party".
 
-**We decided:** nothing yet. v0.9.1 tells the harness to report the dead end
-and ask rather than invent, and leaves the behaviour as the draft requires.
+**We decided:** nothing at first. v0.9.1 told the harness to report the dead
+end and ask rather than invent, leaving the behaviour as the draft required.
+
+**Resolution (`234c67c`):** Settled as the reading we preferred, with three
+refinements that correct it and the reporting half of the alternative kept. A
+workspace tracks a party exactly when it holds any availability whose subject
+is that party, retired and expired included, so the test needs no new
+configuration. The refinements: the subject is never unconstrained, whatever
+their records, including where they appear in their own parties; an untracked
+party contributes no supply but still contributes their placements, since the
+workspace knows exactly what it has already asked of them, and without this
+two meetings with the same external person at one hour would be placed and
+neither reported; and the presumption is recorded, as `presumed` beside
+`supply` on the resolution record, outside the projection. Two things fell
+out: `window-clash` now reads as two placements sharing a party whom both
+occupy, and the object model says plainly that a workspace does not write an
+availability to make a resolution succeed. One consequence is stated rather
+than left to be discovered: declaring your first availability makes you
+strictly harder to schedule with than declaring none. Implemented in
+v0.11.0.
 
 **Proposed text:** say what resolution does about a party whose availability
 the workspace does not track. Either a party with no records at all is

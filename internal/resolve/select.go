@@ -92,7 +92,7 @@ func Select(e Env, in *model.Intention, opts SelectOptions) (Selection, Result, 
 	considered := res.Considered
 	rec := &model.Resolution{
 		ID: model.MintID(model.TypeResolution), Intention: in.ID, Placement: placement, Selector: selector,
-		CandidatesConsidered: &considered, Displaced: chosen.Displaces, Source: opts.Source, Timestamp: opts.Timestamp, Supply: chosen.Supply,
+		CandidatesConsidered: &considered, Displaced: chosen.Displaces, Source: opts.Source, Timestamp: opts.Timestamp, Supply: chosen.Supply, Presumed: res.Presumed,
 	}
 	if err := e.WS.WriteObject(rec); err != nil {
 		return sel, res, err

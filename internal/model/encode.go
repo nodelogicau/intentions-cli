@@ -351,6 +351,7 @@ func resolutionNode(o *Resolution) *yaml.Node {
 	addKV(m, "source", sourceNode(o.Source))
 	addTime(m, "timestamp", o.Timestamp)
 	addStrList(m, "supply", o.Supply, false)
+	addStrList(m, "presumed", o.Presumed, false)
 	addExtras(m, o.Extras)
 	return m
 }

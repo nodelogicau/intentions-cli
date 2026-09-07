@@ -226,6 +226,9 @@ func (a *app) printResult(w io.Writer, in *model.Intention, res resolve.Result) 
 	if res.Reason != "" {
 		fmt.Fprintf(w, "no candidates: %s\n", res.Reason)
 	}
+	if len(res.Presumed) > 0 {
+		fmt.Fprintf(w, "presumed %s: the workspace holds no availability for them, so their time is assumed\n", strings.Join(res.Presumed, ", "))
+	}
 	for _, ex := range res.Excluded {
 		fmt.Fprintf(w, "  excluded %s: %s\n", ex.Availability, ex.Reason)
 	}

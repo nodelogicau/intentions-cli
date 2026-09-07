@@ -33,6 +33,7 @@ type Result struct {
 	Reason     string             `json:"reason,omitempty"`
 	Blocked    string             `json:"blocked_on,omitempty"`
 	NoSupply   []string           `json:"no_supply,omitempty"`
+	Presumed   []string           `json:"presumed,omitempty"` // parties the workspace does not track
 	Excluded   []Exclusion        `json:"excluded,omitempty"`
 	Generated  []string           `json:"generated"`
 	all        []Candidate
@@ -90,11 +91,31 @@ func Resolve(e Env, in *model.Intention, opts Options) (Result, error) {
 		constraint = &c
 	}
 
-	// Supply per particular, intersected.
+	// Supply per particular, intersected. A party the workspace holds no
+	// availability for is untracked: it knows nothing of their capacity, so
+	// they constrain no supply and are presumed rather than reported
+	// missing. The subject is never presumed, whatever their records, or an
+	// intention could resolve for someone who has declared nothing.
 	involved := append([]string{in.Subject}, in.Parties...)
+	var constraining []string
+	for _, uri := range involved {
+		switch {
+		case uri == in.Subject:
+			if len(constraining) == 0 || constraining[0] != uri {
+				constraining = append([]string{uri}, constraining...)
+			}
+		case e.Tracks(uri):
+			constraining = append(constraining, uri)
+		default:
+			if !containsString(res.Presumed, uri) {
+				res.Presumed = append(res.Presumed, uri)
+			}
+		}
+	}
+	sort.Strings(res.Presumed)
 	supplies := map[string]Supply{}
 	var common []temporal.Interval
-	for i, uri := range involved {
+	for i, uri := range constraining {
 		s, err := e.SupplyFor(uri, in, r)
 		if err != nil {
 			return res, err
@@ -127,7 +148,7 @@ func Resolve(e Env, in *model.Intention, opts Options) (Result, error) {
 	}
 	common = temporal.Clamp(common, r)
 	if len(common) == 0 {
-		res.Reason = "supply for " + strings.Join(involved, ", ") + " does not intersect within " + describe(r)
+		res.Reason = "supply for " + strings.Join(constraining, ", ") + " does not intersect within " + describe(r)
 		return res, nil
 	}
 
@@ -150,7 +171,7 @@ func Resolve(e Env, in *model.Intention, opts Options) (Result, error) {
 				if constraint != nil && !constraint.Admits(cand) {
 					continue
 				}
-				supply, ok := e.covers(cand, involved, supplies, placed, opts.Exclude)
+				supply, ok := e.covers(cand, constraining, supplies, placed, opts.Exclude)
 				if !ok {
 					continue
 				}
@@ -382,4 +403,14 @@ func durationsToTry(spec temporal.DurationSpec, step time.Duration) []temporal.D
 // secondsDuration renders a count of seconds as hours, minutes and seconds.
 func secondsDuration(n int64) temporal.Duration {
 	return temporal.Duration{Hours: int(n / 3600), Minutes: int((n % 3600) / 60), Seconds: int(n % 60)}
+}
+
+// containsString reports whether v is in the slice.
+func containsString(vs []string, v string) bool {
+	for _, x := range vs {
+		if x == v {
+			return true
+		}
+	}
+	return false
 }

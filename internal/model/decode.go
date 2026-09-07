@@ -729,6 +729,8 @@ func (d *decoder) resolution(root *yaml.Node) *Resolution {
 			o.Timestamp = d.timestamp(k, v)
 		case "supply":
 			o.Supply = d.strList(k, v)
+		case "presumed":
+			o.Presumed = d.strList(k, v)
 		case "version":
 			o.Version = d.str(k, v)
 		default:

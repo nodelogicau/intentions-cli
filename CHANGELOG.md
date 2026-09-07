@@ -3,6 +3,44 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.11.0] - 2026-09-08
+
+Aligns with the upstream settlement of SPEC-FEEDBACK item 25 (spec commit
+`234c67c`), which came from the first harness feedback
+([#1](https://github.com/nodelogicau/intentions-cli/issues/1)).
+
+### Changed
+
+- **A party the workspace does not track is unconstrained.** A workspace
+  tracks a party exactly when it holds at least one availability whose
+  subject is that party, counting retired and expired records. An untracked
+  party contributes no supply constraint and is no longer reported as having
+  none, so an intention naming someone at another organisation resolves
+  against the subject's own supply instead of never resolving at all. A
+  tracked party whose availability does not fit still yields no candidates,
+  because that is their own answer. The subject is never unconstrained,
+  whatever their records.
+- **An untracked party's placements still constrain.** The workspace knows
+  nothing of an external party's capacity but knows what it has already asked
+  of them, so a second meeting with the same person at the same hour is
+  displacement rather than nothing.
+
+### Added
+
+- `presumed` on the RESOLUTION record and on the `resolve` result: the sorted
+  URIs of parties that contributed no supply because the workspace does not
+  track them, so a reader sees whose time the placement assumes without
+  evidence. Written after `supply` and outside the projection, so no version
+  moves and older readers ignore it.
+
+### Notes
+
+- The skill's rule that an intention naming someone outside the workspace has
+  no candidates until their availability is recorded is reversed, and now
+  states the consequence upstream made explicit: declaring your first
+  availability makes you strictly harder to schedule with than declaring
+  none.
+
 ## [0.10.0] - 2026-09-07
 
 Makes the four additions upstream attached to the resolution settlements in
@@ -280,6 +318,7 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
+[0.11.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/nodelogicau/intentions-cli/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.8.0...v0.9.0
