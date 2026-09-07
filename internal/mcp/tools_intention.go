@@ -37,7 +37,7 @@ func (s *Server) registerTools() {
 		Description: "Every intention (active by default), filtered by subject, activity, stability, recurring, placed, unplaced, instances_of, or retired. Call this before intention_add."},
 		s.intentionList)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "availability_add", Annotations: additive,
-		Description: "Record capacity: a standing statement that a particular (a person, a room, anything with a URI) has a duration of capacity within a window, optionally for certain activities (conditional), at certain places, recurring by cadence. Capacity is a fact about the person; record what they told you, never what an empty calendar suggests."},
+		Description: "Record capacity: a standing statement that a particular (a person, a room, anything with a URI) has a duration of capacity within a window, optionally for certain activities (conditional), at certain places, recurring by cadence. Capacity is a fact about the person: record what they told you, never what an empty calendar suggests and never to make a resolution succeed. Only for the people this workspace tracks, not for external parties."},
 		s.availabilityAdd)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "availability_renew", Annotations: additive,
 		Description: "Advance valid_until on the same availability, when the person reconfirms it. Never moves it earlier."},
@@ -53,7 +53,7 @@ func (s *Server) registerTools() {
 		s.availabilityList)
 	s.registerCommitmentTools()
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "generate", Annotations: additive,
-		Description: "Materialise instances of recurring intentions over a horizon (default generation.horizon from now). Idempotent on (recurring, occurrence); a retired instance is never regenerated. Run before planning a period."},
+		Description: "Materialise instances of recurring intentions over a horizon (default generation.horizon from now). Idempotent on (recurring, occurrence); a retired instance is never regenerated. Use it when the person asks to plan a named period, narrowed with `horizon` and `recurring`; `resolve` already materialises what its own range needs, so creating a recurring intention should not be followed by a generate."},
 		s.generate)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "resolve", Annotations: additive,
 		Description: "Rank candidate placements for one intention against the availability of its subject and every party: rank 1 displaces nothing, rank 2 only tentative things, rank 3 something firm or accepted; then by preference, then earliest. Chooses nothing. Writes only the instances it generates over its range. Put the candidates to the person, then call select with their choice."},
@@ -62,7 +62,7 @@ func (s *Server) registerTools() {
 		Description: "The recorded act of selection. `candidate` is the person's choice (1-based into the full ranked set). `policy` is the only way a harness selects alone: a terminus of the subject carrying auto_select that covers the intention, and only when a rank-1 candidate exists. Writes the RESOLUTION record, the placement, and a commitment with every party tentative when there are parties. Displaced objects are listed and never changed. `replace` re-resolves a placed intention."},
 		s.selectTool)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "unresolved", Annotations: readOnly,
-		Description: "Every active intention still without a placement and what stands in its way, soonest deadline first: ready (candidate count, best rank), blocked (on a relational target with no placement), no_candidates (the resolver's reason), incomplete (duration or window missing), unresolvable (a serves cycle). A dry resolution; writes nothing. Run generate first so instances of recurring intentions exist. Results equal `intentions unresolved --json`."},
+		Description: "Every active intention still without a placement and what stands in its way, soonest deadline first: ready (candidate count, best rank), blocked (on a relational target with no placement), no_candidates (the resolver's reason), incomplete (duration or window missing), unresolvable (a serves cycle). A dry resolution; writes nothing. Instances of recurring intentions appear here once something has materialised them. Results equal `intentions unresolved --json`."},
 		s.unresolvedTool)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "check", Annotations: readOnly,
 		Description: "The consistency check: window-clash, condition-mismatch, location-mismatch, expired-ground, intention-inconsistency, party-declined, cycle. Flags are computed, never stored, never decisions; one already acknowledged against the counterpart's current version is suppressed. Optionally scoped to ids."},

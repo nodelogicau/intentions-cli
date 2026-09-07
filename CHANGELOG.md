@@ -3,6 +3,38 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.1] - 2026-09-07
+
+Guidance only, from the first report of an agent harness driving this CLI
+against a real workspace ([#1](https://github.com/nodelogicau/intentions-cli/issues/1)).
+No behaviour changes.
+
+### Changed
+
+- The skill no longer tells the agent to generate instances ahead of time. It
+  said so in three places, which is why creating a recurring intention was
+  followed by a workspace full of instances nobody asked for. Resolution
+  already materialises what its own range needs; `generate` is now described
+  as something to reach for when the person asks to plan a named period,
+  narrowed with `--horizon` and `--recurring`.
+- A new rule: no supply is an answer to report, not an obstacle to write
+  around. Never create availability so that a resolution succeeds, and never
+  widen a window, drop an activity or extend a horizon to force a fit.
+- A new rule for parties: an intention naming someone outside the workspace
+  has no candidates until that person's availability is recorded, which for an
+  external party it never will be. Say so and ask; do not invent capacity for
+  other people, whose time is not the person's to declare.
+- The availability rule now names the real failure, and says one availability
+  per intention is a sign of fabrication.
+
+### Notes
+
+- SPEC-FEEDBACK item 25 asks upstream what resolution should do about a party
+  whose availability the workspace does not track, which is the structural
+  cause of the invented records.
+- The SPEC-FEEDBACK index now records that items 14, 17, 20 and 22 were
+  settled upstream with additions this implementation does not yet make.
+
 ## [0.9.0] - 2026-09-07
 
 Aligns with the upstream settlement of SPEC-FEEDBACK item 24 (spec commit
@@ -213,6 +245,7 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
+[0.9.1]: https://github.com/nodelogicau/intentions-cli/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.6.0...v0.7.0

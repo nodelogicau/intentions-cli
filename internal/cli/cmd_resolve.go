@@ -484,8 +484,8 @@ func (a *app) unresolvedCmd() *cobra.Command {
 		Use:   "unresolved [--subject <uri>]",
 		Short: "Every active intention still without a placement, and what stands in its way; writes nothing",
 		Long: `Lists each unretired intention that has no placement and could take one: not a
-terminus, not a recurring intention (its instances are what get placed; run
-generate first so they exist). Each entry carries a status from a dry
+terminus, not a recurring intention (its instances are what get placed, and
+they appear as resolution or generate materialises them). Each entry carries a status from a dry
 resolution: ready (with the candidate count and best rank), blocked (on a
 relational target with no placement), no_candidates (with the resolver's
 reason), incomplete (duration or window missing), or unresolvable (a serves

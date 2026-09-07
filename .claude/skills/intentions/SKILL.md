@@ -104,7 +104,7 @@ modifiers inside double quotes, so `"$id:in-order-to"` silently corrupts the id.
 | Change capacity terms | `intentions availability supersede <id> [changed flags] --json` — never `edit` for window, duration, conditional or location |
 | Withdraw | `intentions intention retire <id> --kind fulfilled\|abandoned\|superseded [--superseded-by <id>] --reason "<why>" --json`; `intentions availability retire <id> --kind retracted\|superseded …` |
 | What a window means | `intentions bounds <id> --json` or `intentions bounds --calendar this-week --clock 09:00/12:00 --json`; writes nothing |
-| Generate instances | `intentions generate [--horizon P2W] [--recurring <id>] --json` → `{created, skipped}`; idempotent, run before you plan a period |
+| Generate instances | `intentions generate --horizon <P…> [--recurring <id>] --json` → `{created, skipped}`; idempotent. Only when the person asks to plan a named period, and narrow it to that period |
 | Rank placements | `intentions resolve <id> [--limit N] --json` → `{candidates: [{rank, start, end, displaces, supply}], candidates_considered, reason}`; writes nothing but instances |
 | Record the choice | `intentions select <id> --candidate N --json` → `{resolution, intention, commitment?, flags}`; `--replace` to move a placed one |
 | Select under a policy | `intentions select <id> --policy <terminus id> --json` — harness only, top rank-1 candidate only; refused otherwise |
@@ -175,15 +175,35 @@ On failure stderr carries `{"error": {"code", "message"}}`; a refused write says
   they looked at a specific flag against a specific state of its counterpart.
   It lapses when the counterpart's projection changes, so it is never a way to
   silence a flag for good.
-- **Generate before you plan a period.** Instances of recurring intentions
-  exist only once generated; `resolve` generates over its own range, but a
-  review of the coming weeks wants `generate` first.
+- **Do not materialise a recurrence in advance.** Creating a recurring
+  intention writes one file and no instances, which is right: an instance is
+  something intended on a particular day, and it should appear when that day
+  is being planned. `resolve` materialises what its own range needs, so
+  resolving is usually enough. Reach for `generate` only when the person asks
+  to plan a named period, and pass `--horizon` and `--recurring` so you
+  materialise that period and nothing more. A workspace full of instances
+  nobody asked for is a worse review for the person.
+- **No supply is an answer, not an obstacle.** When `resolve` reports no
+  candidates, read the reason and tell the person: the window has passed, it
+  lies beyond the horizon, a target it waits on is unplaced, or they have
+  offered no capacity that fits. Never write availability so that a
+  resolution succeeds, and never widen a window, drop an activity or extend a
+  horizon to force a fit. A plan resting on capacity the person never offered
+  is worse than no plan, and they cannot see that it was invented.
+- **A party you do not track has no supply.** An intention naming someone
+  outside the workspace has no candidates until that person's availability is
+  recorded, and for an external party it never will be. Say so and ask how
+  they want to proceed; do not invent capacity for other people, whose time
+  is not the person's to declare.
 
 ## Rules for availability
 
 - **Capacity is a fact about the person; only they can assert it.** Record
   availability from what they told you, with `--subject` explicit. Do not
-  infer capacity from an empty calendar.
+  infer it from an empty calendar, do not write it to make a resolution
+  succeed, and do not write it for anyone but the people whose capacity this
+  workspace tracks. One availability per intention is a sign you are
+  fabricating: real capacity is broader than the plans that draw on it.
 - **Terms change by supersession.** Window (including clock), duration,
   conditional and location define the disposition. `availability edit`
   refuses to change them; `availability supersede` creates the new one and

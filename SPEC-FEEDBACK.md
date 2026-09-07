@@ -20,7 +20,22 @@ decided differently and v0.2.0 changed to follow it.
 Items 14 to 22 were raised on 2026-09-06 from the `add-resolution` change
 (v0.4.0), which implements generation, resolution, selection, the consistency
 check and acknowledgement. Each is a rule the text did not state and the
-implementation had to invent; "we decided" is what v0.4.0 does.
+implementation had to invent; "we decided" is what v0.4.0 does. **All nine
+were settled** in
+[nodelogicau/intentions@e5c5753](https://github.com/nodelogicau/intentions/commit/e5c5753):
+five as proposed, and four with an addition this implementation does not yet
+make. Those four are 14 (one `resolver.horizon` for both resolution and
+generation, `generation.horizon` ignored and reported at info level), 17 (a
+ranged duration tries successively shorter durations down to `min` and offers
+the longest that yields anything), 20 (personal availability is visible only
+when its subject is the intention's subject or one of its parties), and 22
+(`select --replace` cancels a live commitment on the old placement and writes
+a fresh one with every party tentative). They want an alignment change.
+
+Items 23 onwards were raised one at a time as later changes met them: 23 from
+the MCP server, 24 from commitments, and 25 from the first report of an agent
+harness driving this CLI against a real workspace
+([intentions-cli#1](https://github.com/nodelogicau/intentions-cli/issues/1)).
 
 | # | Topic | Status |
 |---|---|---|
@@ -37,15 +52,18 @@ implementation had to invent; "we decided" is what v0.4.0 does.
 | 11 | `validate` cannot tell a policy-authorised harness firming from an unauthorised one | adopted, [#11](https://github.com/nodelogicau/intentions/issues/11) |
 | 12 | The canonical form of a zero duration | adopted, [#12](https://github.com/nodelogicau/intentions/issues/12) |
 | 13 | The example objects disagree on list style | adopted, [#13](https://github.com/nodelogicau/intentions/issues/13) |
-| 14 | Resolution needs a bounded range: horizon and now | open, [#14](https://github.com/nodelogicau/intentions/issues/14) |
-| 15 | Capacity depletes per occasion | open, [#15](https://github.com/nodelogicau/intentions/issues/15) |
-| 16 | What a placement rests on is recomputed; propose `supply` on the record | open, [#16](https://github.com/nodelogicau/intentions/issues/16) |
-| 17 | Candidate enumeration on a step grid | open, [#17](https://github.com/nodelogicau/intentions/issues/17) |
-| 18 | Relational anchor bounds per relation | open, [#18](https://github.com/nodelogicau/intentions/issues/18) |
-| 19 | `intention-inconsistency` is pairwise | open, [#19](https://github.com/nodelogicau/intentions/issues/19) |
-| 20 | The resolver's scope comes from `resolver.scope` | open, [#20](https://github.com/nodelogicau/intentions/issues/20) |
-| 21 | Instances copy `location` and the recurring intention's clock | open, [#21](https://github.com/nodelogicau/intentions/issues/21) |
-| 22 | Re-resolving a placed intention | open, [#22](https://github.com/nodelogicau/intentions/issues/22) |
+| 14 | Resolution needs a bounded range: horizon and now | settled with an addition, **not yet implemented**, [#14](https://github.com/nodelogicau/intentions/issues/14) |
+| 15 | Capacity depletes per occasion | adopted, [#15](https://github.com/nodelogicau/intentions/issues/15) |
+| 16 | What a placement rests on is recomputed; propose `supply` on the record | adopted, [#16](https://github.com/nodelogicau/intentions/issues/16) |
+| 17 | Candidate enumeration on a step grid | settled with an addition, **not yet implemented**, [#17](https://github.com/nodelogicau/intentions/issues/17) |
+| 18 | Relational anchor bounds per relation | adopted, [#18](https://github.com/nodelogicau/intentions/issues/18) |
+| 19 | `intention-inconsistency` is pairwise | adopted, [#19](https://github.com/nodelogicau/intentions/issues/19) |
+| 20 | The resolver's scope comes from `resolver.scope` | settled with an addition, **not yet implemented**, [#20](https://github.com/nodelogicau/intentions/issues/20) |
+| 21 | Instances copy `location` and the recurring intention's clock | adopted, [#21](https://github.com/nodelogicau/intentions/issues/21) |
+| 22 | Re-resolving a placed intention | settled with an addition, **not yet implemented**, [#22](https://github.com/nodelogicau/intentions/issues/22) |
+| 23 | A reference tool set for harnesses | open, [#23](https://github.com/nodelogicau/intentions/issues/23) |
+| 24 | What a declined party means | **decided differently**, [#24](https://github.com/nodelogicau/intentions/issues/24) |
+| 25 | A party the workspace does not track | open, [#25](https://github.com/nodelogicau/intentions/issues/25) |
 
 ---
 
@@ -501,3 +519,31 @@ declined party's own time is free while the commitment stands, said also where
 Resolution defines occupancy and naming whose decline frees whose time, or
 declining is purely a record and cancellation is the only act that frees
 anything, in which case say a decline by the subject SHOULD prompt one.
+
+## 25. A party the workspace does not track ([#25](https://github.com/nodelogicau/intentions/issues/25))
+
+**The draft says:** supply is the intersection of eligible availability for
+the subject and for every URI in `parties`, and a party with no eligible
+availability yields an empty set naming that party.
+
+**The problem:** a workspace holds the capacity of the people it is for, not
+of someone at another organisation. An intention naming an external party
+therefore has no candidates, ever, and the reason reads like a defect. Either
+no external meeting can be placed, or the writer manufactures availability for
+that person. An agent harness driving this CLI did the second, inventing an
+availability per external party: a record of a fact nobody asserted, about
+someone whose time is not the workspace owner's to declare
+([intentions-cli#1](https://github.com/nodelogicau/intentions-cli/issues/1)).
+Nothing in the format distinguishes "this party has offered no capacity that
+fits" from "this workspace does not track this party".
+
+**We decided:** nothing yet. v0.9.1 tells the harness to report the dead end
+and ask rather than invent, and leaves the behaviour as the draft requires.
+
+**Proposed text:** say what resolution does about a party whose availability
+the workspace does not track. Either a party with no records at all is
+unconstrained, so the intention resolves against the subject's capacity and
+the commitment is written with that party `tentative`, which is the state an
+invitation is sent from; or the refusal stands but the result must say which
+of the two cases it is. We prefer the first: a `tentative` party is precisely
+someone who has not yet agreed.
