@@ -18,7 +18,7 @@ import (
 )
 
 type generateIn struct {
-	Horizon   string    `json:"horizon,omitempty" jsonschema:"ISO 8601 duration from now (default generation.horizon)"`
+	Horizon   string    `json:"horizon,omitempty" jsonschema:"ISO 8601 duration from now (default resolver.horizon)"`
 	Recurring []string  `json:"recurring,omitempty" jsonschema:"only these recurring intentions"`
 	Now       string    `json:"now,omitempty"`
 	Source    *sourceIn `json:"source,omitempty"`

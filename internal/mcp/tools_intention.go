@@ -53,7 +53,7 @@ func (s *Server) registerTools() {
 		s.availabilityList)
 	s.registerCommitmentTools()
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "generate", Annotations: additive,
-		Description: "Materialise instances of recurring intentions over a horizon (default generation.horizon from now). Idempotent on (recurring, occurrence); a retired instance is never regenerated. Use it when the person asks to plan a named period, narrowed with `horizon` and `recurring`; `resolve` already materialises what its own range needs, so creating a recurring intention should not be followed by a generate."},
+		Description: "Materialise instances of recurring intentions over a horizon (default resolver.horizon from now). Idempotent on (recurring, occurrence); a retired instance is never regenerated. Use it when the person asks to plan a named period, narrowed with `horizon` and `recurring`; `resolve` already materialises what its own range needs, so creating a recurring intention should not be followed by a generate."},
 		s.generate)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "resolve", Annotations: additive,
 		Description: "Rank candidate placements for one intention against the availability of its subject and every party: rank 1 displaces nothing, rank 2 only tentative things, rank 3 something firm or accepted; then by preference, then earliest. Chooses nothing. Writes only the instances it generates over its range. Put the candidates to the person, then call select with their choice."},

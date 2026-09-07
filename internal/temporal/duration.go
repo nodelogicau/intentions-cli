@@ -145,6 +145,12 @@ func (d Duration) HasTimePart() bool {
 	return d.Hours != 0 || d.Minutes != 0 || d.Seconds != 0
 }
 
+// HasDatePart reports whether the duration carries years, months, weeks or
+// days, which no clock-time arithmetic may assume is a fixed length.
+func (d Duration) HasDatePart() bool {
+	return d.Years != 0 || d.Months != 0 || d.Weeks != 0 || d.Days != 0
+}
+
 // ApproxSeconds is a nominal length for comparison only: a year is 365 days,
 // a month 30, a week 7, a day 24 hours. It is never used to place anything.
 func (d Duration) ApproxSeconds() int64 {

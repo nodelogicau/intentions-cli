@@ -1694,3 +1694,155 @@ func TestPartyDeclinedFlag(t *testing.T) {
 		t.Error("flag survived cancellation")
 	}
 }
+
+// --- align-with-resolution-additions ---------------------------------------
+
+func TestOnePlanningHorizon(t *testing.T) {
+	ws := initWS(t)
+	body := readFile(t, ws, "intentions.yaml")
+	if strings.Contains(body, "generation:") || !strings.Contains(body, "horizon: P4W") {
+		t.Errorf("init wrote a generation section:\n%s", body)
+	}
+	if r := run(t, "", "", "init", filepath.Join(t.TempDir(), "x"), "--author", ada, "--generation-horizon", "P2W"); r.code != 2 {
+		t.Errorf("--generation-horizon should be unknown: %d", r.code)
+	}
+	// resolver.horizon governs generation as well as resolution.
+	ws2 := initWS(t, "--horizon", "P1W")
+	mustOK(t, run(t, ws2, "", "availability", "add", "--now", rnow, "--subject", ada, "--duration", "PT2H", "--calendar", "2026-09/2026-12", "--clock", "09:00/11:00", "--cadence", "FREQ=WEEKLY;BYDAY=TU"), "supply")
+	rec := mustOK(t, run(t, ws2, "", "intention", "add", "--now", rnow, "--title", "Weekly", "--duration", "PT1H", "--calendar", "2026-09/2026-12", "--cadence", "FREQ=WEEKLY;BYDAY=TU"), "recurring")
+	g := mustOK(t, run(t, ws2, "", "generate", "--now", rnow), "generate")
+	if int(g.json["count"].(float64)) != 1 {
+		t.Errorf("a one-week horizon should generate one instance, got %v", g.json["count"])
+	}
+	_ = rec
+	// A stale generation.horizon is ignored and reported.
+	cfg := filepath.Join(ws, "intentions.yaml")
+	old := readFileAt(t, cfg)
+	if err := os.WriteFile(cfg, []byte(old+"generation:\n  horizon: P2W\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	v := mustOK(t, run(t, ws, "", "validate"), "validate")
+	found := false
+	for _, f := range v.json["findings"].([]any) {
+		f := f.(map[string]any)
+		if f["severity"] == "info" && strings.Contains(f["message"].(string), "generation.horizon") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("stale generation.horizon not reported: %v", v.json["findings"])
+	}
+	if v.json["ok"] != true {
+		t.Error("a stale key should not be an error")
+	}
+}
+
+func TestRangedDurationShrinksToFit(t *testing.T) {
+	ws := initWS(t)
+	// One hour of supply on the Monday, nothing else that week.
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--duration", "PT1H", "--calendar", "2026-09-14", "--clock", "09:00/10:00"), "supply")
+	// A nominal ninety minutes that will not fit, with a floor of one hour.
+	a := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Ranged", "--duration", "PT90M:PT1H:PT2H", "--calendar", "2026-09-14"), "add")
+	r := mustOK(t, run(t, ws, "", "resolve", a.str("id"), "--now", rnow), "resolve")
+	cands := r.json["candidates"].([]any)
+	if len(cands) == 0 {
+		t.Fatalf("a ranged duration should be offered shorter: %v", r.json)
+	}
+	for _, c := range cands {
+		if c.(map[string]any)["duration"] != "PT1H" {
+			t.Errorf("candidate duration: %v", c)
+		}
+	}
+	// Selecting places what was offered, not the nominal.
+	s := mustOK(t, run(t, ws, "", "select", a.str("id"), "--candidate", "1", "--now", rnow), "select")
+	if s.json["intention"].(map[string]any)["placement"].(map[string]any)["duration"] != "PT1H" {
+		t.Errorf("placement duration: %v", s.json["intention"])
+	}
+	// A nominal that fits is never shortened.
+	b := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Fits", "--duration", "PT30M:PT15M:PT1H", "--calendar", "2026-09-15", "--clock", "09:00/10:00"), "add b")
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--duration", "PT1H", "--calendar", "2026-09-15", "--clock", "09:00/10:00"), "supply b")
+	rb := mustOK(t, run(t, ws, "", "resolve", b.str("id"), "--now", rnow), "resolve b")
+	for _, c := range rb.json["candidates"].([]any) {
+		if c.(map[string]any)["duration"] != "PT30M" {
+			t.Errorf("nominal should be kept: %v", c)
+		}
+	}
+	// Nothing below min is offered.
+	c := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Too long", "--duration", "PT4H:PT3H:PT5H", "--calendar", "2026-09-14"), "add c")
+	rc := mustOK(t, run(t, ws, "", "resolve", c.str("id"), "--now", rnow), "resolve c")
+	if len(rc.json["candidates"].([]any)) != 0 || !strings.Contains(rc.str("reason"), "PT3H") {
+		t.Errorf("below min should not be offered: %v", rc.json)
+	}
+}
+
+func TestPersonalAvailabilityIsNotSharedSupply(t *testing.T) {
+	ws := initWS(t)
+	rob := "https://example.com/people/rob"
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", rob, "--duration", "PT4H", "--calendar", "2026-09-14", "--clock", "09:00/13:00"), "rob's personal supply")
+	// Ada's own intention cannot draw on Rob's personal capacity.
+	a := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Ada alone", "--duration", "PT1H", "--calendar", "2026-09-14"), "add")
+	r := mustOK(t, run(t, ws, "", "resolve", a.str("id"), "--now", rnow), "resolve")
+	if len(r.json["candidates"].([]any)) != 0 {
+		t.Fatalf("Rob's personal availability was used as Ada's supply: %v", r.json)
+	}
+	// Naming Rob a party makes it visible as his supply, and Ada still needs her own.
+	b := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "With Rob", "--duration", "PT1H", "--calendar", "2026-09-14", "--party", rob), "add b")
+	rb := mustOK(t, run(t, ws, "", "resolve", b.str("id"), "--now", rnow), "resolve b")
+	if !strings.Contains(rb.str("reason"), ada) {
+		t.Errorf("Rob's supply should now be visible, leaving Ada without: %v", rb.json)
+	}
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--duration", "PT4H", "--calendar", "2026-09-14", "--clock", "09:00/13:00"), "ada's supply")
+	rb2 := mustOK(t, run(t, ws, "", "resolve", b.str("id"), "--now", rnow), "resolve b2")
+	if len(rb2.json["candidates"].([]any)) == 0 {
+		t.Errorf("a party's personal availability should be visible: %v", rb2.json)
+	}
+	// Widening the scope makes it supply for anyone the resolver may see.
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", "https://example.com/rooms/9", "--duration", "PT8H", "--calendar", "2026-09-15", "--clock", "09:00/17:00", "--scope", "organisation"), "shared room")
+	c := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Uses the shared room", "--duration", "PT1H", "--calendar", "2026-09-15", "--party", "https://example.com/rooms/9"), "add c")
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--duration", "PT8H", "--calendar", "2026-09-15", "--clock", "09:00/17:00"), "ada tuesday")
+	if rc := mustOK(t, run(t, ws, "", "resolve", c.str("id"), "--now", rnow), "resolve c"); len(rc.json["candidates"].([]any)) == 0 {
+		t.Errorf("organisation scope should be visible: %v", rc.json)
+	}
+}
+
+func TestReplacementCarriesTheCommitment(t *testing.T) {
+	ws, cmt, in := commitmentFixture(t)
+	mustOK(t, run(t, ws, "", "commitment", "accept", cmt, "--now", rnow), "accept")
+	r := mustOK(t, run(t, ws, "", "select", in, "--candidate", "2", "--replace", "--now", rnow), "replace")
+	// The old commitment is cancelled, naming the new resolution.
+	old := mustOK(t, run(t, ws, "", "show", cmt), "old commitment").obj()
+	ret, _ := old["retired"].(map[string]any)
+	if ret == nil || ret["kind"] != "cancelled" || !strings.Contains(ret["reason"].(string), r.json["resolution"].(map[string]any)["id"].(string)) {
+		t.Fatalf("old commitment: %v", old["retired"])
+	}
+	// It still records who had accepted.
+	accepted := false
+	for _, p := range old["parties"].([]any) {
+		if p.(map[string]any)["status"] == "accepted" {
+			accepted = true
+		}
+	}
+	if !accepted {
+		t.Error("the retired file should still show who had accepted")
+	}
+	// A fresh commitment carries the new placement with everyone tentative.
+	fresh, _ := r.json["commitment"].(map[string]any)
+	if fresh == nil || fresh["id"] == cmt {
+		t.Fatalf("no fresh commitment: %v", r.json["commitment"])
+	}
+	for _, p := range fresh["parties"].([]any) {
+		if p.(map[string]any)["status"] != "tentative" {
+			t.Errorf("fresh commitment party: %v", p)
+		}
+	}
+	if fresh["placement"].(map[string]any)["start"] != r.json["candidate"].(map[string]any)["start"] {
+		t.Errorf("fresh commitment placement: %v", fresh["placement"])
+	}
+	if r.json["cancelled_commitment"].(map[string]any)["id"] != cmt {
+		t.Errorf("result should name the cancelled commitment: %v", r.json["cancelled_commitment"])
+	}
+	// Only one live commitment remains.
+	if l := mustOK(t, run(t, ws, "", "commitment", "list"), "list"); int(l.json["count"].(float64)) != 1 {
+		t.Errorf("live commitments: %v", l.json)
+	}
+}

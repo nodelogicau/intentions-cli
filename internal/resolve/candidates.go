@@ -131,29 +131,37 @@ func Resolve(e Env, in *model.Intention, opts Options) (Result, error) {
 		return res, nil
 	}
 
-	// Enumerate on the grid.
+	// Enumerate on the grid. A ranged duration that does not fit at its
+	// nominal length is offered shorter rather than not at all: try each
+	// grid length down to min and take the longest that yields anything.
+	// A range nothing honours would be decoration, which the format forbids.
 	placed := e.PlacedObjects()
 	step := e.stepDuration()
-	dur := in.Duration.Nominal
 	var all []Candidate
-	for _, iv := range common {
-		for t := iv.Start; ; t = t.Add(step) {
-			end := temporal.AddDuration(t, dur)
-			if end.After(iv.End) {
-				break
+	for _, dur := range durationsToTry(*in.Duration, step) {
+		all = nil
+		for _, iv := range common {
+			for t := iv.Start; ; t = t.Add(step) {
+				end := temporal.AddDuration(t, dur)
+				if end.After(iv.End) {
+					break
+				}
+				cand := temporal.Interval{Start: t, End: end}
+				if constraint != nil && !constraint.Admits(cand) {
+					continue
+				}
+				supply, ok := e.covers(cand, involved, supplies, placed, opts.Exclude)
+				if !ok {
+					continue
+				}
+				c := Candidate{Start: fmtTime(t), End: fmtTime(end), Duration: dur.String(), Interval: cand, Supply: supply, Displaces: []string{}}
+				c.Location = chooseLocation(in, supplies, supply)
+				c.Rank, c.Displaces = rankAgainst(cand, involved, placed, opts.Exclude)
+				all = append(all, c)
 			}
-			cand := temporal.Interval{Start: t, End: end}
-			if constraint != nil && !constraint.Admits(cand) {
-				continue
-			}
-			supply, ok := e.covers(cand, involved, supplies, placed, opts.Exclude)
-			if !ok {
-				continue
-			}
-			c := Candidate{Start: fmtTime(t), End: fmtTime(end), Duration: dur.String(), Interval: cand, Supply: supply, Displaces: []string{}}
-			c.Location = chooseLocation(in, supplies, supply)
-			c.Rank, c.Displaces = rankAgainst(cand, involved, placed, opts.Exclude)
-			all = append(all, c)
+		}
+		if len(all) > 0 {
+			break
 		}
 	}
 	if all == nil {
@@ -168,7 +176,11 @@ func Resolve(e Env, in *model.Intention, opts Options) (Result, error) {
 		res.Candidates = all
 	}
 	if len(all) == 0 {
-		res.Reason = "no candidate fits: supply intersects but no grid position holds " + dur.String() + " within capacity"
+		held := in.Duration.Nominal.String()
+		if in.Duration.Min != nil {
+			held += " (nor any length down to " + in.Duration.Min.String() + ")"
+		}
+		res.Reason = "no candidate fits: supply intersects but no grid position holds " + held + " within capacity"
 		if constraint != nil {
 			res.Reason += " and the relational anchor"
 		}
@@ -343,4 +355,31 @@ func distanceToSameActivity(cand temporal.Interval, in *model.Intention, placed 
 		}
 	}
 	return best
+}
+
+// durationsToTry lists the lengths to enumerate, longest first: the nominal,
+// then each grid step down towards min when the duration is ranged, and min
+// itself. Lengths are compared nominally, and each shorter length is built
+// from seconds, so this shortens a time-of-day duration; a ranged duration
+// measured in days is offered at its nominal and its min only.
+func durationsToTry(spec temporal.DurationSpec, step time.Duration) []temporal.Duration {
+	out := []temporal.Duration{spec.Nominal}
+	if spec.Min == nil {
+		return out
+	}
+	nominal, min, grid := spec.Nominal.ApproxSeconds(), spec.Min.ApproxSeconds(), int64(step/time.Second)
+	if min >= nominal {
+		return out
+	}
+	if grid > 0 && spec.Nominal.HasTimePart() && !spec.Nominal.HasDatePart() {
+		for d := nominal - grid; d > min; d -= grid {
+			out = append(out, secondsDuration(d))
+		}
+	}
+	return append(out, *spec.Min)
+}
+
+// secondsDuration renders a count of seconds as hours, minutes and seconds.
+func secondsDuration(n int64) temporal.Duration {
+	return temporal.Duration{Hours: int(n / 3600), Minutes: int((n % 3600) / 60), Seconds: int(n % 60)}
 }

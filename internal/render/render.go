@@ -66,6 +66,10 @@ func Selection(sel resolve.Selection, res resolve.Result, flags []consistency.Fl
 		cm, _ := model.ToMap(sel.Commitment)
 		out["commitment"] = cm
 	}
+	if sel.Cancelled != nil {
+		cm, _ := model.ToMap(sel.Cancelled)
+		out["cancelled_commitment"] = cm
+	}
 	if sel.Replaced != nil {
 		out["replaced"] = map[string]any{"start": sel.Replaced.Start.Raw, "duration": sel.Replaced.Duration.String(), "location": sel.Replaced.Location}
 	}

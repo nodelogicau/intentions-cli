@@ -63,10 +63,29 @@ func (e Env) Eligible(av *model.Availability, in *model.Intention) (bool, string
 	if !LocationsIntersect(av.Location, in.Location) {
 		return false, fmt.Sprintf("location %v shares nothing with the intention's %v", av.Location, in.Location)
 	}
+	// Personal capacity is offered to the plan it belongs to, not to the
+	// workspace at large: it is supply only for its own subject, or for an
+	// intention that names them as a party. Wider scopes follow the lattice.
+	if av.Scope == "" || av.Scope == "personal" {
+		if av.Subject != in.Subject && !involves(in.Parties, av.Subject) {
+			return false, fmt.Sprintf("personal to %s, who is neither the subject of %s nor one of its parties", av.Subject, in.ID)
+		}
+		return true, ""
+	}
 	if scopeRank(av.Scope) < scopeRank(e.Scope) {
 		return false, fmt.Sprintf("scope %s is narrower than the resolver's %s", av.Scope, e.Scope)
 	}
 	return true, ""
+}
+
+// involves reports whether uri is one of the listed parties.
+func involves(parties []string, uri string) bool {
+	for _, p := range parties {
+		if p == uri {
+			return true
+		}
+	}
+	return false
 }
 
 // ConditionalAdmits reports whether an availability's conditional admits the

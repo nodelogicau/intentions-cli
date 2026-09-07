@@ -140,7 +140,7 @@ func (a *app) generateCmd() *cobra.Command {
 			})
 		}),
 	}
-	cmd.Flags().StringVar(&horizon, "horizon", "", "how far ahead to generate (default generation.horizon)")
+	cmd.Flags().StringVar(&horizon, "horizon", "", "how far ahead to generate (default resolver.horizon)")
 	cmd.Flags().StringArrayVar(&only, "recurring", nil, "only this recurring intention (repeatable)")
 	addActFlags(cmd, &act)
 	return cmd

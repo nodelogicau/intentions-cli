@@ -15,7 +15,7 @@ import (
 )
 
 func (a *app) initCmd() *cobra.Command {
-	var author, subject, timezone, hemisphere, availHorizon, genHorizon string
+	var author, subject, timezone, hemisphere, availHorizon, horizon string
 	var pointer bool
 	cmd := &cobra.Command{
 		Use:   "init [dir] [--pointer]",
@@ -54,13 +54,13 @@ func (a *app) initCmd() *cobra.Command {
 				}
 				cfg.Resolver.Hemisphere = string(h)
 			}
-			for name, v := range map[string]string{"--availability-horizon": availHorizon, "--generation-horizon": genHorizon} {
+			for name, v := range map[string]string{"--availability-horizon": availHorizon, "--horizon": horizon} {
 				if _, err := temporal.ParseDuration(v); err != nil {
 					return usageErr("%s: %v", name, err)
 				}
 			}
 			cfg.Availability.DefaultHorizon = availHorizon
-			cfg.Generation.Horizon = genHorizon
+			cfg.Resolver.Horizon = horizon
 			ws, created, err := store.Init(dir, cfg)
 			if err != nil {
 				return err
@@ -97,7 +97,7 @@ func (a *app) initCmd() *cobra.Command {
 	cmd.Flags().StringVar(&timezone, "timezone", "", "resolver.timezone (default: the local zone, else UTC)")
 	cmd.Flags().StringVar(&hemisphere, "hemisphere", "", "resolver.hemisphere for season codes: north or south (default north)")
 	cmd.Flags().StringVar(&availHorizon, "availability-horizon", "P13W", "availability.default_horizon")
-	cmd.Flags().StringVar(&genHorizon, "generation-horizon", "P4W", "generation.horizon")
+	cmd.Flags().StringVar(&horizon, "horizon", "P4W", "resolver.horizon: the planning horizon shared by resolution and instance generation")
 	cmd.Flags().BoolVar(&pointer, "pointer", false, "also write ./"+store.PointerFile+" pointing at dir")
 	return cmd
 }

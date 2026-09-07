@@ -410,6 +410,9 @@ func (v *validator) conventions() {
 	if _, err := os.Stat(filepath.Join(v.ws.Root, store.ConventionsFile)); err != nil {
 		v.addPath(SeverityInfo, "no_conventions", store.ConventionsFile, "no %s; a prose conventions file helps agents and people agree on activity terms", store.ConventionsFile)
 	}
+	if v.ws.Config.StaleGeneration != "" {
+		v.addPath(SeverityInfo, "resolver_unknown_key", store.ConfigFile, "generation.horizon is no longer a configuration key and is ignored; resolver.horizon is the one planning horizon, shared by resolution and instance generation")
+	}
 	for _, k := range v.ws.Config.UnknownResolverKeys {
 		if k == "week_start" {
 			v.addPath(SeverityInfo, "resolver_unknown_key", store.ConfigFile, "resolver.week_start is no longer a configuration key and is ignored; weeks are ISO weeks, Monday to Sunday, in every context")

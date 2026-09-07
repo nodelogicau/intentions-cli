@@ -42,10 +42,11 @@ type Config struct {
 	Availability        struct {
 		DefaultHorizon string `json:"default_horizon"`
 	} `json:"availability"`
-	Generation struct {
-		Horizon string `json:"horizon"`
-	} `json:"generation"`
-	Defaults struct {
+	// StaleGeneration records a generation.horizon left by an older writer.
+	// resolver.horizon is the one planning horizon; this is ignored and
+	// reported at info level, as a stale week_start is.
+	StaleGeneration string `json:"-"`
+	Defaults        struct {
 		Subject string       `json:"subject,omitempty"`
 		Source  model.Source `json:"source"`
 	} `json:"defaults"`
@@ -62,7 +63,6 @@ func NewConfig() Config {
 	c.Resolver.Step = "PT15M"
 	c.Resolver.Horizon = "P4W"
 	c.Availability.DefaultHorizon = "P13W"
-	c.Generation.Horizon = "P4W"
 	return c
 }
 
@@ -86,7 +86,7 @@ func ParseConfig(data []byte) (Config, error) {
 	c.Resolver.Scope = getPath(root, "resolver", "scope")
 	c.UnknownResolverKeys = unknownKeys(root, []string{"timezone", "hemisphere", "step", "horizon", "scope"}, "resolver")
 	c.Availability.DefaultHorizon = getPath(root, "availability", "default_horizon")
-	c.Generation.Horizon = getPath(root, "generation", "horizon")
+	c.StaleGeneration = getPath(root, "generation", "horizon")
 	c.Defaults.Subject = getPath(root, "defaults", "subject")
 	c.Defaults.Source.Author = getPath(root, "defaults", "source", "author")
 	c.Defaults.Source.Harness = getPath(root, "defaults", "source", "harness")
@@ -127,9 +127,6 @@ func (c Config) Validate() error {
 	if _, err := temporal.ParseDuration(c.Availability.DefaultHorizon); err != nil {
 		return fmt.Errorf("%s: availability.default_horizon: %v", ConfigFile, err)
 	}
-	if _, err := temporal.ParseDuration(c.Generation.Horizon); err != nil {
-		return fmt.Errorf("%s: generation.horizon: %v", ConfigFile, err)
-	}
 	if strings.TrimSpace(c.Defaults.Source.Author) == "" {
 		return fmt.Errorf("%s: defaults.source.author is required", ConfigFile)
 	}
@@ -155,10 +152,10 @@ func (c Config) DefaultHorizon() temporal.Duration {
 	return d
 }
 
-// GenerationHorizon returns generation.horizon parsed.
+// GenerationHorizon is the horizon instance generation runs over: the same
+// resolver.horizon resolution uses, so the two cannot drift.
 func (c Config) GenerationHorizon() temporal.Duration {
-	d, _ := temporal.ParseDuration(c.Generation.Horizon)
-	return d
+	return c.ResolverHorizon()
 }
 
 // Step returns resolver.step parsed, PT15M when absent.
@@ -221,7 +218,6 @@ func (c Config) Marshal() ([]byte, error) {
 		setPath(root, c.Resolver.Scope, "resolver", "scope")
 	}
 	setPath(root, c.Availability.DefaultHorizon, "availability", "default_horizon")
-	setPath(root, c.Generation.Horizon, "generation", "horizon")
 	if c.Defaults.Subject != "" {
 		setPath(root, c.Defaults.Subject, "defaults", "subject")
 	}

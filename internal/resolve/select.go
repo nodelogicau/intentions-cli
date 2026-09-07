@@ -13,6 +13,7 @@ type Selection struct {
 	Resolution *model.Resolution
 	Intention  *model.Intention
 	Commitment *model.Commitment
+	Cancelled  *model.Commitment // a live commitment the replacement had to cancel
 	Replaced   *temporal.Placement
 	Candidate  Candidate
 }
@@ -83,7 +84,11 @@ func Select(e Env, in *model.Intention, opts SelectOptions) (Selection, Result, 
 	sel.Candidate = chosen
 
 	start, _ := temporal.ParsePlacementStart(chosen.Interval.Start.In(e.Ctx.Location).Format(time.RFC3339))
-	placement := &temporal.Placement{Start: start, Duration: temporal.DurationSpec{Nominal: in.Duration.Nominal}, Location: chosen.Location}
+	offered := in.Duration.Nominal
+	if d, err := temporal.ParseDuration(chosen.Duration); err == nil {
+		offered = d // a ranged duration may have been offered shorter
+	}
+	placement := &temporal.Placement{Start: start, Duration: temporal.DurationSpec{Nominal: offered}, Location: chosen.Location}
 	considered := res.Considered
 	rec := &model.Resolution{
 		ID: model.MintID(model.TypeResolution), Intention: in.ID, Placement: placement, Selector: selector,
@@ -100,6 +105,26 @@ func Select(e Env, in *model.Intention, opts SelectOptions) (Selection, Result, 
 	sel.Resolution, sel.Intention = rec, &updated
 	e.G.Add(rec)
 	e.G.Add(&updated)
+
+	// A placement its parties agreed to cannot move under them. Replacing
+	// one cancels the commitment that rested on it, naming the new
+	// resolution as the reason, and a fresh commitment is written below with
+	// everyone tentative again; the retired file keeps who had accepted.
+	if sel.Replaced != nil {
+		for _, c := range e.G.Commitments() {
+			if c.Retired != nil || c.Intention != in.ID || c.ID == "" {
+				continue
+			}
+			cancelled := *c
+			cancelled.Retired = &model.Retired{Kind: "cancelled", Reason: "superseded by " + rec.ID, Source: opts.Source, Timestamp: opts.Timestamp}
+			if err := e.WS.WriteObject(&cancelled); err != nil {
+				return sel, res, err
+			}
+			e.G.Add(&cancelled)
+			sel.Cancelled = &cancelled
+			break
+		}
+	}
 
 	if len(in.Parties) > 0 {
 		parties := []model.Party{{URI: in.Subject, Status: "tentative"}}
@@ -124,6 +149,9 @@ func (s Selection) Describe() string {
 	out := fmt.Sprintf("Selected candidate %s (rank %d) for %s: resolution %s", s.Candidate.Start, s.Candidate.Rank, s.Intention.ID, s.Resolution.ID)
 	if s.Commitment != nil {
 		out += ", commitment " + s.Commitment.ID
+	}
+	if s.Cancelled != nil {
+		out += " (cancelling " + s.Cancelled.ID + ")"
 	}
 	if len(s.Candidate.Displaces) > 0 {
 		out += fmt.Sprintf("; displaces %v", s.Candidate.Displaces)

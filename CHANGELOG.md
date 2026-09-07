@@ -3,6 +3,40 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.10.0] - 2026-09-07
+
+Makes the four additions upstream attached to the resolution settlements in
+spec commit `e5c5753`, which this implementation had not followed.
+
+### Changed
+
+- **One planning horizon.** `resolver.horizon` is the horizon for resolution
+  and for instance generation, so the two cannot drift. `generation.horizon`
+  is no longer written or read; an existing one loads, is ignored, and
+  `validate` reports it at info level. `init` takes `--horizon`;
+  `--generation-horizon` is gone.
+- **A ranged duration is honoured.** When the nominal yields no candidate,
+  resolution now tries successively shorter lengths on the same grid down to
+  `min` and offers the longest that yields any. Each candidate carries the
+  duration offered, and selecting one places that rather than the nominal.
+  Previously only the nominal was tried, which made a declared range
+  decoration.
+- **Personal availability stays personal.** A `personal` availability is
+  supply only when its subject is the intention's subject or one of its
+  parties. Previously any availability whose scope was at or wider than the
+  resolver's was usable, so a resolution for one person could consume
+  another person's personal capacity. Workspaces relying on that will now
+  see no supply, with an exclusion reason saying why; widen the scope to
+  `organisation` if sharing was intended.
+- **Replacement carries the commitment.** `select --replace` on a placement a
+  live commitment rests on now cancels that commitment, with the new
+  resolution's id as its reason, and writes a fresh one with every party at
+  `tentative`. A placement its parties accepted cannot move under them
+  without their act. The retired file still records who had accepted, and the
+  result names both commitments.
+
+No file format change and no projection change.
+
 ## [0.9.1] - 2026-09-07
 
 Guidance only, from the first report of an agent harness driving this CLI
@@ -245,6 +279,7 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
+[0.10.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/nodelogicau/intentions-cli/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.7.0...v0.8.0
