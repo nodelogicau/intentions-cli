@@ -19,7 +19,7 @@
 
 #### Scenario: Unknown kind refused
 - **WHEN** `acknowledge int_A --kind overlap` is run
-- **THEN** the command exits with code 2 naming the six kinds
+- **THEN** the command exits with code 2 naming the seven kinds
 
 #### Scenario: Missing counterpart refused
 - **WHEN** `acknowledge int_A --kind window-clash` is run with no `--counterpart` and int_A has supply
@@ -28,6 +28,10 @@
 #### Scenario: Cycle acknowledgement has no counterpart
 - **WHEN** `acknowledge int_A --kind cycle --reason "known, being untangled"` is run
 - **THEN** the entry carries no `counterpart` and no `counterpart_version`
+
+#### Scenario: Party-declined acknowledgement names the commitment
+- **WHEN** `acknowledge int_A --kind party-declined --counterpart cmt_X --reason "going ahead without them"` is run
+- **THEN** the entry carries cmt_X and its current version, and the flag is suppressed until that commitment's projection changes
 
 ### Requirement: Acknowledgements are outside the projection
 Appending an acknowledgement SHALL NOT change the object's version.

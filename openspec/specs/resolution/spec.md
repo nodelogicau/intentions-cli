@@ -56,7 +56,7 @@ Supply SHALL be the intersection of eligible availability for the subject and fo
 - **THEN** the candidate set is empty and `reason` names it as retired or expired
 
 ### Requirement: Capacity per occasion
-An occasion SHALL offer its availability's nominal duration (the max when ranged). A candidate SHALL NOT exceed it, and the opaque unretired placements already resting on the occasion plus the candidate SHALL NOT exceed it.
+An occasion SHALL offer its availability's nominal duration (the max when ranged). A candidate SHALL NOT exceed it, and the opaque unretired placements already resting on the occasion plus the candidate SHALL NOT exceed it. A commitment SHALL consume a party's capacity only where that party's own entry is `tentative` or `accepted`. An intention's placement and the commitment created from it SHALL count once against the subject, and that placement SHALL consume the subject's capacity whatever their party entry says.
 
 #### Scenario: Capacity shorter than the interval
 - **WHEN** an availability has `clock: 09:00/17:00` and `duration: PT3H`
@@ -65,6 +65,10 @@ An occasion SHALL offer its availability's nominal duration (the max when ranged
 #### Scenario: Capacity consumed
 - **WHEN** a two-hour intention is already placed on a three-hour occasion
 - **THEN** a second two-hour intention finds no candidate on that occasion
+
+#### Scenario: Declined import does not consume
+- **WHEN** the subject declines an imported one-hour commitment resting on a three-hour occasion
+- **THEN** the occasion offers three hours to them again
 
 ### Requirement: Candidate enumeration
 Candidate starts SHALL lie on a grid of `resolver.step` (default `PT15M`, overridable with `--step`) aligned to each supply interval's start, with the candidate spanning the intention's nominal duration.
@@ -85,7 +89,7 @@ When the window carries a `relative` anchor whose target has a placement, candid
 - **THEN** `resolve` returns no candidates and `reason` says blocked on the target
 
 ### Requirement: Ranking by reconsideration cost
-Candidates SHALL be ordered by rank: 1, overlapping no opaque placed intention and no opaque commitment of any involved particular; 2, overlapping only tentative intentions or tentative commitments; 3, overlapping a firm intention or an accepted commitment. Overlap with a transparent commitment SHALL NOT count. Within a rank, order SHALL follow the intention's `preference`, else that of the recurring intention it is an instance of, else earliest start: `earliest`, `latest`, `adjacent` (nearest to an existing placement with the same activity), `spread` (farthest).
+Candidates SHALL be ordered by rank: 1, overlapping no opaque placed intention and no commitment occupying an involved particular; 2, overlapping only tentative intentions or commitments the resolving subject holds at `tentative`; 3, overlapping a firm intention or a commitment the resolving subject holds at `accepted`. Where a rung names a commitment's status it SHALL mean the resolving subject's own party entry, never another party's. A commitment that does not occupy the subject, because their entry is `declined` or because it is transparent, SHALL NOT be treated as displaced by any candidate and SHALL NOT raise a candidate's rank. Within a rank, order SHALL follow the intention's `preference`, else that of the recurring intention it is an instance of, else earliest start: `earliest`, `latest`, `adjacent` (nearest to an existing placement with the same activity), `spread` (farthest).
 
 #### Scenario: Firm outranks tentative
 - **WHEN** candidate X overlaps a tentative placed intention and candidate Y overlaps nothing
@@ -102,6 +106,14 @@ Candidates SHALL be ordered by rank: 1, overlapping no opaque placed intention a
 #### Scenario: Transparent overlap is free
 - **WHEN** candidate X overlaps an accepted commitment with `transparent: true` and candidate Y overlaps nothing
 - **THEN** X and Y have the same rank
+
+#### Scenario: The subject's own entry decides the rung
+- **WHEN** a candidate overlaps a commitment on which the subject is `tentative` and a counterparty is `accepted`
+- **THEN** the candidate is ranked as displacing a tentative commitment
+
+#### Scenario: A declined commitment is not displaced
+- **WHEN** a candidate overlaps a commitment with no intention that the subject has declined, and nothing else
+- **THEN** the candidate is ranked as displacing nothing and the commitment is not listed in `displaces`
 
 ### Requirement: Preconditions
 `resolve` SHALL refuse with exit code 2 and a reason an intention that lacks `duration` or `window`, is retired, is in a serves cycle, or is already placed. A blocked relational target and an empty supply SHALL be reported in the result with exit code 0.

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`check`: the six flag kinds, flag shape, transparent commitments, suppression by acknowledgement and lapse, when writes run the check, and the rule that it changes nothing.
+`check`: the seven flag kinds, flag shape, transparent commitments, suppression by acknowledgement and lapse, when writes run the check, and the rule that it changes nothing.
 
 ## Requirements
 
@@ -18,7 +18,7 @@
 - **THEN** only flags whose subject or counterpart is int_A are reported
 
 ### Requirement: Flag kinds
-A flag SHALL have exactly one kind: `window-clash` (a placement overlaps another opaque placement of an involved particular, or no eligible occasion contains it), `condition-mismatch` (an availability whose window contains the placement has a `conditional` that excludes the intention's `activity`), `location-mismatch` (the placement's location is outside such an availability's `location` list, or outside the intention's), `expired-ground` (every availability whose window contains the placement has expired or been retired), `intention-inconsistency` (two active unplaced intentions of one subject each have candidates alone but no non-overlapping pair within shared capacity), `cycle` (the intention is in a serves cycle). Flags SHALL carry no severity.
+A flag SHALL have exactly one kind: `window-clash` (a placement overlaps another opaque placement of an involved particular, or no eligible occasion contains it), `condition-mismatch` (an availability whose window contains the placement has a `conditional` that excludes the intention's `activity`), `location-mismatch` (the placement's location is outside such an availability's `location` list, or outside the intention's), `expired-ground` (every availability whose window contains the placement has expired or been retired), `intention-inconsistency` (two active unplaced intentions of one subject each have candidates alone but no non-overlapping pair within shared capacity), `party-declined` (a commitment has a party at `declined` while the intention it fulfils is still placed), `cycle` (the intention is in a serves cycle). Flags SHALL carry no severity.
 
 #### Scenario: Window clash on both
 - **WHEN** commitment cmt_X overlaps intention int_Y
@@ -43,6 +43,35 @@ A flag SHALL have exactly one kind: `window-clash` (a placement overlaps another
 #### Scenario: Cycle
 - **WHEN** the serves graph has a cycle
 - **THEN** every member carries a `cycle` flag with no counterpart
+
+#### Scenario: Seven kinds
+- **WHEN** a check reports a problem
+- **THEN** it is reported under exactly one of the seven kinds
+
+### Requirement: A decline against a standing plan is flagged
+A `party-declined` flag SHALL be reported when a commitment has any party at `declined` and the intention it fulfils exists, is unretired and still carries a placement. It SHALL be reported on both the commitment and that intention, each naming the other as counterpart, and its `detail` SHALL name the declining party and whether that party is the intention's subject. A commitment with no `intention`, which is every imported one, SHALL NOT raise it. A commitment whose intention has no placement SHALL NOT raise it. Where several parties have declined, one flag per declining party SHALL be reported on each object.
+
+The flag SHALL change no party status, clear no placement and retire nothing. It SHALL be acknowledgeable like any other flag, and because a party status is in the commitment's projection, a later change to it SHALL lapse the acknowledgement.
+
+#### Scenario: Subject declines their own arrangement
+- **WHEN** the subject sets their own entry to `declined` on a commitment created from their placed intention
+- **THEN** a `party-declined` flag is reported on the commitment and on the intention, the placement is unchanged, and the detail says the declining party is the subject
+
+#### Scenario: Counterparty declines
+- **WHEN** a counterparty declines a commitment whose intention is still placed
+- **THEN** the same flag is reported on both objects and the detail names that party as not the subject
+
+#### Scenario: Imported commitment declined
+- **WHEN** the subject declines a commitment with no `intention`
+- **THEN** no `party-declined` flag is reported
+
+#### Scenario: Cancelled, not declined
+- **WHEN** the commitment is cancelled, clearing the intention's placement
+- **THEN** no `party-declined` flag is reported
+
+#### Scenario: Acknowledgement lapses on a reversal
+- **WHEN** an acknowledged declining party later sets their status to `accepted`
+- **THEN** the commitment's projection changes, the acknowledgement lapses, and the flag is not reported because no party is declined
 
 ### Requirement: Flag shape
 A flag SHALL carry `kind`, `subject`, `counterpart` (absent for `cycle` and for `window-clash` against absent supply), `counterpart_version` (the counterpart's computed version at check time), and a human-readable `detail`.
