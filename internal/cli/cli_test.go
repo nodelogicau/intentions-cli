@@ -1796,6 +1796,12 @@ func TestPersonalAvailabilityIsNotSharedSupply(t *testing.T) {
 	if len(rb2.json["candidates"].([]any)) == 0 {
 		t.Errorf("a party's personal availability should be visible: %v", rb2.json)
 	}
+	// The real correction: a resolver at a wider scope no longer excludes the
+	// subject's and parties' own personal capacity by rank.
+	wide := mustOK(t, run(t, ws, "", "resolve", b.str("id"), "--scope", "organisation", "--now", rnow), "resolve at organisation scope")
+	if len(wide.json["candidates"].([]any)) == 0 {
+		t.Errorf("a wider resolver scope should still see the subject's own personal availability: %v", wide.json)
+	}
 	// Widening the scope makes it supply for anyone the resolver may see.
 	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", "https://example.com/rooms/9", "--duration", "PT8H", "--calendar", "2026-09-15", "--clock", "09:00/17:00", "--scope", "organisation"), "shared room")
 	c := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Uses the shared room", "--duration", "PT1H", "--calendar", "2026-09-15", "--party", "https://example.com/rooms/9"), "add c")

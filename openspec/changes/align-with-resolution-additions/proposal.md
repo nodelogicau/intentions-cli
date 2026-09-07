@@ -24,4 +24,4 @@ One of the four is not merely a divergence. Under item 20 the format restricts p
 
 ## Impact
 
-A configuration change with a compatibility path: workspaces created before this carry `generation.horizon`, which keeps working as an ignored key with an info finding, but their planning horizon becomes `resolver.horizon` (default `P4W`), which `init` has written since v0.1.0. The ranged-duration change can turn "no candidates" into candidates for intentions that declare a `min`. The visibility change can remove supply that was previously used, which is the point. No file format change and no projection change.
+A configuration change with a compatibility path: workspaces created before this carry `generation.horizon`, which keeps working as an ignored key with an info finding, but their planning horizon becomes `resolver.horizon` (default `P4W`), which `init` has written since v0.1.0. The ranged-duration change can turn "no candidates" into candidates for intentions that declare a `min`. The visibility change can return candidates where a resolver at `organisation` or `public` scope previously found none. No file format change and no projection change.

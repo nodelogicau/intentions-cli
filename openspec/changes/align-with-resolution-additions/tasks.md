@@ -19,4 +19,4 @@
 
 - [x] 5.1 Tests for all four, including a shorter-duration placement, an invisible personal availability, and the cancelled-and-recreated commitment
 - [x] 5.2 README, skill and `docs/mcp.md` where they mention the horizon or scope; SPEC-FEEDBACK items 14, 17, 20, 22 record the settlement; CHANGELOG 0.10.0
-- [ ] 5.3 Tag `v0.10.0` and verify the release
+- [x] 5.3 Tag `v0.10.0` and verify the release

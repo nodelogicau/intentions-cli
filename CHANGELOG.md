@@ -21,13 +21,14 @@ spec commit `e5c5753`, which this implementation had not followed.
   duration offered, and selecting one places that rather than the nominal.
   Previously only the nominal was tried, which made a declared range
   decoration.
-- **Personal availability stays personal.** A `personal` availability is
-  supply only when its subject is the intention's subject or one of its
-  parties. Previously any availability whose scope was at or wider than the
-  resolver's was usable, so a resolution for one person could consume
-  another person's personal capacity. Workspaces relying on that will now
-  see no supply, with an exclusion reason saying why; widen the scope to
-  `organisation` if sharing was intended.
+- **Personal availability is judged by whose plan it serves, not by the
+  resolver's scope.** A `personal` availability is supply when its subject is
+  the intention's subject or one of its parties, whatever `resolver.scope`
+  says; wider scopes still follow the lattice with `resolver.scope` as the
+  ceiling. Supply was already looked up per particular, so no availability
+  was ever readable as another person's capacity; what this fixes is
+  `--scope organisation` or `public` excluding the subject's own personal
+  availability, which left a legitimate resolution with no supply at all.
 - **Replacement carries the commitment.** `select --replace` on a placement a
   live commitment rests on now cancels that commitment, with the new
   resolution's id as its reason, and writes a fresh one with every party at
