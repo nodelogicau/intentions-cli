@@ -37,7 +37,7 @@ The resolution range SHALL start at the later of the window's start and now, and
 - **THEN** the candidate set is empty and `reason` says the window starts beyond the horizon
 
 ### Requirement: Eligible supply and intersection
-Supply SHALL be the intersection of eligible availability for the subject and for every URI in `parties`. An availability is eligible when unretired, not past its effective horizon at now, its `conditional` absent or containing the intention's `activity`, its `location` absent or sharing a URI with the intention's `location` (or the intention has none), and its scope at or wider than the resolver's. A recurring availability contributes one occasion per cadence day, each clipped to its `clock`. A party with no eligible availability SHALL yield an empty set naming the party.
+Supply SHALL be the intersection of eligible availability for the subject and for every URI in `parties`. An availability is eligible when unretired, not past its effective horizon at now, its `conditional` absent or containing the intention's `activity`, its `location` absent or sharing a URI with the intention's `location` (or the intention has none), and visible to the resolver. Visibility SHALL be: a `personal` availability is visible only when its `subject` is the intention's `subject` or one of its `parties`; an `organisation` or `public` availability is visible when its scope is at or wider than the resolver's. A recurring availability contributes one occasion per cadence day, each clipped to its `clock`. A party with no eligible availability SHALL yield an empty set naming the party.
 
 #### Scenario: Multi-party intersection
 - **WHEN** an intention lists a counterparty and a room in `parties`
@@ -55,6 +55,18 @@ Supply SHALL be the intersection of eligible availability for the subject and fo
 - **WHEN** the only matching availability is retired, or is recurring with its horizon passed
 - **THEN** the candidate set is empty and `reason` names it as retired or expired
 
+#### Scenario: Another person's personal availability is invisible
+- **WHEN** an organisation workspace holds Rob's `personal` availability and Ada resolves an intention that does not involve Rob
+- **THEN** it is not used as supply
+
+#### Scenario: A wider resolver scope keeps the subject's own capacity
+- **WHEN** an intention is resolved with `--scope organisation` and the subject's own availability is `personal`
+- **THEN** it is still supply, because a personal availability is judged by whose plan it serves rather than by the resolver's scope
+
+#### Scenario: A party's personal availability is visible
+- **WHEN** Ada's intention lists Rob in `parties` and Rob's availability is `personal`
+- **THEN** it is used as Rob's supply for that intention
+
 ### Requirement: Capacity per occasion
 An occasion SHALL offer its availability's nominal duration (the max when ranged). A candidate SHALL NOT exceed it, and the opaque unretired placements already resting on the occasion plus the candidate SHALL NOT exceed it. A commitment SHALL consume a party's capacity only where that party's own entry is `tentative` or `accepted`. An intention's placement and the commitment created from it SHALL count once against the subject, and that placement SHALL consume the subject's capacity whatever their party entry says.
 
@@ -71,11 +83,23 @@ An occasion SHALL offer its availability's nominal duration (the max when ranged
 - **THEN** the occasion offers three hours to them again
 
 ### Requirement: Candidate enumeration
-Candidate starts SHALL lie on a grid of `resolver.step` (default `PT15M`, overridable with `--step`) aligned to each supply interval's start, with the candidate spanning the intention's nominal duration.
+Candidate starts SHALL lie on a grid of `resolver.step` (default `PT15M`, overridable with `--step`) aligned to each supply interval's start, with the candidate spanning the intention's nominal duration. When the duration is ranged and the nominal yields no candidate, resolution SHALL try successively shorter durations on the same grid, down to `min`, and SHALL offer the longest that yields any. Each candidate SHALL carry the duration actually offered, `candidates_considered` SHALL count the set offered, and a selection SHALL place the offered duration rather than the nominal.
 
 #### Scenario: Grid alignment
 - **WHEN** supply runs 10:00 to 12:00, the step is PT30M and the duration is PT1H
 - **THEN** the candidates start at 10:00, 10:30 and 11:00
+
+#### Scenario: Shorter duration offered
+- **WHEN** an intention has `duration: {nominal: PT90M, min: PT1H}` and the only supply left that day is one hour
+- **THEN** candidates of PT1H are offered, each carrying that duration, and selecting one places PT1H
+
+#### Scenario: Nominal wins when it fits
+- **WHEN** the nominal duration yields candidates
+- **THEN** no shorter duration is tried and every candidate spans the nominal
+
+#### Scenario: Below min is not offered
+- **WHEN** the largest gap is shorter than `min`
+- **THEN** the candidate set is empty and `reason` says no grid position holds the duration within capacity
 
 ### Requirement: Relational anchor
 When the window carries a `relative` anchor whose target has a placement, candidates SHALL satisfy it: `FINISHTOSTART` puts the start in `[target end + min, target end + max]`; `STARTTOSTART` the start in `[target start + min, target start + max]`; `FINISHTOFINISH` the end in `[target end + min, target end + max]`; `STARTTOFINISH` the end in `[target start + min, target start + max]`. An absent gap SHALL mean min zero and no max. A target with no placement, or retired, SHALL make the intention blocked.

@@ -40,7 +40,11 @@ Supply SHALL be the intersection of eligible availability for the subject and fo
 
 #### Scenario: Another person's personal availability is invisible
 - **WHEN** an organisation workspace holds Rob's `personal` availability and Ada resolves an intention that does not involve Rob
-- **THEN** it is not used as supply and the exclusion says it is personal to another particular
+- **THEN** it is not used as supply
+
+#### Scenario: A wider resolver scope keeps the subject's own capacity
+- **WHEN** an intention is resolved with `--scope organisation` and the subject's own availability is `personal`
+- **THEN** it is still supply, because a personal availability is judged by whose plan it serves rather than by the resolver's scope
 
 #### Scenario: A party's personal availability is visible
 - **WHEN** Ada's intention lists Rob in `parties` and Rob's availability is `personal`

@@ -41,7 +41,7 @@ Each `conditional` entry SHALL be a lowercase kebab-case term. The list SHALL be
 - **THEN** the command exits with code 2
 
 ### Requirement: Scope
-`scope` SHALL be `personal`, `organisation`, or `public`. `availability edit --scope` SHALL only widen: `personal` to `organisation` or `public`, `organisation` to `public`.
+`scope` SHALL be `personal`, `organisation`, or `public`, and SHALL default to `personal`. `availability edit --scope` SHALL only widen: `personal` to `organisation` or `public`, `organisation` to `public`. Scope SHALL govern which resolutions may use the availability as supply: a `personal` availability is visible only when its `subject` is the intention's `subject` or one of its `parties`, while `organisation` and `public` availability is visible to a resolver whose `resolver.scope` is at or narrower than the availability's scope.
 
 #### Scenario: Widen accepted
 - **WHEN** `availability edit avl_A --scope organisation` is run on a `personal` availability
@@ -50,6 +50,10 @@ Each `conditional` entry SHALL be a lowercase kebab-case term. The list SHALL be
 #### Scenario: Narrowing refused
 - **WHEN** `availability edit avl_A --scope personal` is run on an `organisation` availability
 - **THEN** the command exits with code 2
+
+#### Scenario: Personal stays personal
+- **WHEN** an organisation workspace holds Rob's `personal` availability and Ada resolves an intention that does not involve Rob
+- **THEN** it is not visible as supply
 
 ### Requirement: Validity horizon as stored
 `valid_until` SHALL be an admitted EDTF expression or an RFC 3339 datetime. `availability show` SHALL report `effective_valid_until`: the explicit value, else for a recurring availability `timestamp` plus `availability.default_horizon`, else the end of the window's calendar bounds. Nothing SHALL be written for the default.
