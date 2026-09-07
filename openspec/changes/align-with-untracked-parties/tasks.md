@@ -18,4 +18,4 @@
 
 - [x] 4.1 Reverse the skill rule and state that declaring capacity narrows it; README and `docs/mcp.md` where they describe supply
 - [x] 4.2 SPEC-FEEDBACK item 25 records the settlement; CHANGELOG 0.11.0; reply on intentions-cli#1
-- [ ] 4.3 Tag `v0.11.0` and verify the release
+- [x] 4.3 Tag `v0.11.0` and verify the release
