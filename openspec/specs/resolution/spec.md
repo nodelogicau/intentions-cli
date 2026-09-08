@@ -37,7 +37,7 @@ The resolution range SHALL start at the later of the window's start and now, and
 - **THEN** the candidate set is empty and `reason` says the window starts beyond the horizon
 
 ### Requirement: Eligible supply and intersection
-Supply SHALL be the intersection of eligible availability for the subject and for every URI in `parties`. An availability is eligible when unretired, not past its effective horizon at now, its `conditional` absent or containing the intention's `activity`, its `location` absent or sharing a URI with the intention's `location` (or the intention has none), and visible to the resolver. Visibility SHALL be: a `personal` availability is visible only when its `subject` is the intention's `subject` or one of its `parties`; an `organisation` or `public` availability is visible when its scope is at or wider than the resolver's. A recurring availability contributes one occasion per cadence day, each clipped to its `clock`. A party with no eligible availability SHALL yield an empty set naming the party.
+Supply SHALL be the intersection of eligible availability for the subject and for every URI in `parties`. An availability is eligible when unretired, not past its effective horizon at now, its `conditional` absent or containing the intention's `activity`, its `location` absent or sharing a URI with the intention's `location` (or the intention has none), and visible to the resolver. Visibility SHALL be: a `personal` availability is visible only when its `subject` is the intention's `subject` or one of its `parties`; an `organisation` or `public` availability is visible when its scope is at or wider than the resolver's. A recurring availability contributes one occasion per cadence day, each clipped to its `clock`. A tracked party with no eligible availability SHALL yield an empty set naming the party.
 
 #### Scenario: Multi-party intersection
 - **WHEN** an intention lists a counterparty and a room in `parties`
@@ -45,7 +45,7 @@ Supply SHALL be the intersection of eligible availability for the subject and fo
 
 #### Scenario: Party held elsewhere
 - **WHEN** an intention lists a party for which no availability exists in the workspace
-- **THEN** the candidate set is empty and `reason` names that party
+- **THEN** that party is untracked, contributes no supply constraint, and resolution places against the subject's and the tracked parties' supply
 
 #### Scenario: Location excludes supply
 - **WHEN** an intention requires `location: [https://h/]` and the subject's only availability carries `location: [https://o/]`
@@ -66,6 +66,10 @@ Supply SHALL be the intersection of eligible availability for the subject and fo
 #### Scenario: A party's personal availability is visible
 - **WHEN** Ada's intention lists Rob in `parties` and Rob's availability is `personal`
 - **THEN** it is used as Rob's supply for that intention
+
+#### Scenario: Untracked party is not reported as missing supply
+- **WHEN** an intention lists a party the workspace holds no availability for
+- **THEN** the candidate set is computed without them and `no_supply` does not name them
 
 ### Requirement: Capacity per occasion
 An occasion SHALL offer its availability's nominal duration (the max when ranged). A candidate SHALL NOT exceed it, and the opaque unretired placements already resting on the occasion plus the candidate SHALL NOT exceed it. A commitment SHALL consume a party's capacity only where that party's own entry is `tentative` or `accepted`. An intention's placement and the commitment created from it SHALL count once against the subject, and that placement SHALL consume the subject's capacity whatever their party entry says.
@@ -168,3 +172,33 @@ Candidates SHALL be ordered by rank: 1, overlapping no opaque placed intention a
 #### Scenario: Filter by subject
 - **WHEN** `unresolved --subject <uri>` is run
 - **THEN** only intentions of that subject are listed
+
+### Requirement: A party the workspace does not track is unconstrained
+A workspace tracks a party exactly when it holds at least one availability whose `subject` is that party's URI, whether or not that availability is retired, expired, or eligible. A party in an intention's `parties` that the workspace does not track SHALL contribute no supply constraint: resolution SHALL place against the subject's supply and that of every tracked party, and SHALL NOT report no supply on the untracked party's account. The intention's `subject` SHALL NEVER be unconstrained by this rule, whatever their records, including where the subject also appears in `parties`. An untracked party is unconstrained, not satisfied: the commitment created from the placement carries them at `tentative` as any party would be.
+
+#### Scenario: External party has no records
+- **WHEN** an intention lists `mailto:someone@another-company.example` in `parties` and the workspace holds no availability for that URI
+- **THEN** candidates are computed from the subject's own supply and that party is not reported as having no supply
+
+#### Scenario: Tracked party with nothing eligible
+- **WHEN** an intention lists a party the workspace tracks, whose eligible availability does not overlap the window
+- **THEN** the candidate set is empty and `reason` names that party
+
+#### Scenario: A retired record still counts as tracked
+- **WHEN** the only availability for a party carries a `retired` record
+- **THEN** that party is tracked, contributes no eligible supply, and resolution reports no supply for them
+
+#### Scenario: Subject with no records
+- **WHEN** an intention's subject has no eligible availability for the window
+- **THEN** the candidate set is empty and `reason` names the subject, whether or not the subject also appears in `parties`
+
+### Requirement: An untracked party's placements still constrain
+Every unretired placement that names an untracked party and occupies them by their own party entry SHALL constrain candidates for that party exactly as a tracked party's placements do. A candidate that would place a second commitment on an untracked party at an overlapping time SHALL be treated as displacing that commitment and ranked accordingly.
+
+#### Scenario: No double-booking an external party
+- **WHEN** a commitment already places an untracked party at an hour and a candidate for another intention would place the same party at an overlapping hour
+- **THEN** the candidate is ranked as displacing that commitment and names it in `displaces`
+
+#### Scenario: Declined untracked party frees the hour
+- **WHEN** the untracked party's entry on the earlier commitment is `declined`
+- **THEN** that commitment does not occupy them and a candidate at the same hour displaces nothing on their account

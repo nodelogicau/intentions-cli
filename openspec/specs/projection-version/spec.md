@@ -7,7 +7,7 @@ How an object's version is derived: the frozen scheduling projection per type, v
 ## Requirements
 
 ### Requirement: Projection field sets
-The scheduling projection SHALL be, per type: intention `subject, duration, window, stability, activity, location, parties, serves, cadence, occurrence, placement, retired.kind`; availability `subject, duration, window, conditional, location, cadence, valid_until, retired.kind`; commitment `parties, placement, intention, origin, transparent, external, retired.kind`; resolution `intention, placement, selector, displaced`. `version` and `firmed_under` SHALL NOT enter any projection. The sets SHALL be frozen for `intentions/0.1`.
+The scheduling projection SHALL be, per type: intention `subject, duration, window, stability, activity, location, parties, serves, cadence, occurrence, placement, retired.kind`; availability `subject, duration, window, conditional, location, cadence, valid_until, retired.kind`; commitment `parties, placement, intention, origin, transparent, external, retired.kind`; resolution `intention, placement, selector, displaced`. `version`, `firmed_under`, and the resolution record's `supply` and `presumed` SHALL NOT enter any projection. The sets SHALL be frozen for `intentions/0.1`.
 
 #### Scenario: Prose edit does not change version
 - **WHEN** only an intention's `description` is edited

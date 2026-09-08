@@ -18,7 +18,7 @@
 - **THEN** only flags whose subject or counterpart is int_A are reported
 
 ### Requirement: Flag kinds
-A flag SHALL have exactly one kind: `window-clash` (a placement overlaps another opaque placement of an involved particular, or no eligible occasion contains it), `condition-mismatch` (an availability whose window contains the placement has a `conditional` that excludes the intention's `activity`), `location-mismatch` (the placement's location is outside such an availability's `location` list, or outside the intention's), `expired-ground` (every availability whose window contains the placement has expired or been retired), `intention-inconsistency` (two active unplaced intentions of one subject each have candidates alone but no non-overlapping pair within shared capacity), `party-declined` (a commitment has a party at `declined` while the intention it fulfils is still placed), `cycle` (the intention is in a serves cycle). Flags SHALL carry no severity.
+A flag SHALL have exactly one kind: `window-clash` (two placements overlap while sharing a particular whom both occupy, occupancy being by each party's own entry, or no eligible occasion contains a placement), `condition-mismatch` (an availability whose window contains the placement has a `conditional` that excludes the intention's `activity`), `location-mismatch` (the placement's location is outside such an availability's `location` list, or outside the intention's), `expired-ground` (every availability whose window contains the placement has expired or been retired), `intention-inconsistency` (two active unplaced intentions of one subject each have candidates alone but no non-overlapping pair within shared capacity), `party-declined` (a commitment has a party at `declined` while the intention it fulfils is still placed), `cycle` (the intention is in a serves cycle). Flags SHALL carry no severity.
 
 #### Scenario: Window clash on both
 - **WHEN** commitment cmt_X overlaps intention int_Y
@@ -47,6 +47,14 @@ A flag SHALL have exactly one kind: `window-clash` (a placement overlaps another
 #### Scenario: Seven kinds
 - **WHEN** a check reports a problem
 - **THEN** it is reported under exactly one of the seven kinds
+
+#### Scenario: Overlap without a shared particular
+- **WHEN** two commitments overlap in time and share no party
+- **THEN** no `window-clash` is reported between them
+
+#### Scenario: Overlap on an untracked party
+- **WHEN** two commitments overlap and both carry the same untracked external party at `tentative`
+- **THEN** a `window-clash` is reported on both, naming that party in `detail`
 
 ### Requirement: A decline against a standing plan is flagged
 A `party-declined` flag SHALL be reported when a commitment has any party at `declined` and the intention it fulfils exists, is unretired and still carries a placement. It SHALL be reported on both the commitment and that intention, each naming the other as counterpart, and its `detail` SHALL name the declining party and whether that party is the intention's subject. A commitment with no `intention`, which is every imported one, SHALL NOT raise it. A commitment whose intention has no placement SHALL NOT raise it. Where several parties have declined, one flag per declining party SHALL be reported on each object.

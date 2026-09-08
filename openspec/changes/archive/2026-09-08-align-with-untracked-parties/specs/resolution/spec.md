@@ -9,7 +9,7 @@ Supply SHALL be the intersection of eligible availability for the subject and fo
 
 #### Scenario: Party held elsewhere
 - **WHEN** an intention lists a party for which no availability exists in the workspace
-- **THEN** the candidate set is empty and `reason` names that party
+- **THEN** that party is untracked, contributes no supply constraint, and resolution places against the subject's and the tracked parties' supply
 
 #### Scenario: Location excludes supply
 - **WHEN** an intention requires `location: [https://h/]` and the subject's only availability carries `location: [https://o/]`
