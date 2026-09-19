@@ -62,7 +62,7 @@ harness driving this CLI against a real workspace
 | 20 | The resolver's scope comes from `resolver.scope` | settled with an addition, adopted in v0.10.0, [#20](https://github.com/nodelogicau/intentions/issues/20) |
 | 21 | Instances copy `location` and the recurring intention's clock | adopted, [#21](https://github.com/nodelogicau/intentions/issues/21) |
 | 22 | Re-resolving a placed intention | settled with an addition, adopted in v0.10.0, [#22](https://github.com/nodelogicau/intentions/issues/22) |
-| 23 | A reference tool set for harnesses | open, [#23](https://github.com/nodelogicau/intentions/issues/23) |
+| 23 | A reference tool set for harnesses | adopted with refinements, [#23](https://github.com/nodelogicau/intentions/issues/23) |
 | 24 | What a declined party means | **decided differently**, [#24](https://github.com/nodelogicau/intentions/issues/24) |
 | 25 | A party the workspace does not track | adopted with refinements, [#25](https://github.com/nodelogicau/intentions/issues/25) |
 
@@ -484,6 +484,8 @@ about their will). `unresolved` is the one tool with no verb in the draft.
 these names and parameters, with the status DKF gives its tool names: an
 implementation MAY expose them under other names, but one that exposes these
 SHOULD keep their semantics, so that skills and prompts transfer.
+
+**Resolution (nodelogicau/intentions 8dd6f6e):** Adopted with three refinements. A "Reference Tool Set" section now sits between Status and References, listing the twenty-five names grouped by object with parameters generated from this binary's own tool schemas (v0.11.0, verified over `tools/list` rather than from `docs/mcp.md`). The standing is as proposed except that an implementation exposing a listed name SHALL, not SHOULD, keep its semantics; the four semantics named here (`select`, `intention_firm`, the two answering tools, and `unresolved`) are stated with SHALL and carried as a `harness-tools` capability in the spec. `unresolved` is named in the text, both in the section and in the resolution lifecycle, as the inventory of intentions still carried without a plan. Every name and parameter this binary exposes matches the section; nothing here needs to change.
 
 ## 24. What a declined party means ([#24](https://github.com/nodelogicau/intentions/issues/24))
 
