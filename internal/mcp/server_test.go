@@ -125,7 +125,7 @@ func list(m map[string]any, k string) []any { l, _ := m[k].([]any); return l }
 func TestInstructionsPromptAndTools(t *testing.T) {
 	h := newHarness(t, "claude-ai", Options{})
 	ins := h.cs.InitializeResult().Instructions
-	for _, want := range []string{h.ws.Root, "default subject is " + ada, "Tool names are this implementation's", "Workspace conventions (intentions.md)"} {
+	for _, want := range []string{h.ws.Root, "default subject is " + ada, "Tool names are the Intentions Format's Reference Tool Set", "Workspace conventions (intentions.md)"} {
 		if !strings.Contains(ins, want) {
 			t.Errorf("instructions lack %q", want)
 		}

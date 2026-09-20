@@ -113,8 +113,8 @@ message.
 
 At `initialize` the server sends `instructions`: which workspace it is bound
 to and its default subject, that writes land as files for a person to review,
-that the tool names are this implementation's (the format names none), and the
-full intentions discipline, the same text as the agent skill: list before you
+that the tool names are the format's Reference Tool Set, exposed as listed,
+and the full intentions discipline, the same text as the agent skill: list before you
 add, a duration and a window never a slot, draft tentative, resolve then ask,
 a policy is the only way a harness firms or selects alone. The same text is
 available as the prompt `intentions-discipline` for clients that surface
@@ -135,8 +135,11 @@ session's context.
 
 ## Tools
 
-The Intentions Format defines no tool set; these names are this
-implementation's, one per CLI operation. Every optional field may be omitted;
+These names are the Intentions Format's [Reference Tool
+Set](https://github.com/nodelogicau/intentions#reference-tool-set), one per
+CLI operation, which this implementation exposes as listed: a listed name
+keeps the semantics and accepts the parameters the specification states, and
+its result equals the verb's `--json` output. Every optional field may be omitted;
 `source` is `{author?, harness?, model?}`; a `window` is
 `{calendar?, clock?, relative?: {target, relation, gap?: {min?, max?}}}`; a
 `duration` is an ISO 8601 string or `{nominal, min?, max?}`.

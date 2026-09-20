@@ -5,6 +5,15 @@ All notable changes to `intentions` are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The tool names are the format's Reference Tool Set**
+  ([#3](https://github.com/nodelogicau/intentions-cli/issues/3)). The server's
+  `instructions` and `docs/mcp.md` said the Intentions Format names no tools.
+  Since spec commit `8dd6f6e` it carries a Reference Tool Set naming exactly
+  the twenty-five tools this binary exposes, so both now say so and point at
+  that section. Nothing about the tools themselves changes.
+
 ### Fixed
 
 - **Tool schemas declare the parameters their verbs require**
