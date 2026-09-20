@@ -189,6 +189,13 @@ intention's ` + "`activity`" + ` and an availability's ` + "`conditional`" + `.
 
 - deep-work
 - meeting
+
+## Termini
+
+A terminus is titled as who the person is, not what they do: *being someone
+who follows through*, never *follow through*. The test is whether the title
+names a person or a task. Look for an intention's chain before you draft it;
+one that serves nothing is held at the weaker construal.
 `
 
 // WritePointer writes a .intentions pointer file in dir naming target. A

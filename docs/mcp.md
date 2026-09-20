@@ -122,9 +122,9 @@ prompts.
 
 ### Workspace conventions
 
-A workspace's own conventions, the activity terms in use and what the
-workspace is for, live in `intentions.md` at the workspace root, the prose
-sibling of `intentions.yaml`. The server appends it to the instructions under
+A workspace's own conventions, the activity terms in use, the terminus
+convention and what the workspace is for, live in `intentions.md` at the
+workspace root, the prose sibling of `intentions.yaml`. The server appends it to the instructions under
 a heading naming the file. At least the first 16 KiB is always delivered, cut
 only on a character boundary, with a note naming the file when longer. For
 clients that never surface `instructions`, the same document is listed as an

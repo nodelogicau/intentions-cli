@@ -7,6 +7,17 @@ All notable changes to `intentions` are recorded here. The format follows
 
 ### Changed
 
+- **`init` writes the terminus convention, and the skill states it**
+  ([#2](https://github.com/nodelogicau/intentions-cli/issues/2)). The
+  generated `intentions.md` gains a **Termini** heading saying a terminus is
+  titled as who the person is, not what they do, as the specification's
+  `intentions.md` section recommends (spec change `place-early-firm-late`).
+  The agent skill's "Say what it is for" bullet states the same convention
+  and asks for an intention's chain before drafting it, and the loop now says
+  to place early and firm late: resolve and offer candidates as soon as
+  duration and window are known, and treat `unresolved` as the inventory to
+  shrink each session.
+
 - **The tool names are the format's Reference Tool Set**
   ([#3](https://github.com/nodelogicau/intentions-cli/issues/3)). The server's
   `instructions` and `docs/mcp.md` said the Intentions Format names no tools.

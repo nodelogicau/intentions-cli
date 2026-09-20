@@ -49,6 +49,13 @@ List before you add. A second intention for the same thing is noise for the
 reviewer; edit the one that exists. When the person's plan becomes more
 definite, narrow the window on the same intention rather than writing a new one.
 
+Place early, firm late. Resolve and put the candidates to the person as soon
+as an intention has a duration and a window; do not wait for the plan to be
+definite. A tentative placement is relief, a plan the mind lets go of, and the
+person can move it; the firm slot comes last. `unresolved` is the inventory of
+what they still carry without a plan, and a session that shrinks it has done
+its work. Selecting still happens only on the person's word or under a policy.
+
 ## Setup
 
 Find the workspace. Precedence is **`--workspace <dir>`, then
@@ -131,9 +138,14 @@ On failure stderr carries `{"error": {"code", "message"}}`; a refused write says
   writes it, and only after `resolve` has ranked the candidates.
 - **Say what it is for.** `--serves <id>:in-order-to` links a means to an
   end; `--serves <id>:for-the-sake-of` links to a terminus, an intention with
-  no window, no duration and no serves of its own, such as *being someone who
-  follows through*. The graph is a DAG; a write that would close a cycle is
-  refused. A terminus is a sink and cannot gain serves.
+  no window, no duration and no serves of its own. Look for the chain before
+  you draft: an intention that serves nothing is held at the weaker construal,
+  so ask what it is for and link it. A terminus is titled as who the person
+  is, not what they do: *being someone who follows through*, never *follow
+  through*; the test is whether the title names a person or a task. The
+  workspace's `intentions.md` carries this convention under **Termini**. The
+  graph is a DAG; a write that would close a cycle is refused. A terminus is
+  a sink and cannot gain serves.
 - **Draft tentative. Firm is the person's.** Every intention you add is
   `tentative`. Setting `firm` with a harness in the source is refused unless
   `--policy` names a terminus of the subject carrying `auto_firm` whose terms
