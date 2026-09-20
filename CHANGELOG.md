@@ -3,7 +3,11 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.11.1] - 2026-09-20
+
+Follows the upstream Reference Tool Set (spec commit `8dd6f6e`) and the
+`place-early-firm-late` change (`384aad0`), closing the three issues raised
+while verifying the set against this binary.
 
 ### Changed
 
@@ -351,6 +355,7 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
+[0.11.1]: https://github.com/nodelogicau/intentions-cli/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/nodelogicau/intentions-cli/compare/v0.9.0...v0.9.1
