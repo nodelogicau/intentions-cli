@@ -173,6 +173,12 @@ and `{"error": {"code", "message"}}` using the CLI's codes (`usage`,
 `refused`, `invalid`, `not_found`, `runtime`). Every refusal the verbs make,
 the tools make: a harness firming without a policy, a subject change, a cycle
 in `serves`, a narrowed scope, selecting a placed intention without `replace`.
+One class of error never reaches a verb: each tool's `inputSchema.required`
+names the parameters its verb refuses to run without (`title` on
+`intention_add`; `subject`, `duration` and `window` on `availability_add`;
+`id` on every tool that takes one), and a call missing one is rejected against
+the schema with a text result naming the missing property and no structured
+`error`.
 
 ## Attribution
 

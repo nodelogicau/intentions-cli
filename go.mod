@@ -3,6 +3,7 @@ module github.com/nodelogicau/intentions-cli
 go 1.26.7
 
 require (
+	github.com/google/jsonschema-go v0.4.3
 	github.com/google/uuid v1.6.0
 	github.com/gowebpki/jcs v1.0.1
 	github.com/modelcontextprotocol/go-sdk v1.7.0
@@ -13,7 +14,6 @@ require (
 )
 
 require (
-	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect

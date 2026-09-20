@@ -18,7 +18,7 @@ import (
 )
 
 func (s *Server) registerTools() {
-	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_add", Annotations: additive,
+	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_add", Annotations: additive, InputSchema: requiring[intentionIn]("title"),
 		Description: "Record what a person means to do: a duration and a window, never a slot. Always tentative; a harness may draft but may not make it firm here (see intention_firm). List first (intention_list) so you edit an existing intention rather than write a second one for the same thing. Writes one YAML file for a person to review; results equal `intentions intention add --json`."},
 		s.intentionAdd)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_edit", Annotations: additive,
@@ -36,7 +36,7 @@ func (s *Server) registerTools() {
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_list", Annotations: readOnly,
 		Description: "Every intention (active by default), filtered by subject, activity, stability, recurring, placed, unplaced, instances_of, or retired. Call this before intention_add."},
 		s.intentionList)
-	sdk.AddTool(s.srv, &sdk.Tool{Name: "availability_add", Annotations: additive,
+	sdk.AddTool(s.srv, &sdk.Tool{Name: "availability_add", Annotations: additive, InputSchema: requiring[availabilityIn]("subject", "duration", "window"),
 		Description: "Record capacity: a standing statement that a particular (a person, a room, anything with a URI) has a duration of capacity within a window, optionally for certain activities (conditional), at certain places, recurring by cadence. Capacity is a fact about the person: record what they told you, never what an empty calendar suggests and never to make a resolution succeed. Only for the people this workspace tracks, not for external parties."},
 		s.availabilityAdd)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "availability_renew", Annotations: additive,

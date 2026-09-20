@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -72,6 +73,19 @@ func (h *harness) call(name string, args map[string]any) (map[string]any, bool, 
 		_ = json.Unmarshal(b, &out)
 	}
 	return out, res.IsError, text
+}
+
+// rejected asserts the call never reached the verb: the SDK refused it
+// against the input schema for the missing required field.
+func (h *harness) rejected(name string, args map[string]any, field string) {
+	h.t.Helper()
+	out, isErr, text := h.call(name, args)
+	if !isErr {
+		h.t.Fatalf("%s should have been rejected, got %v", name, out)
+	}
+	if !strings.Contains(text, "missing properties") || !strings.Contains(text, `"`+field+`"`) || out != nil {
+		h.t.Errorf("%s: want a schema rejection naming %s, got %q %v", name, field, text, out)
+	}
 }
 
 func (h *harness) ok(name string, args map[string]any) map[string]any {
@@ -157,6 +171,35 @@ func TestInstructionsPromptAndTools(t *testing.T) {
 	if props["window"].(map[string]any)["properties"] == nil || props["serves"].(map[string]any)["items"] == nil {
 		t.Errorf("input schema: %v", props["window"])
 	}
+	// Every tool declares as required exactly the parameters its verb refuses
+	// to run without, as the specification's Reference Tool Set marks them
+	// (issue #4). Add tools carry them although their inputs are embedded in
+	// edit and supersede, where every field is optional.
+	required := map[string][]string{
+		"intention_add": {"title"}, "intention_edit": {"id"}, "intention_firm": {"id"}, "intention_retire": {"id", "kind"}, "intention_show": {"id"},
+		"availability_add": {"subject", "duration", "window"}, "availability_renew": {"id", "valid_until"}, "availability_supersede": {"id"}, "availability_retire": {"id", "kind"},
+		"commitment_accept": {"id"}, "commitment_decline": {"id"}, "commitment_cancel": {"id"}, "commitment_show": {"id"},
+		"resolve": {"id"}, "select": {"id"}, "acknowledge": {"id", "kind"},
+	}
+	for _, n := range want {
+		b, _ := json.Marshal(names[n].InputSchema)
+		var sc struct {
+			Required   []string       `json:"required"`
+			Properties map[string]any `json:"properties"`
+		}
+		_ = json.Unmarshal(b, &sc)
+		sort.Strings(sc.Required)
+		exp := append([]string(nil), required[n]...)
+		sort.Strings(exp)
+		if strings.Join(sc.Required, ",") != strings.Join(exp, ",") {
+			t.Errorf("%s required = %v, want %v", n, sc.Required, exp)
+		}
+		for _, f := range exp {
+			if sc.Properties[f] == nil {
+				t.Errorf("%s requires %s but does not declare it", n, f)
+			}
+		}
+	}
 }
 
 func TestIntentionLifecycle(t *testing.T) {
@@ -213,14 +256,14 @@ func TestIntentionLifecycle(t *testing.T) {
 	}
 	// Errors carry the CLI's codes.
 	h.fail("intention_show", map[string]any{"id": "int_0000"}, "not_found")
-	h.fail("intention_add", map[string]any{}, "usage")
+	h.rejected("intention_add", map[string]any{}, "title")
 	h.fail("intention_add", map[string]any{"title": "bad", "duration": "90 minutes"}, "invalid")
 	h.fail("intention_retire", map[string]any{"id": str(term, "id"), "kind": "superseded"}, "refused")
 }
 
 func TestAvailabilityLifecycle(t *testing.T) {
 	h := newHarness(t, "claude-ai", Options{})
-	h.fail("availability_add", map[string]any{"duration": "PT3H", "window": map[string]any{"clock": "09:00/12:00"}}, "usage")
+	h.rejected("availability_add", map[string]any{"duration": "PT3H", "window": map[string]any{"clock": "09:00/12:00"}}, "subject")
 	a := h.ok("availability_add", map[string]any{"subject": ada, "title": "Tuesday mornings", "duration": "PT3H", "window": map[string]any{"calendar": "2026-09/2026-12", "clock": "09:00/12:00"}, "conditional": []string{"deep-work"}, "cadence": "FREQ=WEEKLY;BYDAY=TU"})
 	id := str(a, "id")
 	if !strings.HasPrefix(id, "avl_") || a["effective_valid_until_from"] != "default_horizon" || obj(a)["scope"] != "personal" {

@@ -3,6 +3,19 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Tool schemas declare the parameters their verbs require**
+  ([#4](https://github.com/nodelogicau/intentions-cli/issues/4)). `tools/list`
+  reported no `required` for `intention_add` and `availability_add`, though
+  the verbs refuse an add without `title`, and without `subject`, `duration`
+  and `window`. Both now declare them, matching the specification's Reference
+  Tool Set; the other twenty-three tools already did. A call missing one is
+  rejected against the schema before it reaches the verb, with a text result
+  naming the missing property rather than a `usage` error.
+
 ## [0.11.0] - 2026-09-08
 
 Aligns with the upstream settlement of SPEC-FEEDBACK item 25 (spec commit

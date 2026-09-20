@@ -16,6 +16,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/nodelogicau/intentions-cli/internal/apperr"
@@ -323,6 +324,20 @@ var (
 	readOnly = &sdk.ToolAnnotations{ReadOnlyHint: true}
 	additive = &sdk.ToolAnnotations{DestructiveHint: boolp(false)}
 )
+
+// requiring infers the input schema for T as AddTool would and marks fields
+// required. The add inputs are embedded in the edit and supersede inputs,
+// where every field is optional, so the struct tags cannot carry the
+// requirement; it is set here for the one tool whose verb refuses to run
+// without the fields, so that a client sees it before calling.
+func requiring[T any](fields ...string) *jsonschema.Schema {
+	s, err := jsonschema.For[T](nil)
+	if err != nil {
+		panic(fmt.Errorf("input schema: %w", err))
+	}
+	s.Required = fields
+	return s
+}
 
 // --- value parsers shared by the tools -------------------------------------
 
