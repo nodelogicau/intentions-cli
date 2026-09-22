@@ -12,6 +12,7 @@ import (
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/nodelogicau/intentions-cli/internal/model"
 	"github.com/nodelogicau/intentions-cli/internal/store"
 )
 
@@ -85,6 +86,26 @@ func (h *harness) rejected(name string, args map[string]any, field string) {
 	}
 	if !strings.Contains(text, "missing properties") || !strings.Contains(text, `"`+field+`"`) || out != nil {
 		h.t.Errorf("%s: want a schema rejection naming %s, got %q %v", name, field, text, out)
+	}
+}
+
+// firm makes an intention firm on disk by the person's own act, which no
+// call through this server can do, since every call carries the client as
+// harness.
+func (h *harness) firm(id string) {
+	h.t.Helper()
+	g, err := h.ws.Load()
+	if err != nil {
+		h.t.Fatal(err)
+	}
+	obj, ok := g.Get(id)
+	if !ok {
+		h.t.Fatalf("firm: %s not found", id)
+	}
+	o := *obj.(*model.Intention)
+	o.Stability, o.FirmedUnder, o.Source = "firm", "", model.Source{Author: ada}
+	if err := h.ws.WriteObject(&o); err != nil {
+		h.t.Fatal(err)
 	}
 }
 
@@ -241,6 +262,11 @@ func TestIntentionLifecycle(t *testing.T) {
 	h.fail("intention_firm", map[string]any{"id": id}, "refused")
 	term := h.ok("intention_add", map[string]any{"title": "Ship the budget", "auto_firm": "max_duration=PT2H"})
 	h.ok("intention_edit", map[string]any{"id": id, "serves": []map[string]any{{"id": str(term, "id"), "role": "for-the-sake-of"}}})
+	// A drafted policy authorises nothing until the person firms it.
+	if msg := h.fail("intention_firm", map[string]any{"id": id, "policy": str(term, "id")}, "refused"); !strings.Contains(msg, "draft") {
+		t.Errorf("draft policy: %s", msg)
+	}
+	h.firm(str(term, "id"))
 	f := h.ok("intention_firm", map[string]any{"id": id, "policy": str(term, "id")})
 	if obj(f)["stability"] != "firm" || obj(f)["firmed_under"] != str(term, "id") {
 		t.Errorf("firm: %v", obj(f))
@@ -326,6 +352,8 @@ func TestResolutionLoop(t *testing.T) {
 	term := h.ok("intention_add", map[string]any{"title": "Keep the board informed", "auto_select": "max_duration=PT1H"})
 	b := h.ok("intention_add", map[string]any{"title": "Read the board pack", "duration": "PT1H", "window": map[string]any{"calendar": "2026-W38"}, "activity": "deep-work", "serves": []map[string]any{{"id": str(term, "id"), "role": "for-the-sake-of"}}})
 	h.fail("select", map[string]any{"id": str(b, "id"), "policy": str(a, "id")}, "refused")
+	h.fail("select", map[string]any{"id": str(b, "id"), "policy": str(term, "id")}, "refused")
+	h.firm(str(term, "id"))
 	sb := h.ok("select", map[string]any{"id": str(b, "id"), "policy": str(term, "id")})
 	if sb["resolution"].(map[string]any)["selector"] != str(term, "id") || sb["policy"] != str(term, "id") || sb["candidate"].(map[string]any)["start"] != "2026-09-15T10:30:00+10:00" {
 		t.Errorf("policy select: %v", sb)

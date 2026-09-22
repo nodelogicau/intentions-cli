@@ -579,6 +579,13 @@ func TestSelectPolicyAndDisplacement(t *testing.T) {
 	if _, _, err := Select(e, quick, SelectOptions{Policy: policy.ID, Source: model.Source{Author: ada}, Timestamp: now}); err == nil {
 		t.Error("person with --policy accepted")
 	}
+	// A tentative policy is a draft and authorises nothing.
+	if _, _, err := Select(e, quick, SelectOptions{Policy: policy.ID, Source: harness, Timestamp: now}); err == nil || !strings.Contains(err.Error(), "draft") {
+		t.Errorf("draft policy: %v", err)
+	}
+	policy.Stability = "firm"
+	f.write(policy)
+	e = f.env()
 	sel, _, err := Select(e, quick, SelectOptions{Policy: policy.ID, Source: harness, Timestamp: now})
 	if err != nil || sel.Resolution.Selector != policy.ID || sel.Resolution.Source.Harness != "claude" {
 		t.Errorf("policy select: %v %+v", err, sel.Resolution)
@@ -596,6 +603,7 @@ func TestSelectPolicyAndDisplacement(t *testing.T) {
 	f2.write(firm)
 	p2 := intention("Policy", "", "", "")
 	p2.AutoSelect = &model.Policy{MaxDuration: &d30}
+	p2.Stability = "firm"
 	q2 := intention("Quick", "PT15M", "2026-09-15", "")
 	f2.write(p2, q2)
 	// Capacity 8h leaves room, so the 15-minute candidate overlaps the firm placement at rank 3.

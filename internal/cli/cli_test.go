@@ -438,6 +438,12 @@ func TestFirmAndPolicies(t *testing.T) {
 	if !strings.Contains(readFile(t, ws, p.str("path")), "auto_firm: {max_duration: PT30M, stability: tentative}") {
 		t.Errorf("policy file:\n%s", readFile(t, ws, p.str("path")))
 	}
+	// A tentative policy is a draft: refused by name, with the person's command.
+	r = run(t, ws, "", "intention", "firm", b.str("id"), "--harness", "claude", "--policy", p.str("id"))
+	if r.code != 2 || !strings.Contains(errMsg(r), "draft") || !strings.Contains(errMsg(r), "intentions intention firm "+p.str("id")) {
+		t.Errorf("draft policy: %d %s", r.code, errMsg(r))
+	}
+	mustOK(t, run(t, ws, "", "intention", "firm", p.str("id")), "person firms the policy")
 	// Harness under policy: firmed_under written after stability, version moves only for the stability edit.
 	r = mustOK(t, run(t, ws, "", "intention", "firm", b.str("id"), "--harness", "claude", "--policy", p.str("id")), "harness under policy")
 	if r.str("policy") != p.str("id") || r.obj()["stability"] != "firm" || r.obj()["firmed_under"] != p.str("id") {
@@ -1121,6 +1127,10 @@ func TestResolutionLoop(t *testing.T) {
 	if r := run(t, ws, "", "select", q.str("id"), "--policy", p.str("id"), "--now", rnow); r.code != 2 {
 		t.Errorf("person with policy: %d", r.code)
 	}
+	if r := run(t, ws, "", "select", q.str("id"), "--policy", p.str("id"), "--harness", "claude", "--now", rnow); r.code != 2 || !strings.Contains(errMsg(r), "draft") {
+		t.Errorf("draft policy select: %d %s", r.code, errMsg(r))
+	}
+	mustOK(t, run(t, ws, "", "intention", "firm", p.str("id")), "person firms the policy")
 	sq := mustOK(t, run(t, ws, "", "select", q.str("id"), "--policy", p.str("id"), "--harness", "claude", "--now", rnow), "policy select")
 	if sq.json["resolution"].(map[string]any)["selector"] != p.str("id") || sq.json["resolution"].(map[string]any)["source"].(map[string]any)["harness"] != "claude" {
 		t.Errorf("policy record: %v", sq.json["resolution"])
@@ -2031,5 +2041,40 @@ func TestEveryIntentionReachesATerminus(t *testing.T) {
 	tx := text(t, ws, "intention", "add", "--title", "C", "--duration", "PT1H")
 	if tx.code != 0 || !strings.Contains(tx.stdout, "Created ") || !strings.Contains(tx.stdout, "  warning unserved: ") || !strings.Contains(tx.stdout, "--serves "+d.str("id")+":for-the-sake-of") {
 		t.Errorf("text findings:\n%s", tx.stdout)
+	}
+}
+
+func TestPolicyWithdrawal(t *testing.T) {
+	ws := initWS(t)
+	tt := addIntention(t, ws, "--title", "being someone who follows through")
+	mustOK(t, run(t, ws, "", "intention", "firm", tt.str("id")), "firm terminus")
+	p := addIntention(t, ws, "--title", "Small things may be firmed", "--auto-firm", "max_duration=PT30M")
+	mustOK(t, run(t, ws, "", "intention", "firm", p.str("id")), "firm policy")
+	a := addIntention(t, ws, "--title", "A", "--duration", "PT20M", "--serves", tt.str("id")+":for-the-sake-of")
+	mustOK(t, run(t, ws, "", "intention", "firm", a.str("id"), "--harness", "claude", "--policy", p.str("id")), "harness firms under policy")
+	if v := run(t, ws, "", "validate"); v.code != 0 || int(v.json["counts"].(map[string]any)["error"].(float64)) != 0 {
+		t.Fatalf("clean before withdrawal: %v", v.json["findings"])
+	}
+	// Suspend the policy: what rested on it is in error, with the ways out.
+	mustOK(t, run(t, ws, "", "intention", "edit", p.str("id"), "--stability", "tentative"), "suspend policy")
+	v := run(t, ws, "", "validate")
+	found := false
+	for _, x := range v.json["findings"].([]any) {
+		f := x.(map[string]any)
+		if f["code"] == "firmed_under_target" && f["id"] == a.str("id") {
+			found = true
+			if f["severity"] != "error" || !strings.Contains(f["message"].(string), "set tentative") || !strings.Contains(f["message"].(string), "intentions intention firm "+a.str("id")) {
+				t.Errorf("withdrawn finding: %v", f)
+			}
+		}
+	}
+	if !found || v.code != 4 {
+		t.Errorf("suspended policy not reported: %d %v", v.code, v.json["findings"])
+	}
+	// The person re-firms by their own act and the error clears.
+	mustOK(t, run(t, ws, "", "intention", "edit", a.str("id"), "--stability", "tentative"), "unfirm")
+	mustOK(t, run(t, ws, "", "intention", "firm", a.str("id")), "person re-firms")
+	if v := run(t, ws, "", "validate"); v.code != 0 {
+		t.Errorf("after re-firm: %v", v.json["findings"])
 	}
 }

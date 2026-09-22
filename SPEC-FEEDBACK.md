@@ -69,7 +69,7 @@ the same object inert as a ground and live as an authorisation.
 | 24 | What a declined party means | **decided differently**, [#24](https://github.com/nodelogicau/intentions/issues/24) |
 | 25 | A party the workspace does not track | adopted with refinements, [#25](https://github.com/nodelogicau/intentions/issues/25) |
 | 26 | Every intention reaches a terminus | adopted with refinements, implemented in v0.12.0, [#26](https://github.com/nodelogicau/intentions/issues/26) |
-| 27 | A policy authorises nothing until it is firm | open, [#27](https://github.com/nodelogicau/intentions/issues/27) |
+| 27 | A policy authorises nothing until it is firm | adopted with refinements, [#27](https://github.com/nodelogicau/intentions/issues/27) |
 
 ---
 
@@ -685,3 +685,22 @@ existing rule, closing the loop item 26 opened: a harness may draft the self
 and the standing permission, and the person's one act makes either real.
 Nothing changes for a person who writes and firms their own policies, which
 is every correct use today.
+
+**Resolution (`16e178e`, change `policies-authorise-when-firm`):** Adopted
+with two refinements from the review. The rule is stated once, on the
+terminus: a terminus is inert until it is firm, grounding nothing and
+authorising nothing; Policies says a condition applies only while the policy
+is firm, Auto-selection says a firm policy, and the Design Principles
+sentence gains two words rather than a paragraph. Withdrawal is defined and
+treats live objects and records differently: `firmed_under` must name an
+active, firm policy, so a person withdrawing a policy, by setting it
+tentative to suspend it or retiring it to end it, puts every intention
+firmed under it in error until they re-firm it by their own act or set it
+tentative; a RESOLUTION record whose `selector` names a policy since
+withdrawn is a warning, not an error, because a record is history and the
+act was authorised when it happened. The retired case, previously unstated,
+is settled the same way. Error level from the first revision, since no known
+workspace holds a tentative policy. The CLI work is
+[intentions-cli#6](https://github.com/nodelogicau/intentions-cli/issues/6):
+the refusals by name, the `firmed_under` error with the two ways out, the
+record warning, and the skill.

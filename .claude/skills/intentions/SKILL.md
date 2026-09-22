@@ -160,7 +160,12 @@ On failure stderr carries `{"error": {"code", "message"}}`; a refused write says
   because they said to, or because a policy they hold covers it. A terminus
   is the exception with no policy: no policy applies to one, and `firm` on a
   terminus is refused for any source carrying a harness. You may draft a
-  terminus; only the person firms it.
+  terminus; only the person firms it. That includes a policy: one you draft
+  is tentative and authorises nothing until the person firms it, and
+  `--policy` naming a draft is refused with the command they run. Setting a
+  firm policy tentative suspends it, retiring it ends it, and either
+  withdraws what rested on it: `validate` then reports every intention
+  firmed under it until the person re-firms it or sets it tentative.
 - **Activity terms are lowercase kebab-case** and matched exactly against an
   availability's `conditional`. Reuse terms already in the workspace
   (`intentions.md` lists them; `validate` reports a term used once at info
@@ -214,9 +219,11 @@ finding under `findings` in its result. The next revision refuses both.
   minutes) and record what they chose with `select --candidate N`. The record
   says `selector: person` because it was.
 - **A policy is the only way you select alone.** `select --policy` works
-  when the person holds a terminus with `auto_select` covering the intention
-  and a rank-1 candidate exists. It is refused otherwise, and refusal is not
-  an invitation to pick a candidate yourself.
+  when the person holds a firm terminus with `auto_select` covering the
+  intention and a rank-1 candidate exists. It is refused otherwise, a draft
+  policy included, and refusal is not an invitation to pick a candidate
+  yourself. A record selected under a policy the person later suspends or
+  retires stands; `validate` warns and the placement is theirs to keep.
 - **Displacement is a flag, not a fix.** A rank-2 or rank-3 candidate
   overlaps something. If the person chooses it anyway, the record lists what
   was displaced, `check` shows `window-clash` on both, and nothing else

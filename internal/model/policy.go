@@ -254,9 +254,26 @@ func CheckFirm(g Graph, target *Intention, act Source, policyID string) (string,
 	return policyID, nil
 }
 
-// LookupPolicy resolves a policy id for a subject: an existing, active
-// intention of that subject that is a terminus carrying a condition.
+// LookupPolicy resolves a policy id for a subject as something a harness may
+// act under now: an existing, active, firm intention of that subject that is
+// a terminus carrying a condition. A tentative policy is a draft and
+// authorises nothing until the person firms it.
 func LookupPolicy(g Graph, policyID, subject string) (*Intention, error) {
+	policy, err := PolicyOf(g, policyID, subject)
+	if err != nil {
+		return nil, err
+	}
+	if err := PolicyLive(policy); err != nil {
+		return nil, err
+	}
+	return policy, nil
+}
+
+// PolicyOf resolves a policy id for a subject regardless of its state: an
+// existing intention of that subject that is a terminus carrying a
+// condition. A record that names one names history, whatever the policy has
+// since become; PolicyLive says whether it authorises anything now.
+func PolicyOf(g Graph, policyID, subject string) (*Intention, error) {
 	obj, ok := g.Get(policyID)
 	if !ok {
 		return nil, refuse("dangling", "policy %s does not exist", policyID)
@@ -264,9 +281,6 @@ func LookupPolicy(g Graph, policyID, subject string) (*Intention, error) {
 	policy, ok := obj.(*Intention)
 	if !ok {
 		return nil, refuse("policy", "policy %s is not an intention", policyID)
-	}
-	if policy.Retired != nil {
-		return nil, refuse("policy", "policy %s is retired", policyID)
 	}
 	if policy.Subject != subject {
 		return nil, refuse("policy", "policy %s belongs to %s, not to %s", policyID, policy.Subject, subject)
@@ -278,6 +292,19 @@ func LookupPolicy(g Graph, policyID, subject string) (*Intention, error) {
 		return nil, refuse("policy", "policy %s carries no condition", policyID)
 	}
 	return policy, nil
+}
+
+// PolicyLive reports whether a policy authorises anything now: it is neither
+// retired (ended) nor tentative (a draft, or suspended). The refusal names
+// the act by which the person makes it theirs.
+func PolicyLive(policy *Intention) error {
+	if policy.Retired != nil {
+		return refuse("policy", "policy %s is retired, which ends it; nothing is authorised under it", policy.ID)
+	}
+	if policy.Stability != "firm" {
+		return refuse("policy_draft", "policy %s is a draft: a tentative policy authorises nothing until the person firms it with `intentions intention firm %s` (an author, no harness)", policy.ID, policy.ID)
+	}
+	return nil
 }
 
 func windowString(w *temporal.Window) string {

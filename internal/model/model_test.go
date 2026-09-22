@@ -323,6 +323,11 @@ func TestFirmPolicy(t *testing.T) {
 	target := intention("int_x")
 	target.Duration = &temporal.DurationSpec{Nominal: temporal.Duration{Minutes: 20}}
 	g := fakeGraph{objs: map[string]Object{"int_p": policy, "int_x": target}}
+	// A tentative policy is a draft and authorises nothing.
+	if _, err := CheckFirm(g, target, Source{Author: "a", Harness: "claude"}, "int_p"); err == nil || !strings.Contains(err.Error(), "draft") || !strings.Contains(err.Error(), "intentions intention firm int_p") {
+		t.Errorf("draft policy: %v", err)
+	}
+	policy.Stability = "firm"
 	if fu, err := CheckFirm(g, target, Source{Author: "a"}, ""); err != nil || fu != "" {
 		t.Errorf("person: %q %v", fu, err)
 	}

@@ -168,3 +168,41 @@ func TestWriteFindings(t *testing.T) {
 		t.Errorf("firm terminus: %+v", fs)
 	}
 }
+
+func TestSelectorWithdrawn(t *testing.T) {
+	ws := newWS(t)
+	pol := firmTerminus("int_pol")
+	d30 := temporal.Duration{Minutes: 30}
+	pol.AutoSelect = &model.Policy{MaxDuration: &d30}
+	a := withDuration(intention("int_a"))
+	a.Serves = []model.Ref{{ID: "int_pol", Role: model.RoleForTheSakeOf}}
+	rec := &model.Resolution{ID: "res_1", Intention: "int_a", Selector: "int_pol", Source: model.Source{Author: "a", Harness: "claude"}, Timestamp: time.Now(), Placement: a.Placement}
+	write(t, ws, pol, a)
+	if err := ws.WriteObject(rec); err != nil {
+		t.Fatal(err)
+	}
+	if r := run(t, ws); has(r, SeverityError, "selector_not_policy") || has(r, SeverityWarning, "selector_withdrawn") {
+		t.Errorf("live policy: %v", r.Findings)
+	}
+	// Suspended: a warning, never an error; the record is history.
+	pol.Stability = "tentative"
+	write(t, ws, pol)
+	r := run(t, ws)
+	if f := findingsFor(r, "res_1"); !strings.HasPrefix(f["selector_withdrawn"], "warning:") || !strings.Contains(f["selector_withdrawn"], "set tentative") || f["selector_not_policy"] != "" {
+		t.Errorf("suspended: %v", f)
+	}
+	// Ended: the same warning, naming retirement.
+	pol.Stability = "firm"
+	pol.Retired = &model.Retired{Kind: "abandoned", Source: model.Source{Author: "a"}, Timestamp: time.Now()}
+	write(t, ws, pol)
+	if f := findingsFor(run(t, ws), "res_1"); !strings.Contains(f["selector_withdrawn"], "retired") {
+		t.Errorf("retired: %v", f)
+	}
+	// Not a policy at all is still an error.
+	pol.Retired = nil
+	pol.AutoSelect = nil
+	write(t, ws, pol)
+	if f := findingsFor(run(t, ws), "res_1"); !strings.HasPrefix(f["selector_not_policy"], "error:") {
+		t.Errorf("not a policy: %v", f)
+	}
+}

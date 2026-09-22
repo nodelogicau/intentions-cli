@@ -3,6 +3,33 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+Aligns with the upstream settlement of SPEC-FEEDBACK item 27 (spec commit
+`16e178e`, change `policies-authorise-when-firm`), raised from implementing
+item 26 and implemented here as
+[#6](https://github.com/nodelogicau/intentions-cli/issues/6).
+
+### Changed
+
+- **A policy authorises nothing until it is firm.** A terminus is inert
+  until firm in both roles: it grounds nothing (0.12.0) and now authorises
+  nothing. `intention firm --policy` and `select --policy`, in the CLI and
+  over MCP, refuse a tentative policy whatever its condition, naming the
+  draft and the command the person runs to firm it. This closes the loophole
+  0.12.0 left open, where a harness could draft a policy and use it in the
+  same session.
+- **Withdrawing a policy withdraws what rested on it.** Setting a firm
+  policy tentative suspends it and retiring it ends it. `validate` reports
+  an error on every intention whose `firmed_under` names a withdrawn policy,
+  with the two ways out: re-firm by the person's own act, or set the
+  intention tentative. A resolution record whose `selector` names a policy
+  since withdrawn is a warning (`selector_withdrawn`), not an error, because
+  the record is history and the placement stands; a retired selector was an
+  error before and is a warning now.
+- **The skill says so** where it describes firming and selecting under a
+  policy.
+
 ## [0.12.0] - 2026-09-22
 
 Aligns with the upstream settlement of SPEC-FEEDBACK item 26 (spec commit

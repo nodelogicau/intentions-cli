@@ -156,10 +156,14 @@ func (v *validator) referential() {
 			if o.FirmedUnder != "" {
 				if o.IsTerminus() {
 					v.add(SeverityError, "firmed_under_terminus", id, "firmed_under on a terminus: no policy applies to a terminus, which is firmed only by the person's own act")
-				} else if _, err := model.LookupPolicy(v.g, o.FirmedUnder, o.Subject); err != nil {
+				} else if p, err := model.PolicyOf(v.g, o.FirmedUnder, o.Subject); err != nil {
 					v.add(SeverityError, "firmed_under_target", id, "firmed_under: %v", err)
-				} else if p, _ := v.g.Get(o.FirmedUnder); p.(*model.Intention).AutoFirm == nil {
+				} else if p.AutoFirm == nil {
 					v.add(SeverityError, "firmed_under_target", id, "firmed_under names %s, which carries no auto_firm condition", o.FirmedUnder)
+				} else if err := model.PolicyLive(p); err != nil {
+					// The policy was withdrawn, by suspension or retirement, and
+					// with it what rested on it.
+					v.add(SeverityError, "firmed_under_target", id, "firmed under %s, a policy since withdrawn (%s); re-firm %s by your own act (`intentions intention firm %s`, an author and no harness) or set it tentative", o.FirmedUnder, withdrawn(p), id, id)
 				}
 			}
 			if o.Window != nil && o.Window.Relative != nil {
@@ -228,6 +232,15 @@ func (v *validator) graph() {
 			}
 		}
 	}
+}
+
+// withdrawn says how a policy stopped authorising: ended by retirement, or
+// suspended by being set tentative.
+func withdrawn(p *model.Intention) string {
+	if p.Retired != nil {
+		return "retired"
+	}
+	return "set tentative"
 }
 
 // StronglyConnected returns every strongly connected component of size > 1
@@ -338,11 +351,14 @@ func (v *validator) instances() {
 				subject = in.Subject
 			}
 		}
-		p, err := model.LookupPolicy(v.g, r.Selector, subject)
+		p, err := model.PolicyOf(v.g, r.Selector, subject)
 		if err != nil {
 			v.add(SeverityError, "selector_not_policy", r.ID, "selector: %v", err)
 		} else if p.AutoSelect == nil {
 			v.add(SeverityError, "selector_not_policy", r.ID, "selector %s carries no auto_select condition", r.Selector)
+		} else if model.PolicyLive(p) != nil {
+			// A record is history: the act was authorised when it happened.
+			v.add(SeverityWarning, "selector_withdrawn", r.ID, "selected under %s, a policy since withdrawn (%s); the placement stands and is the person's to keep or re-resolve", r.Selector, withdrawn(p))
 		}
 	}
 	for key, ids := range seen {

@@ -195,7 +195,9 @@ handshake (`claude-ai`, `claude-code`, `cursor`, …) when neither the call, the
 server flags, `INTENTIONS_HARNESS`, nor `intentions.yaml` supplies one. So an
 act through this server is always a harness's act: `intention_firm` needs
 `policy`, and `select` needs either the person's `candidate` relayed by you or
-a `policy`. A terminus is the one thing no policy covers, so it is never
+a `policy`, and the policy must be firm: a draft you wrote authorises
+nothing, and the refusal names the command the person runs. A terminus is the
+one thing no policy covers, so it is never
 firmed through this server: draft it tentative and give the person the CLI
 command, `intentions intention firm <id>`, run with their author and no
 harness. Until they do, it grounds nothing. `source.author` comes from the call, `--author`,
