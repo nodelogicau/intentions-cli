@@ -9,6 +9,7 @@ import (
 
 	"github.com/nodelogicau/intentions-cli/internal/model"
 	"github.com/nodelogicau/intentions-cli/internal/projection"
+	"github.com/nodelogicau/intentions-cli/internal/query"
 	"github.com/nodelogicau/intentions-cli/internal/store"
 	"github.com/nodelogicau/intentions-cli/internal/temporal"
 )
@@ -187,6 +188,23 @@ func (a *app) applyIntentionFields(cmd *cobra.Command, f intentionFields, o *mod
 	return nil
 }
 
+// attachFindings puts what validate would say about the written intention
+// on the result under "findings", and returns them for text output. The key
+// is absent when nothing warrants a finding.
+func attachFindings(out map[string]any, g *store.Graph, o *model.Intention) []query.Finding {
+	fs := query.WriteFindings(g, o)
+	if len(fs) > 0 {
+		out["findings"] = fs
+	}
+	return fs
+}
+
+func printFindings(w io.Writer, fs []query.Finding) {
+	for _, f := range fs {
+		fmt.Fprintf(w, "  %s %s: %s\n", f.Severity, f.Code, f.Message)
+	}
+}
+
 // checkIntentionWrite applies the workspace-level write policy for a proposed
 // state, given the state before the act (nil on add). When the act sets firm
 // it also settles firmed_under on o: the policy id for a harness, absent for
@@ -212,7 +230,9 @@ func checkIntentionWrite(g *store.Graph, before, o *model.Intention, act model.S
 		if err != nil {
 			return err
 		}
-		o.FirmedUnder = fu
+		// The firming act is the one the file must answer for: a person
+		// firming a harness's draft leaves their own source on it.
+		o.FirmedUnder, o.Source = fu, act
 	}
 	if o.Stability != "firm" {
 		o.FirmedUnder = ""
@@ -276,8 +296,10 @@ func (a *app) intentionAddCmd() *cobra.Command {
 			if f.policy != "" && o.Stability == "firm" {
 				out["policy"] = f.policy
 			}
+			fs := attachFindings(out, g, o)
 			return a.emit(out, func(w io.Writer) {
 				fmt.Fprintf(w, "Created %s (%s)\n  %s\n", o.ID, o.Version, out["path"])
+				printFindings(w, fs)
 			})
 		}),
 	}
@@ -341,12 +363,14 @@ func (a *app) intentionEditCmd() *cobra.Command {
 			if f.policy != "" && o.Stability == "firm" {
 				out["policy"] = f.policy
 			}
+			fs := attachFindings(out, g, &o)
 			return a.emit(out, func(w io.Writer) {
 				if prev == o.Version {
 					fmt.Fprintf(w, "Edited %s (version unchanged %s)\n", o.ID, o.Version)
 				} else {
 					fmt.Fprintf(w, "Edited %s (%s -> %s)\n", o.ID, prev, o.Version)
 				}
+				printFindings(w, fs)
 			})
 		}),
 	}
@@ -387,8 +411,7 @@ func (a *app) intentionFirmCmd() *cobra.Command {
 				return err
 			}
 			o := *before
-			o.Stability = "firm"
-			o.FirmedUnder = fu
+			o.Stability, o.FirmedUnder, o.Source = "firm", fu, src
 			prev, _ := projection.Version(before)
 			if err := writeObject(ws, &o); err != nil {
 				return err
@@ -402,8 +425,10 @@ func (a *app) intentionFirmCmd() *cobra.Command {
 			if policy != "" {
 				out["policy"] = policy
 			}
+			fs := attachFindings(out, g, &o)
 			return a.emit(out, func(w io.Writer) {
 				fmt.Fprintf(w, "Firmed %s (%s -> %s)\n", o.ID, prev, o.Version)
+				printFindings(w, fs)
 			})
 		}),
 	}

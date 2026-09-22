@@ -11,6 +11,7 @@ import (
 	"github.com/nodelogicau/intentions-cli/internal/consistency"
 	"github.com/nodelogicau/intentions-cli/internal/model"
 	"github.com/nodelogicau/intentions-cli/internal/projection"
+	"github.com/nodelogicau/intentions-cli/internal/query"
 	"github.com/nodelogicau/intentions-cli/internal/render"
 	"github.com/nodelogicau/intentions-cli/internal/resolve"
 	"github.com/nodelogicau/intentions-cli/internal/store"
@@ -19,13 +20,13 @@ import (
 
 func (s *Server) registerTools() {
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_add", Annotations: additive, InputSchema: requiring[intentionIn]("title"),
-		Description: "Record what a person means to do: a duration and a window, never a slot. Always tentative; a harness may draft but may not make it firm here (see intention_firm). List first (intention_list) so you edit an existing intention rather than write a second one for the same thing. Writes one YAML file for a person to review; results equal `intentions intention add --json`."},
+		Description: "Record what a person means to do: a duration and a window, never a slot. Always tentative; a harness may draft but may not make it firm here (see intention_firm). List first (intention_list) so you edit an existing intention rather than write a second one for the same thing. An intention that is not a terminus should serve one (serves [{id, role: for-the-sake-of}] naming a firm terminus of the subject, or an intention that reaches one); an unserved write is accepted and its result carries a warning under findings. Writes one YAML file for a person to review; results equal `intentions intention add --json`."},
 		s.intentionAdd)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_edit", Annotations: additive,
 		Description: "Edit an intention in place: fill the plan in as it becomes definite. Each field given replaces its own; each window anchor given replaces its own; `clear` removes optional fields. Prose edits leave the version unchanged. Refuses a retired intention, a subject change, a cycle in serves, and firm by a harness without policy. Results equal `intentions intention edit --json`."},
 		s.intentionEdit)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_firm", Annotations: additive,
-		Description: "Set stability to firm. A person's act needs nothing; a harness (you, when this session identifies one) must pass `policy`, a terminus of the subject carrying auto_firm whose terms the intention satisfies, and the file then records firmed_under. Refused otherwise: never firm because the person sounds sure."},
+		Description: "Set stability to firm. A person's act needs nothing; a harness (you, when this session identifies one) must pass `policy`, a terminus of the subject carrying auto_firm whose terms the intention satisfies, and the file then records firmed_under. Refused otherwise: never firm because the person sounds sure. On a terminus it refuses any policy and any harness: a terminus is the person's word, firmed only by a call naming an author and no harness, and it grounds nothing until then."},
 		s.intentionFirm)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_retire", Annotations: additive,
 		Description: "Append a retirement record: fulfilled, abandoned, or superseded (with superseded_by). Nothing is deleted; the file stays and every reference to it still resolves. A retired intention refuses further edits."},
@@ -247,6 +248,25 @@ func (s *Server) apply(in intentionIn, clear []string, o *model.Intention, g *st
 }
 
 // checkWrite applies the workspace-level write policy and settles firmed_under.
+// attachFindings puts what validate would say about the written intention on
+// the result under "findings", absent when nothing warrants one, and returns
+// them for the text content.
+func attachFindings(out map[string]any, g *store.Graph, o *model.Intention) []query.Finding {
+	fs := query.WriteFindings(g, o)
+	if len(fs) > 0 {
+		out["findings"] = fs
+	}
+	return fs
+}
+
+func findingsText(fs []query.Finding) string {
+	var b strings.Builder
+	for _, f := range fs {
+		fmt.Fprintf(&b, "\n  %s %s: %s", f.Severity, f.Code, f.Message)
+	}
+	return b.String()
+}
+
 func checkWrite(g *store.Graph, before, o *model.Intention, act model.Source, policy string) error {
 	if before != nil {
 		if err := model.CheckNotRetired(before); err != nil {
@@ -268,7 +288,7 @@ func checkWrite(g *store.Graph, before, o *model.Intention, act model.Source, po
 		if err != nil {
 			return err
 		}
-		o.FirmedUnder = fu
+		o.FirmedUnder, o.Source = fu, act
 	}
 	if o.Stability != "firm" {
 		o.FirmedUnder = ""
@@ -340,7 +360,8 @@ func (s *Server) intentionAdd(ctx context.Context, req *sdk.CallToolRequest, in 
 	if in.Policy != "" && o.Stability == "firm" {
 		out["policy"] = in.Policy
 	}
-	return okResult(fmt.Sprintf("Created %s (%s)", o.ID, o.Version)), out, nil
+	fs := attachFindings(out, g, o)
+	return okResult(fmt.Sprintf("Created %s (%s)", o.ID, o.Version) + findingsText(fs)), out, nil
 }
 
 func (s *Server) intentionEdit(ctx context.Context, req *sdk.CallToolRequest, in intentionEditIn) (*sdk.CallToolResult, any, error) {
@@ -385,7 +406,8 @@ func (s *Server) intentionEdit(ctx context.Context, req *sdk.CallToolRequest, in
 		out["policy"] = in.Policy
 	}
 	out["flags"] = s.flagsOn(resolve.NewEnv(s.ws, g, at), o.ID)
-	return okResult(fmt.Sprintf("Edited %s (%s -> %s)", o.ID, prev, o.Version)), out, nil
+	fs := attachFindings(out, g, &o)
+	return okResult(fmt.Sprintf("Edited %s (%s -> %s)", o.ID, prev, o.Version) + findingsText(fs)), out, nil
 }
 
 type firmIn struct {
@@ -417,7 +439,7 @@ func (s *Server) intentionFirm(ctx context.Context, req *sdk.CallToolRequest, in
 		return errResult(err), nil, nil
 	}
 	o := *before
-	o.Stability, o.FirmedUnder = "firm", fu
+	o.Stability, o.FirmedUnder, o.Source = "firm", fu, src
 	prev, _ := projection.Version(before)
 	if err := s.write(&o); err != nil {
 		return errResult(err), nil, nil
@@ -431,7 +453,8 @@ func (s *Server) intentionFirm(ctx context.Context, req *sdk.CallToolRequest, in
 	if in.Policy != "" {
 		out["policy"] = in.Policy
 	}
-	return okResult(fmt.Sprintf("Firmed %s (%s -> %s)", o.ID, prev, o.Version)), out, nil
+	fs := attachFindings(out, g, &o)
+	return okResult(fmt.Sprintf("Firmed %s (%s -> %s)", o.ID, prev, o.Version) + findingsText(fs)), out, nil
 }
 
 type retireIn struct {

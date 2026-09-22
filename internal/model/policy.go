@@ -224,6 +224,17 @@ func Satisfies(p *Policy, target *Intention) error {
 // stands before the act. It returns the value to write into firmed_under:
 // the policy id for a harness, empty for a person's own act.
 func CheckFirm(g Graph, target *Intention, act Source, policyID string) (string, error) {
+	if target.IsTerminus() {
+		// A terminus is the person's word: no policy applies to it, and it
+		// grounds nothing until the person, by their own act, has made it firm.
+		if policyID != "" {
+			return "", refuse("terminus_policy", "no policy applies to a terminus: %s is firmed only by the person's own act, with an author and no harness", target.ID)
+		}
+		if act.Harness != "" {
+			return "", refuse("terminus_firm", "a terminus is the person's word: %s is firmed only by an act with an author and no harness; draft it tentative and give the person the command", target.ID)
+		}
+		return "", nil
+	}
 	if act.Harness == "" {
 		return "", nil
 	}

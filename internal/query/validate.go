@@ -154,7 +154,9 @@ func (v *validator) referential() {
 				check(fmt.Sprintf("serves[%d]", i), r.ID, model.TypeIntention)
 			}
 			if o.FirmedUnder != "" {
-				if _, err := model.LookupPolicy(v.g, o.FirmedUnder, o.Subject); err != nil {
+				if o.IsTerminus() {
+					v.add(SeverityError, "firmed_under_terminus", id, "firmed_under on a terminus: no policy applies to a terminus, which is firmed only by the person's own act")
+				} else if _, err := model.LookupPolicy(v.g, o.FirmedUnder, o.Subject); err != nil {
 					v.add(SeverityError, "firmed_under_target", id, "firmed_under: %v", err)
 				} else if p, _ := v.g.Get(o.FirmedUnder); p.(*model.Intention).AutoFirm == nil {
 					v.add(SeverityError, "firmed_under_target", id, "firmed_under names %s, which carries no auto_firm condition", o.FirmedUnder)
@@ -185,13 +187,34 @@ func (v *validator) referential() {
 	}
 }
 
-// graph reports serves cycles (one error per strongly connected component)
-// and the terminus rule.
+// graph reports serves cycles (one error per strongly connected component),
+// the terminus rule, every intention that reaches no firm terminus of its own
+// subject, and every terminus still held as a draft.
 func (v *validator) graph() {
+	inCycle := map[string]bool{}
 	for _, scc := range StronglyConnected(v.g) {
 		sort.Strings(scc)
 		for _, id := range scc {
+			inCycle[id] = true
 			v.add(SeverityError, "cycle", id, "in a serves cycle with %s; every member is unresolvable", strings.Join(scc, ", "))
+		}
+	}
+	termini := map[string][]string{}
+	for _, in := range v.g.Intentions() {
+		if in.Retired != nil || inCycle[in.ID] {
+			continue
+		}
+		if in.IsTerminus() {
+			if in.Stability != "firm" {
+				v.add(SeverityInfo, "draft_terminus", in.ID, "%s", draftMessage(in.ID))
+			}
+			continue
+		}
+		if _, ok := termini[in.Subject]; !ok {
+			termini[in.Subject] = model.FirmTermini(v.g.Intentions(), in.Subject)
+		}
+		if msg := model.Unserved(v.g, in, termini[in.Subject]); msg != "" {
+			v.add(SeverityWarning, "unserved", in.ID, "%s", msg)
 		}
 	}
 	for _, in := range v.g.Intentions() {

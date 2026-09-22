@@ -56,6 +56,11 @@ person can move it; the firm slot comes last. `unresolved` is the inventory of
 what they still carry without a plan, and a session that shrinks it has done
 its work. Selecting still happens only on the person's word or under a policy.
 
+Termini first. If `intention list` shows no firm terminus of the person's,
+your first question is who they are trying to be, before you record anything
+they mean to do: every intention reaches a terminus, and the why is the price
+of entry (see "Every intention reaches a terminus" below).
+
 ## Setup
 
 Find the workspace. Precedence is **`--workspace <dir>`, then
@@ -138,20 +143,24 @@ On failure stderr carries `{"error": {"code", "message"}}`; a refused write says
   writes it, and only after `resolve` has ranked the candidates.
 - **Say what it is for.** `--serves <id>:in-order-to` links a means to an
   end; `--serves <id>:for-the-sake-of` links to a terminus, an intention with
-  no window, no duration and no serves of its own. Look for the chain before
-  you draft: an intention that serves nothing is held at the weaker construal,
-  so ask what it is for and link it. A terminus is titled as who the person
-  is, not what they do: *being someone who follows through*, never *follow
-  through*; the test is whether the title names a person or a task. The
-  workspace's `intentions.md` carries this convention under **Termini**. The
-  graph is a DAG; a write that would close a cycle is refused. A terminus is
-  a sink and cannot gain serves.
+  no window, no duration and no serves of its own. Every intention that is
+  not a terminus reaches a firm terminus of the person's own through that
+  chain; one that does not is accepted with an `unserved` warning in the
+  result, so ask what it is for and link it before you write. A terminus is
+  titled as who the person is, not what they do: *being someone who follows
+  through*, never *follow through*; the test is whether the title names a
+  person or a task. The workspace's `intentions.md` carries this convention
+  under **Termini**. The graph is a DAG; a write that would close a cycle is
+  refused. A terminus is a sink and cannot gain serves.
 - **Draft tentative. Firm is the person's.** Every intention you add is
   `tentative`. Setting `firm` with a harness in the source is refused unless
   `--policy` names a terminus of the subject carrying `auto_firm` whose terms
   the intention satisfies; the tool then writes `firmed_under` so the file
   shows what authorised it. Never firm because the person sounds sure; firm
-  because they said to, or because a policy they hold covers it.
+  because they said to, or because a policy they hold covers it. A terminus
+  is the exception with no policy: no policy applies to one, and `firm` on a
+  terminus is refused for any source carrying a harness. You may draft a
+  terminus; only the person firms it.
 - **Activity terms are lowercase kebab-case** and matched exactly against an
   availability's `conditional`. Reuse terms already in the workspace
   (`intentions.md` lists them; `validate` reports a term used once at info
@@ -167,6 +176,36 @@ On failure stderr carries `{"error": {"code", "message"}}`; a refused write says
   settling, a title fix: `intention edit`. Prose edits leave the version
   unchanged; the result's `projection_changed` tells you whether the
   scheduling projection moved.
+
+## Every intention reaches a terminus
+
+A terminus grounds an intention the way a particular grounds a claim: it is
+what the intention is ultimately for. Every intention that is not a terminus
+reaches a **firm** terminus of its **own subject** through `serves`, by any
+path of `in-order-to`, `for-the-sake-of` and `instance-of`. Reachability is
+the test, not the presence of an entry: a chain that ends on a scheduled
+intention, or on a terminus still `tentative`, is unserved all the way down.
+In this revision an unserved intention is a `validate` warning that names the
+fix, and a write that leaves one unserved is accepted and carries the same
+finding under `findings` in its result. The next revision refuses both.
+
+- **Who are you trying to be?** In a workspace with no firm terminus of the
+  person's, that is your first question, before anything they mean to do.
+  Draft their answer as a terminus, titled as who they are, and tell them the
+  one command that makes it theirs: `intentions intention firm <id>`, run
+  with their author and no harness. Do not run it.
+- **A draft grounds nothing.** A terminus you add is `tentative`; `validate`
+  reports it as `draft_terminus` at info level, and every intention that
+  reaches only drafts stays `unserved`. Inventing termini silences nothing,
+  so never add one the person did not describe.
+- **Walk an existing workspace up one intention at a time.** Take `validate`'s
+  `unserved` findings and, for each, ask what it is for. Link it to a firm
+  terminus the person names (`intention edit <id> --serves
+  <terminus>:for-the-sake-of`) or to an intention that already reaches one
+  (`--serves <id>:in-order-to`). If the person cannot say what it is for,
+  say so and leave it; that is the format's question, not a gap to fill.
+- **The terminus is the person's own.** Reaching another subject's terminus
+  does not count. An organisation workspace holds termini per subject.
 
 ## Rules for resolution
 

@@ -116,9 +116,9 @@ intentions intention add --title "Read the board pack" --json
 | `init [dir] [--pointer]` | Create `intentions.yaml`, the type directories, `index.yaml`, `intentions.md`; `--pointer` also writes `./.intentions` naming it |
 | `workspace` | Print the resolved workspace root, how it was found, and its configuration |
 | `workspace pointer [dir] [--at D] [--force]` | Write a `.intentions` pointer so a directory and everything below it resolves to the workspace |
-| `intention add` | Create an intention. `--title` is required; `subject` defaults from `intentions.yaml` |
+| `intention add` | Create an intention. `--title` is required; `subject` defaults from `intentions.yaml`. An intention that is not a terminus should reach one through `--serves`; an unserved write is accepted and its result carries a warning under `findings` |
 | `intention edit <id>` | Edit fields in place. Prose edits leave the version unchanged; `--clear-<field>` removes one |
-| `intention firm <id>` | Set stability to firm. A harness must pass `--policy <int_id>` naming a terminus of the subject carrying `auto_firm`; the id is written to `firmed_under` |
+| `intention firm <id>` | Set stability to firm. A harness must pass `--policy <int_id>` naming a terminus of the subject carrying `auto_firm`; the id is written to `firmed_under`. On a terminus, refuses any policy and any harness: only the person firms one |
 | `intention retire <id>` | Append a retirement record: `--kind fulfilled\|abandoned\|superseded [--superseded-by id]` |
 | `intention show <id>`, `intention list` | Show one with its version and resolved serves targets; list active (or `--retired`, `--recurring`) with filters |
 | `availability add` | Create an availability. `--subject`, `--duration` and a window are required |
@@ -139,7 +139,7 @@ intentions intention add --title "Read the board pack" --json
 | `show <id>` | Show any object, including commitments and resolutions written by other tools |
 | `version-of <id> [--projection]` | The computed version, and the canonical JSON it hashes |
 | `bounds [<id>] [--calendar] [--clock]` | Clock-time bounds of a window in the resolver context, with overrides |
-| `validate` | Check the whole workspace; exits 4 on any error |
+| `validate` | Check the whole workspace; exits 4 on any error. An intention reaching no firm terminus of its subject is a warning (`unserved`) naming the fix; a tentative terminus is info (`draft_terminus`) |
 | `index [--check]` | Rebuild `index.yaml`, or verify it and exit 4 on drift |
 | `skill show\|install` | Print or install the embedded agent skill for a harness; `install --check` for CI |
 | `serve --mcp [--workspace D]` | Serve the workspace to an MCP client over stdio (see [docs/mcp.md](docs/mcp.md)) |
@@ -170,6 +170,13 @@ makes the intention recurring and needs a `--calendar` anchor to expand within.
 A **terminus** is an intention with no window, no duration and no `serves`
 entries: a held self-understanding, or a **policy** when it carries
 `--auto-select` or `--auto-firm`. Conditions are admitted on termini only.
+Every other intention reaches a firm terminus of its own subject through
+`serves`, by any path of the three roles; one that does not is reported as
+`unserved`, at warning level in this revision, by `validate` and in the
+result of the write that left it so. A terminus is the person's word: it
+grounds nothing until it is firm, no policy applies to it, and `firm` on one
+is refused for any source carrying a harness. A harness may draft a terminus
+tentative; only the person firms it.
 
 ### Resolution
 

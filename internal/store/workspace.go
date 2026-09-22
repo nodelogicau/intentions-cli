@@ -194,8 +194,10 @@ intention's ` + "`activity`" + ` and an availability's ` + "`conditional`" + `.
 
 A terminus is titled as who the person is, not what they do: *being someone
 who follows through*, never *follow through*. The test is whether the title
-names a person or a task. Look for an intention's chain before you draft it;
-one that serves nothing is held at the weaker construal.
+names a person or a task. Every intention that is not a terminus reaches a
+firm terminus of its own subject through ` + "`serves`" + `; one that does not
+is a warning. A terminus grounds nothing until the person, by their own act,
+has made it firm: a harness may draft one, only the person firms it.
 `
 
 // WritePointer writes a .intentions pointer file in dir naming target. A

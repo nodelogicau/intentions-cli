@@ -498,3 +498,35 @@ func TestCommitmentTools(t *testing.T) {
 		t.Errorf("cancelled list: %v", l)
 	}
 }
+
+func TestEveryIntentionReachesATerminus(t *testing.T) {
+	h := newHarness(t, "claude-ai", Options{})
+	// Unserved write accepted with the finding; a drafted terminus reported as a draft.
+	a := h.ok("intention_add", map[string]any{"title": "A", "duration": "PT1H", "window": map[string]any{"calendar": "2026-W40"}})
+	fs, _ := a["findings"].([]any)
+	if len(fs) != 1 || fs[0].(map[string]any)["code"] != "unserved" || fs[0].(map[string]any)["id"] != str(a, "id") {
+		t.Errorf("unserved add: %v", a)
+	}
+	d := h.ok("intention_add", map[string]any{"title": "being someone who follows through"})
+	if fs, _ := d["findings"].([]any); len(fs) != 1 || fs[0].(map[string]any)["code"] != "draft_terminus" {
+		t.Errorf("draft: %v", d)
+	}
+	// Every call through this server carries the client as harness, so a
+	// terminus is never firmed here, policy or not; the person firms it in the CLI.
+	p := h.ok("intention_add", map[string]any{"title": "Small things may be firmed", "auto_firm": "max_duration=PT30M"})
+	h.fail("intention_firm", map[string]any{"id": str(d, "id")}, "refused")
+	h.fail("intention_firm", map[string]any{"id": str(d, "id"), "policy": str(p, "id")}, "refused")
+	h.fail("intention_firm", map[string]any{"id": str(d, "id"), "source": map[string]any{"author": ada}}, "refused")
+	if strings.Contains(h.file("intentions/"+str(d, "id")+".yaml"), "stability: firm") {
+		t.Error("terminus firmed through the server")
+	}
+	// A served write carries no findings.
+	e := h.ok("intention_edit", map[string]any{"id": str(a, "id"), "serves": []map[string]any{{"id": str(p, "id"), "role": "for-the-sake-of"}}})
+	if _, has := e["findings"]; !has {
+		t.Errorf("serving a draft should still warn: %v", e)
+	}
+	v := h.ok("validate", map[string]any{})
+	if int(v["counts"].(map[string]any)["warning"].(float64)) < 1 || v["ok"] != true {
+		t.Errorf("validate: %v", v)
+	}
+}

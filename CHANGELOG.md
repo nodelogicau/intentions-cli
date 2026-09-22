@@ -3,6 +3,44 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+Aligns with the upstream settlement of SPEC-FEEDBACK item 26 (spec commit
+`72d7f9f`, change `ground-every-intention`), raised from this repository and
+implemented here as [#5](https://github.com/nodelogicau/intentions-cli/issues/5).
+
+### Changed
+
+- **Every intention reaches a terminus.** An intention that is not a
+  terminus reaches a firm terminus of its own subject through `serves`, by
+  any path of `in-order-to`, `for-the-sake-of` and `instance-of`;
+  reachability is the test, so a chain ending on a scheduled intention or a
+  tentative terminus is unserved all the way down, and an instance reaches
+  through its recurring intention. `validate` reports an unserved intention
+  at warning level (`unserved`) naming the fix, and `intention add`, `edit`
+  and `firm`, with their MCP tools, accept a write that leaves one unserved
+  and carry the same finding under `findings` in the result. Every workspace
+  written before this rule warns on every intention; exit codes do not
+  change, and the next file-breaking revision refuses.
+- **A terminus is the person's word.** A tentative terminus is reported at
+  info level as a draft (`draft_terminus`) and grounds nothing. `intention
+  firm` on a terminus refuses any `--policy` and any source carrying a
+  harness, in the CLI and over MCP, so only the person's own act firms one;
+  `firmed_under` on a terminus is a validation error. A harness may still
+  draft a terminus tentative.
+- **The skill asks rather than invents.** A new section walks a workspace up
+  to its termini one intention at a time; the loop opens with who the person
+  is trying to be when no firm terminus exists; the `init` conventions stub
+  says a terminus grounds nothing until the person firms it.
+
+### Fixed
+
+- **A firming act writes its own source.** `intention firm`, and `add` or
+  `edit` setting firm, left the file's `source` as the drafter's, so a
+  person could never firm what a harness had drafted: validation read the
+  drafter's harness and demanded a policy. The act that sets firm now writes
+  its source, which is what the harness boundary was always about.
+
 ## [0.11.1] - 2026-09-20
 
 Follows the upstream Reference Tool Set (spec commit `8dd6f6e`) and the

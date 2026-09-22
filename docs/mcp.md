@@ -146,9 +146,9 @@ its result equals the verb's `--json` output. Every optional field may be omitte
 
 | Tool | Parameters | Returns (= CLI `--json`) |
 |---|---|---|
-| `intention_add` | `title`, `subject?`, `duration?`, `window?`, `activity?`, `location[]?`, `parties[]?`, `serves[{id, role}]?`, `cadence?`, `preference?`, `auto_select?`, `auto_firm?`, `stability?`, `policy?`, `reference?`, `description?`, `timestamp?`, `source?` | `{id, type, path, version, object, created}` |
+| `intention_add` | `title`, `subject?`, `duration?`, `window?`, `activity?`, `location[]?`, `parties[]?`, `serves[{id, role}]?`, `cadence?`, `preference?`, `auto_select?`, `auto_firm?`, `stability?`, `policy?`, `reference?`, `description?`, `timestamp?`, `source?` | `{id, type, path, version, object, created, findings?}` |
 | `intention_edit` | `id`, any of the above, `clear[]?` | `{…, previous_version, projection_changed, flags}` |
-| `intention_firm` | `id`, `policy?`, `source?` | `{…, previous_version, policy?}` |
+| `intention_firm` | `id`, `policy?`, `source?` | `{…, previous_version, policy?, findings?}` |
 | `intention_retire` | `id`, `kind`, `superseded_by?`, `reason?` | `{…, retired}` |
 | `intention_show` | `id`, `now?` | `{…, serves_resolved, flags}` |
 | `intention_list` | `subject?`, `activity?`, `stability?`, `recurring?`, `placed?`, `unplaced?`, `instances_of?`, `retired?` | `{intentions, count}` |
@@ -176,7 +176,12 @@ and `{"error": {"code", "message"}}` using the CLI's codes (`usage`,
 `refused`, `invalid`, `not_found`, `runtime`). Every refusal the verbs make,
 the tools make: a harness firming without a policy, a subject change, a cycle
 in `serves`, a narrowed scope, selecting a placed intention without `replace`.
-One class of error never reaches a verb: each tool's `inputSchema.required`
+Where a write can tell that its result would warn, it accepts and reports:
+`intention_add`, `intention_edit` and `intention_firm` carry `findings`, in
+the shape `validate` reports, when the written intention reaches no firm
+terminus of its subject (`unserved`, a warning) or is a tentative terminus
+(`draft_terminus`, info), and omit the key otherwise. One class of error
+never reaches a verb: each tool's `inputSchema.required`
 names the parameters its verb refuses to run without (`title` on
 `intention_add`; `subject`, `duration` and `window` on `availability_add`;
 `id` on every tool that takes one), and a call missing one is rejected against
@@ -190,7 +195,10 @@ handshake (`claude-ai`, `claude-code`, `cursor`, …) when neither the call, the
 server flags, `INTENTIONS_HARNESS`, nor `intentions.yaml` supplies one. So an
 act through this server is always a harness's act: `intention_firm` needs
 `policy`, and `select` needs either the person's `candidate` relayed by you or
-a `policy`. `source.author` comes from the call, `--author`,
+a `policy`. A terminus is the one thing no policy covers, so it is never
+firmed through this server: draft it tentative and give the person the CLI
+command, `intentions intention firm <id>`, run with their author and no
+harness. Until they do, it grounds nothing. `source.author` comes from the call, `--author`,
 `INTENTIONS_AUTHOR`, or `defaults.source.author` in `intentions.yaml`; an
 intention or availability with no author is refused.
 

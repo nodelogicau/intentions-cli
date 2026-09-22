@@ -1962,3 +1962,74 @@ func TestTrackedPartyStillAnswers(t *testing.T) {
 		t.Errorf("a retired record should still track: %v", r2.json)
 	}
 }
+
+// --- ground-every-intention ------------------------------------------------
+
+func TestEveryIntentionReachesATerminus(t *testing.T) {
+	ws := initWS(t)
+	// A workspace with no terminus: the add is accepted and warns.
+	a := addIntention(t, ws, "--title", "A", "--duration", "PT1H", "--calendar", "2026-W40")
+	fs, _ := a.json["findings"].([]any)
+	if len(fs) != 1 {
+		t.Fatalf("unserved add findings: %v", a.json)
+	}
+	if f := fs[0].(map[string]any); f["code"] != "unserved" || f["severity"] != "warning" || f["id"] != a.str("id") || !strings.Contains(f["message"].(string), "add one first") {
+		t.Errorf("unserved finding: %v", f)
+	}
+	// A harness drafts a terminus: accepted tentative, reported as a draft.
+	d := addIntention(t, ws, "--title", "being someone who follows through", "--harness", "claude")
+	if d.obj()["stability"] != "tentative" {
+		t.Errorf("draft: %v", d.json)
+	}
+	if fs, _ := d.json["findings"].([]any); len(fs) != 1 || fs[0].(map[string]any)["code"] != "draft_terminus" || fs[0].(map[string]any)["severity"] != "info" {
+		t.Errorf("draft finding: %v", d.json)
+	}
+	// Reaching only a draft names the command the person runs.
+	b := addIntention(t, ws, "--title", "B", "--duration", "PT1H", "--serves", d.str("id")+":for-the-sake-of")
+	if fs, _ := b.json["findings"].([]any); len(fs) != 1 || !strings.Contains(fs[0].(map[string]any)["message"].(string), "intentions intention firm "+d.str("id")) {
+		t.Errorf("draft chain: %v", b.json)
+	}
+	// A harness cannot firm the terminus, with or without a policy.
+	p := addIntention(t, ws, "--title", "Small things may be firmed", "--auto-firm", "max_duration=PT30M")
+	if r := run(t, ws, "", "intention", "firm", d.str("id"), "--harness", "claude"); r.code != 2 || !strings.Contains(errMsg(r), "person's word") {
+		t.Errorf("harness firms terminus: %d %s", r.code, errMsg(r))
+	}
+	if r := run(t, ws, "", "intention", "firm", d.str("id"), "--harness", "claude", "--policy", p.str("id")); r.code != 2 || !strings.Contains(errMsg(r), "no policy applies to a terminus") {
+		t.Errorf("policy on terminus: %d %s", r.code, errMsg(r))
+	}
+	if r := run(t, ws, "", "intention", "add", "--title", "T2", "--stability", "firm", "--harness", "claude"); r.code != 2 {
+		t.Errorf("harness adds firm terminus: %d %s", r.code, errMsg(r))
+	}
+	if strings.Contains(readFile(t, ws, d.str("path")), "stability: firm") {
+		t.Error("terminus changed after refusal")
+	}
+	// The person firms it: no findings, and B is now served.
+	f := mustOK(t, run(t, ws, "", "intention", "firm", d.str("id")), "person firms terminus")
+	if _, has := f.json["findings"]; has || f.obj()["stability"] != "firm" {
+		t.Errorf("person firm: %v", f.json)
+	}
+	if _, has := f.obj()["firmed_under"]; has {
+		t.Error("firmed_under on a terminus")
+	}
+	// The policy is a terminus too, and a draft until the person firms it.
+	mustOK(t, run(t, ws, "", "intention", "firm", p.str("id")), "person firms policy")
+	// A serves an intention that reaches the terminus: edit closes the chain, result is clean.
+	e := mustOK(t, run(t, ws, "", "intention", "edit", a.str("id"), "--serves", b.str("id")+":in-order-to"), "edit closes chain")
+	if _, has := e.json["findings"]; has {
+		t.Errorf("served edit: %v", e.json)
+	}
+	v := run(t, ws, "", "validate")
+	if v.code != 0 {
+		t.Fatalf("validate: %d %s", v.code, v.stderr)
+	}
+	for _, x := range v.json["findings"].([]any) {
+		if c := x.(map[string]any)["code"]; c == "unserved" || c == "draft_terminus" {
+			t.Errorf("still reported: %v", x)
+		}
+	}
+	// Text mode prints the finding after the confirmation.
+	tx := text(t, ws, "intention", "add", "--title", "C", "--duration", "PT1H")
+	if tx.code != 0 || !strings.Contains(tx.stdout, "Created ") || !strings.Contains(tx.stdout, "  warning unserved: ") || !strings.Contains(tx.stdout, "--serves "+d.str("id")+":for-the-sake-of") {
+		t.Errorf("text findings:\n%s", tx.stdout)
+	}
+}
