@@ -34,9 +34,11 @@ tentative). They went unimplemented until the first harness feedback surfaced
 them, and v0.10.0 makes all four.
 
 Items 23 onwards were raised one at a time as later changes met them: 23 from
-the MCP server, 24 from commitments, and 25 from the first report of an agent
+the MCP server, 24 from commitments, 25 from the first report of an agent
 harness driving this CLI against a real workspace
-([intentions-cli#1](https://github.com/nodelogicau/intentions-cli/issues/1)).
+([intentions-cli#1](https://github.com/nodelogicau/intentions-cli/issues/1)),
+and 26 from writing the terminus convention into the skill and finding the
+format gave it nothing to stand on.
 
 | # | Topic | Status |
 |---|---|---|
@@ -65,6 +67,7 @@ harness driving this CLI against a real workspace
 | 23 | A reference tool set for harnesses | adopted with refinements, aligned in v0.11.1, [#23](https://github.com/nodelogicau/intentions/issues/23) |
 | 24 | What a declined party means | **decided differently**, [#24](https://github.com/nodelogicau/intentions/issues/24) |
 | 25 | A party the workspace does not track | adopted with refinements, [#25](https://github.com/nodelogicau/intentions/issues/25) |
+| 26 | Every intention reaches a terminus | open, [#26](https://github.com/nodelogicau/intentions/issues/26) |
 
 ---
 
@@ -568,3 +571,46 @@ the commitment is written with that party `tentative`, which is the state an
 invitation is sent from; or the refusal stands but the result must say which
 of the two cases it is. We prefer the first: a `tentative` party is precisely
 someone who has not yet agreed.
+
+## 26. Every intention reaches a terminus ([#26](https://github.com/nodelogicau/intentions/issues/26))
+
+**The draft says:** `serves` is required on every intention but may be
+empty. A terminus is an intention with no `serves`, no `window` and no
+`duration`. The Design Principles argue that the chain up to a terminus is
+the instrument of the stronger reading: an intention read at the level of
+what it is for resists reconsideration better than one read at the level of
+how it is done. The only normative trace of that argument is the SHOULD on
+how a terminus is titled. Validation checks that the graph has no cycles and
+that a terminus has no outbound references, and nothing else about the chain.
+
+**The problem:** an intention with no chain is admitted, placed, firmed and
+committed without anyone having said what it is for, and nothing reports it.
+Every argument the text makes for the chain applies to none of these
+intentions; they are the cheapest thing to write and the least tested. DKF
+settles the corresponding question the other way: every claim carries a
+`subject` and an `evidential`, and a claim backed by nothing external is
+marked `held`. The Intentions Format already has the matching slots, an
+intention serves a terminus `for-the-sake-of` and a terminus may `reference`
+a held DKF claim, so the grounding chain is designed end to end with every
+link optional. The harness side is the same gap: our skill says to ask what
+an intention is for, and the format gives the question no backing.
+
+**We decided:** nothing yet. v0.11.1 writes the terminus convention into a
+workspace's `intentions.md` and tells the skill to look for the chain before
+drafting, and the CLI admits an unserved intention and reports nothing.
+
+**Proposed text:** three rules. Every intention that is not a terminus SHALL
+reach a terminus through its `serves` graph, by reachability rather than the
+presence of an entry, so an `in-order-to` chain ending on a scheduled
+intention is unserved all the way down; a write that would leave an
+intention unserved is refused and validation reports an existing one, at
+warning level in the current draft. A terminus is the person's word: a write
+of a terminus whose `source` carries a `harness` is refused, on the felicity
+logic that already governs `firm` and a party's status, since otherwise the
+first rule makes a harness invent selves to satisfy it. And the consequence
+stated in the Design Principles: a workspace's first act is a terminus, a
+harness's first question is who the person is trying to be, and the format
+does not hold an intention the person cannot say the point of. Set aside:
+admitting an unserved intention but refusing to select or firm it, which
+sits badly with placing early and lets the clutter in on a promise. The why
+is the price of entry, as the subject and the evidential are in DKF.
