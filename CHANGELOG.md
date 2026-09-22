@@ -3,7 +3,7 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.13.0] - 2026-09-23
 
 Aligns with the upstream settlement of SPEC-FEEDBACK item 27 (spec commit
 `16e178e`, change `policies-authorise-when-firm`), raised from implementing
@@ -420,6 +420,7 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
+[0.13.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/nodelogicau/intentions-cli/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.10.0...v0.11.0

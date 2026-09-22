@@ -18,5 +18,5 @@
 
 - [x] 4.1 Skill: the "Draft tentative" and "policy is the only way you select alone" bullets; regenerate the installed copy
 - [x] 4.2 README verbs table and policies paragraph; `docs/mcp.md` attribution paragraph
-- [ ] 4.3 CHANGELOG 0.13.0; SPEC-FEEDBACK item 27 resolution and "implemented in v0.13.0"; reply on intentions-cli#6
+- [x] 4.3 CHANGELOG 0.13.0; SPEC-FEEDBACK item 27 resolution and "implemented in v0.13.0"; reply on intentions-cli#6
 - [ ] 4.4 Tag `v0.13.0` and verify the release

@@ -69,7 +69,7 @@ the same object inert as a ground and live as an authorisation.
 | 24 | What a declined party means | **decided differently**, [#24](https://github.com/nodelogicau/intentions/issues/24) |
 | 25 | A party the workspace does not track | adopted with refinements, [#25](https://github.com/nodelogicau/intentions/issues/25) |
 | 26 | Every intention reaches a terminus | adopted with refinements, implemented in v0.12.0, [#26](https://github.com/nodelogicau/intentions/issues/26) |
-| 27 | A policy authorises nothing until it is firm | adopted with refinements, [#27](https://github.com/nodelogicau/intentions/issues/27) |
+| 27 | A policy authorises nothing until it is firm | adopted with refinements, implemented in v0.13.0, [#27](https://github.com/nodelogicau/intentions/issues/27) |
 
 ---
 
@@ -703,4 +703,4 @@ is settled the same way. Error level from the first revision, since no known
 workspace holds a tentative policy. The CLI work is
 [intentions-cli#6](https://github.com/nodelogicau/intentions-cli/issues/6):
 the refusals by name, the `firmed_under` error with the two ways out, the
-record warning, and the skill.
+record warning, and the skill. Implemented in v0.13.0.
