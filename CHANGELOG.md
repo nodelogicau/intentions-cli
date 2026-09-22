@@ -3,7 +3,7 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.12.0] - 2026-09-22
 
 Aligns with the upstream settlement of SPEC-FEEDBACK item 26 (spec commit
 `72d7f9f`, change `ground-every-intention`), raised from this repository and
@@ -393,6 +393,7 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
+[0.12.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/nodelogicau/intentions-cli/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.9.1...v0.10.0

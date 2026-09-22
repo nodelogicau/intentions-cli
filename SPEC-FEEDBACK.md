@@ -67,7 +67,7 @@ format gave it nothing to stand on.
 | 23 | A reference tool set for harnesses | adopted with refinements, aligned in v0.11.1, [#23](https://github.com/nodelogicau/intentions/issues/23) |
 | 24 | What a declined party means | **decided differently**, [#24](https://github.com/nodelogicau/intentions/issues/24) |
 | 25 | A party the workspace does not track | adopted with refinements, [#25](https://github.com/nodelogicau/intentions/issues/25) |
-| 26 | Every intention reaches a terminus | adopted with refinements, [#26](https://github.com/nodelogicau/intentions/issues/26) |
+| 26 | Every intention reaches a terminus | adopted with refinements, implemented in v0.12.0, [#26](https://github.com/nodelogicau/intentions/issues/26) |
 
 ---
 
@@ -638,4 +638,8 @@ terminus with the proof figure's candidates unchanged. The maintainer's own
 workspace holds forty-six intentions and no terminus, which is why the
 transition has a warning that names the fix and a skill that walks a
 workspace up to its termini by asking. The CLI work is
-[intentions-cli#5](https://github.com/nodelogicau/intentions-cli/issues/5).
+[intentions-cli#5](https://github.com/nodelogicau/intentions-cli/issues/5),
+implemented in v0.12.0: the warning on `validate` and on the write, the
+terminus firmness rules, and the skill's walk-up. Implementing it surfaced
+that a firming act never wrote its own source, so a person could not firm
+what a harness had drafted; v0.12.0 fixes that too.
