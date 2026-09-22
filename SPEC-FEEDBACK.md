@@ -67,7 +67,7 @@ format gave it nothing to stand on.
 | 23 | A reference tool set for harnesses | adopted with refinements, aligned in v0.11.1, [#23](https://github.com/nodelogicau/intentions/issues/23) |
 | 24 | What a declined party means | **decided differently**, [#24](https://github.com/nodelogicau/intentions/issues/24) |
 | 25 | A party the workspace does not track | adopted with refinements, [#25](https://github.com/nodelogicau/intentions/issues/25) |
-| 26 | Every intention reaches a terminus | open, [#26](https://github.com/nodelogicau/intentions/issues/26) |
+| 26 | Every intention reaches a terminus | adopted with refinements, [#26](https://github.com/nodelogicau/intentions/issues/26) |
 
 ---
 
@@ -614,3 +614,28 @@ does not hold an intention the person cannot say the point of. Set aside:
 admitting an unserved intention but refusing to select or firm it, which
 sits badly with placing early and lets the clutter in on a promise. The why
 is the price of entry, as the subject and the evidential are in DKF.
+
+**Resolution (`72d7f9f`, change `ground-every-intention`):** Adopted with
+three refinements from the review. Rule 1 as proposed, at one level: every
+intention that is not a terminus reaches a firm terminus of its own subject
+by reachability, and in this revision both `validate` and the write report an
+unserved intention at warning level, the write accepted with the finding in
+its result; the next file-breaking revision refuses both, as DKF refuses a
+claim with no particular, and the Status paragraph announces it. Rule 2 was
+aimed at the right danger and the wrong mechanism: over MCP every write
+carries a harness, so refusing harness-sourced termini would make a terminus
+impossible to create from Claude Desktop, and under rule 1 an intention too.
+Rebuilt from rules the text already had: a terminus grounds nothing until
+`firm`, no policy applies to a terminus, so `firm` on one comes only from an
+act with no harness; a harness may draft one tentative, validation reports it
+at info level as a draft, and intentions reaching only drafts are unserved.
+The invented self is answered with visibility rather than refusal: it exists,
+grounds nothing, and waits. Third, the subject match is stated: reaching
+another subject's terminus does not count. Rule 3 is in Design Principles as
+"The why is the price of entry", with the DKF grounding analogy in the text's
+own voice. The site's example workspace now has every intention reaching its
+terminus with the proof figure's candidates unchanged. The maintainer's own
+workspace holds forty-six intentions and no terminus, which is why the
+transition has a warning that names the fix and a skill that walks a
+workspace up to its termini by asking. The CLI work is
+[intentions-cli#5](https://github.com/nodelogicau/intentions-cli/issues/5).
