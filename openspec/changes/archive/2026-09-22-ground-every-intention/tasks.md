@@ -31,4 +31,4 @@
 - [x] 6.1 Skill: new section on reaching a terminus with the walk-up; the "Draft tentative" bullet gains the terminus clause; the loop's opening names the first question; `init` stub's Termini section says a terminus grounds nothing until firmed; regenerate the installed copy
 - [x] 6.2 README verbs table (`firm`, `validate`), `docs/mcp.md` (write results carry `findings`; the terminus clause on `intention_firm`)
 - [x] 6.3 CHANGELOG 0.12.0; SPEC-FEEDBACK item 26 gains "implemented in v0.12.0"; reply on intentions-cli#5
-- [ ] 6.4 Tag `v0.12.0` and verify the release
+- [x] 6.4 Tag `v0.12.0` and verify the release

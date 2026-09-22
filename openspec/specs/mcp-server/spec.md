@@ -51,7 +51,7 @@ The server SHALL expose `commitment_accept`, `commitment_decline`, `commitment_c
 - **THEN** the commitment is retired as cancelled and the intention it named is listed again
 
 ### Requirement: The harness boundary holds
-`intention_firm` and `select` with `policy` SHALL require, for a source carrying a harness, a terminus of the subject carrying the matching condition that the intention satisfies, exactly as the CLI does; a client identifying itself in `initialize` is a harness unless the call names an author with no harness. `intention_firm` without `policy` from a harness SHALL be an error result.
+`intention_firm` and `select` with `policy` SHALL require, for a source carrying a harness, a terminus of the subject carrying the matching condition that the intention satisfies, exactly as the CLI does; a client identifying itself in `initialize` is a harness unless the call names an author with no harness. `intention_firm` without `policy` from a harness SHALL be an error result. When the intention is a terminus, `intention_firm` SHALL refuse any call naming a `policy` and any call whose source carries a harness; since every call through this server carries the client as harness, a terminus is never firmed through it, and the tool's description SHALL say the person firms it in the CLI.
 
 #### Scenario: Client firms without a policy
 - **WHEN** a client identifying as `claude-ai` calls `intention_firm{id}` with no `policy`
@@ -60,6 +60,14 @@ The server SHALL expose `commitment_accept`, `commitment_decline`, `commitment_c
 #### Scenario: Client firms under a policy
 - **WHEN** the same client calls `intention_firm{id, policy: <terminus id>}` and the condition holds
 - **THEN** the file carries `stability: firm`, `firmed_under: <terminus id>`, and `source.harness: claude-ai`
+
+#### Scenario: Client firms a terminus under a policy
+- **WHEN** the same client calls `intention_firm{id: <terminus id>, policy: <policy id>}`
+- **THEN** the result is an error with code `refused` saying no policy applies to a terminus, and the file is unchanged
+
+#### Scenario: Author-only call still carries the client as harness
+- **WHEN** a call `intention_firm{id: <terminus id>, source: {author: <uri>}}` names an author and no harness
+- **THEN** the result is an error with code `refused`, because the session's client is the harness, and the file is unchanged
 
 ### Requirement: Attribution from the handshake
 For each session the server SHALL default `source.harness` to the client's `clientInfo.name` when no harness is supplied by the call, server flags, environment, or `intentions.yaml`. `author` SHALL default from the call, `--author`, `INTENTIONS_AUTHOR`, then `intentions.yaml`. An attribution value or workspace path that is an unsubstituted `${…}` placeholder SHALL be treated as absent.
@@ -104,3 +112,14 @@ Mutating tools SHALL be serialised by a server-wide lock.
 #### Scenario: Parallel adds
 - **WHEN** twenty `intention_add` calls run concurrently
 - **THEN** twenty intention files exist and `index --check` passes
+
+### Requirement: Write tools report what they accepted with a warning
+`intention_add`, `intention_edit` and `intention_firm` SHALL carry `findings` in their structured result exactly as the CLI verbs do: a list of `{severity, code, id, message}` present when the written intention is unserved (code `unserved`, severity `warning`) or is a tentative terminus (code `draft_terminus`, severity `info`), and absent otherwise. The tool descriptions SHALL say that an intention that is not a terminus should serve one, and that a terminus is firmed only by the person.
+
+#### Scenario: Unserved write over MCP
+- **WHEN** a client identifying as `claude-ai` calls `intention_add{title, duration, window}` in a workspace holding no firm terminus of the subject
+- **THEN** the file is written, the result is not an error, and its structured content carries `findings` with one `unserved` entry naming the new id
+
+#### Scenario: Draft terminus over MCP
+- **WHEN** the same client calls `intention_add{title}` with no window, duration or serves
+- **THEN** the write is accepted tentative and the result carries a `draft_terminus` finding at info level
