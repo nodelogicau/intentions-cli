@@ -37,8 +37,9 @@ Items 23 onwards were raised one at a time as later changes met them: 23 from
 the MCP server, 24 from commitments, 25 from the first report of an agent
 harness driving this CLI against a real workspace
 ([intentions-cli#1](https://github.com/nodelogicau/intentions-cli/issues/1)),
-and 26 from writing the terminus convention into the skill and finding the
-format gave it nothing to stand on.
+26 from writing the terminus convention into the skill and finding the
+format gave it nothing to stand on, and 27 from implementing 26 and finding
+the same object inert as a ground and live as an authorisation.
 
 | # | Topic | Status |
 |---|---|---|
@@ -68,6 +69,7 @@ format gave it nothing to stand on.
 | 24 | What a declined party means | **decided differently**, [#24](https://github.com/nodelogicau/intentions/issues/24) |
 | 25 | A party the workspace does not track | adopted with refinements, [#25](https://github.com/nodelogicau/intentions/issues/25) |
 | 26 | Every intention reaches a terminus | adopted with refinements, implemented in v0.12.0, [#26](https://github.com/nodelogicau/intentions/issues/26) |
+| 27 | A policy authorises nothing until it is firm | open, [#27](https://github.com/nodelogicau/intentions/issues/27) |
 
 ---
 
@@ -643,3 +645,43 @@ implemented in v0.12.0: the warning on `validate` and on the write, the
 terminus firmness rules, and the skill's walk-up. Implementing it surfaced
 that a firming act never wrote its own source, so a person could not firm
 what a harness had drafted; v0.12.0 fixes that too.
+
+## 27. A policy authorises nothing until it is firm ([#27](https://github.com/nodelogicau/intentions/issues/27))
+
+**The draft says:** a policy is a terminus carrying `auto_select` or
+`auto_firm`, the only means by which a harness selects or firms without a
+person's direct act. `firmed_under` names an active terminus of the subject
+carrying `auto_firm`, and validation checks that it exists and is a policy.
+Since item 26, a terminus grounds nothing until `firm`, no policy applies to
+it, and a harness may draft one tentative.
+
+**The problem:** nothing requires a policy to be firm, so a harness may
+draft one and use it in the same session. With v0.12.0 on a fresh workspace,
+a harness added a tentative policy with `auto_firm max_duration=PT30M`,
+added a twenty-minute intention, firmed it under that policy, and `validate`
+reported no error. Every rule about the harness boundary held: the policy
+was the subject's, the condition was satisfied, `firmed_under` named it.
+The boundary was meant to make a harness's firming rest on something the
+person holds, and what it rested on was never held by anyone. `auto_select`
+has the same hole. Item 26 settled the analogous question for grounding, a
+tentative terminus grounds nothing, and did not reach the terminus's other
+role, which leaves it inert as a ground and live as an authorisation: the
+wrong way round, since authorising a harness to act alone is the stronger
+power.
+
+**We decided:** nothing yet. v0.12.0 reports a tentative policy as a draft
+at info level, like any tentative terminus, and accepts it as a policy.
+
+**Proposed text:** a policy's condition applies only while the policy is
+`firm`. A tentative policy is a draft: a harness may write one, and until
+the person firms it, `intention_firm` and `select` refuse to act under it,
+naming the draft and the command that makes it the person's. `firmed_under`
+and a resolution's `selector` name a firm policy; naming a tentative one is
+a validation error, with the finding saying which policy to firm for a
+workspace written before the rule. And the principle beside "The why is the
+price of entry": a terminus is the person's word whether it grounds or
+authorises, and it does neither until they have said it. One clause on the
+existing rule, closing the loop item 26 opened: a harness may draft the self
+and the standing permission, and the person's one act makes either real.
+Nothing changes for a person who writes and firms their own policies, which
+is every correct use today.
