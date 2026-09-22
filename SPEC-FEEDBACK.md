@@ -38,8 +38,10 @@ the MCP server, 24 from commitments, 25 from the first report of an agent
 harness driving this CLI against a real workspace
 ([intentions-cli#1](https://github.com/nodelogicau/intentions-cli/issues/1)),
 26 from writing the terminus convention into the skill and finding the
-format gave it nothing to stand on, and 27 from implementing 26 and finding
-the same object inert as a ground and live as an authorisation.
+format gave it nothing to stand on, 27 from implementing 26 and finding
+the same object inert as a ground and live as an authorisation, and 28 from
+reading the DESIRE text against the terminus definition before implementing
+it.
 
 | # | Topic | Status |
 |---|---|---|
@@ -70,6 +72,7 @@ the same object inert as a ground and live as an authorisation.
 | 25 | A party the workspace does not track | adopted with refinements, [#25](https://github.com/nodelogicau/intentions/issues/25) |
 | 26 | Every intention reaches a terminus | adopted with refinements, implemented in v0.12.0, [#26](https://github.com/nodelogicau/intentions/issues/26) |
 | 27 | A policy authorises nothing until it is firm | adopted with refinements, implemented in v0.13.0, [#27](https://github.com/nodelogicau/intentions/issues/27) |
+| 28 | Adopting a bare desire creates a terminus | open, [#28](https://github.com/nodelogicau/intentions/issues/28) |
 
 ---
 
@@ -704,3 +707,41 @@ workspace holds a tentative policy. The CLI work is
 [intentions-cli#6](https://github.com/nodelogicau/intentions-cli/issues/6):
 the refusals by name, the `firmed_under` error with the two ways out, the
 record warning, and the skill. Implemented in v0.13.0.
+
+## 28. Adopting a bare desire creates a terminus ([#28](https://github.com/nodelogicau/intentions/issues/28))
+
+**The draft says:** adopting a DESIRE creates a new INTENTION carrying the
+desire's fields, the `duration` and `window` the adopting act supplies,
+`stability: tentative`, and the act's `source`. In the Reference Tool Set,
+`desire_adopt` takes `id`, `duration?`, `window?`: both optional. A desire's
+`serves` may be empty. A terminus is an intention with no `serves`, no
+`window` and no `duration`, and since items 26 and 27 it is the person's
+word, inert until they firm it.
+
+**The problem:** adopt a bare want bare and the result is a terminus.
+`desire_adopt{id}` on "call the accountant" with an empty `serves` and no
+duration or window writes an intention with none of the three, which is a
+self titled as a task, reported only as a draft at info level. Nothing
+refuses it. The ladder is desire, intention, commitment, and adoption is the
+rung from want to plan; this path steps sideways from a want to a self. The
+skill's advice to adopt when the want has a when and a how long is advice to
+a harness; the tool's own semantics admit the call, and a harness that treats
+adoption as "promote this" will produce termini named after errands and ask
+the person to firm them as selves.
+
+**We decided:** nothing yet; DESIRE is not implemented here
+([intentions-cli#7](https://github.com/nodelogicau/intentions-cli/issues/7)
+is open). This is the one question in the tool's semantics worth settling
+before it hardens.
+
+**Proposed text:** one sentence in the adoption requirement: adoption is
+refused where the intention it would write is a terminus, that is where the
+desire's `serves` is empty and the act supplies neither `duration` nor
+`window`; an adopted want is a plan, and a self is declared, not adopted.
+The refusal names what is missing. `duration?` and `window?` stay optional
+on the tool, since a desire that already serves a terminus may be adopted
+with either alone, or with neither into an intention that has a why and not
+yet a when, which the format admits and `unresolved` reports as incomplete.
+Set aside: requiring a duration or a window on every adoption, which would
+make adoption stricter than `intention_add`; the skill says when to adopt,
+the rule says only what adoption may not produce.
