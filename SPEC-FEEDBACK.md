@@ -39,9 +39,10 @@ harness driving this CLI against a real workspace
 ([intentions-cli#1](https://github.com/nodelogicau/intentions-cli/issues/1)),
 26 from writing the terminus convention into the skill and finding the
 format gave it nothing to stand on, 27 from implementing 26 and finding
-the same object inert as a ground and live as an authorisation, and 28 from
+the same object inert as a ground and live as an authorisation, 28 from
 reading the DESIRE text against the terminus definition before implementing
-it.
+it, and 29 from reading a field refinement against the text's own rule on
+projections.
 
 | # | Topic | Status |
 |---|---|---|
@@ -73,6 +74,7 @@ it.
 | 26 | Every intention reaches a terminus | adopted with refinements, implemented in v0.12.0, [#26](https://github.com/nodelogicau/intentions/issues/26) |
 | 27 | A policy authorises nothing until it is firm | adopted with refinements, implemented in v0.13.0, [#27](https://github.com/nodelogicau/intentions/issues/27) |
 | 28 | Adopting a bare desire creates a terminus | adopted with additions, [#28](https://github.com/nodelogicau/intentions/issues/28) |
+| 29 | The origin change alters the commitment projection under intentions/0.1 | open, [#29](https://github.com/nodelogicau/intentions/issues/29) |
 
 ---
 
@@ -762,3 +764,40 @@ adopted`, since only adoption writes the intention the pointer must name,
 and `superseded_by` on a desire naming anything but a desire is a validation
 error. The refinements are on
 [intentions-cli#7](https://github.com/nodelogicau/intentions-cli/issues/7).
+
+## 29. The origin change alters the commitment projection under intentions/0.1 ([#29](https://github.com/nodelogicau/intentions/issues/29))
+
+**The draft says:** since `refine-object-fields`, a commitment carries
+`origin: resolution` or `origin: import` and a sibling `resolution: res_…`
+present when and only when `origin` is `resolution`, replacing the union
+`origin: {resolution: res_…}` | `import`, with both in the projection. The
+format version stays `intentions/0.1`. Elsewhere: "a change to any
+projection is a new format version, so a stored `counterpart_version` stays
+comparable", and twice the text defers a change to "the next revision that
+breaks files".
+
+**The problem:** this is that revision, without the version. For every
+workspace that has selected with parties: every resolution-born
+commitment's version moves, so `validate` warns `stale_version` on each and
+`index --check`, the CI gate the README recommends, exits non-zero until
+the index is rebuilt; every acknowledgement against such a commitment
+lapses, since lapsing on a version change is the mechanism, which changes
+what the workspace says without anyone saying it; and compatibility runs
+one way, since a new reader can accept the old map and rewrite it while a
+`0.1` reader sees `origin: resolution` as malformed and `resolution` as an
+unknown key. The other three refinements in the change are additive or
+outside the projection and raise none of this.
+
+**We decided:** nothing yet;
+[intentions-cli#8](https://github.com/nodelogicau/intentions-cli/issues/8)
+is open, and we would rather have the version settled than write files a
+`0.1` reader rejects under a `0.1` label.
+
+**Proposed text:** declare `intentions/0.2` with this change, carrying the
+other deferred file-breaking changes with it, the unserved refusal on
+`validate` and on the write, and say in Status how a `0.1` file is read:
+the old `origin` map accepted on read and written new on the next write,
+versions recomputed under `0.2`, acknowledgements against a rewritten
+commitment lapsing once. Or hold the `origin` change for that revision and
+ship the three safe refinements now. Either way the stated rule should
+decide it, or it stops being a rule.
