@@ -18,7 +18,7 @@
 - **THEN** the process exits with code 5 and stdout is empty
 
 ### Requirement: Tool surface
-The server SHALL expose tools named `workspace_status`, `desire_add`, `desire_edit`, `desire_adopt`, `desire_retire`, `desire_show`, `desire_list`, `intention_add`, `intention_edit`, `intention_firm`, `intention_retire`, `intention_show`, `intention_list`, `availability_add`, `availability_renew`, `availability_supersede`, `availability_retire`, `availability_list`, `commitment_accept`, `commitment_decline`, `commitment_cancel`, `commitment_show`, `commitment_list`, `generate`, `resolve`, `select`, `unresolved`, `check`, `acknowledge`, `bounds`, and `validate`. Each tool's structured result SHALL equal the corresponding CLI verb's `--json` output. Every write SHALL apply the same rules and refusals as the verb. Query tools SHALL be annotated read-only and no tool destructive. Inputs that name a window SHALL take `{calendar, clock, relative}`; a duration SHALL be a string or `{nominal, min, max}`; `serves` a list of `{id, role}`. `desire_adopt` SHALL write the intention first and the desire's retirement second, return both, refuse a retired desire, and refuse a bare adoption naming what is missing; `desire_retire` SHALL accept `abandoned` and `superseded` and refuse `adopted`.
+The server SHALL expose tools named `workspace_status`, `desire_add`, `desire_edit`, `desire_adopt`, `desire_retire`, `desire_show`, `desire_list`, `intention_add`, `intention_edit`, `intention_firm`, `intention_retire`, `intention_show`, `intention_list`, `availability_add`, `availability_renew`, `availability_supersede`, `availability_retire`, `availability_list`, `commitment_accept`, `commitment_decline`, `commitment_cancel`, `commitment_show`, `commitment_list`, `generate`, `resolve`, `select`, `unresolved`, `check`, `acknowledge`, `bounds`, `validate`, and `migrate`. Each tool's structured result SHALL equal the corresponding CLI verb's `--json` output. Every write SHALL apply the same rules and refusals as the verb. Query tools SHALL be annotated read-only and no tool destructive. Inputs that name a window SHALL take `{calendar, clock, relative}`; a duration SHALL be a string or `{nominal, min, max}`; `serves` a list of `{id, role}`. `desire_adopt` SHALL write the intention first and the desire's retirement second, return both, refuse a retired desire, and refuse a bare adoption naming what is missing; `desire_retire` SHALL accept `abandoned` and `superseded` and refuse `adopted`.
 
 #### Scenario: Add, resolve, select over MCP
 - **WHEN** a client calls `availability_add`, then `intention_add{title, duration: "PT90M", window: {calendar: "2026-W38"}}`, then `resolve{id}`, then `select{id, candidate: 1}`
@@ -139,3 +139,10 @@ Mutating tools SHALL be serialised by a server-wide lock.
 #### Scenario: Draft terminus over MCP
 - **WHEN** the same client calls `intention_add{title}` with no window, duration or serves
 - **THEN** the write is accepted tentative and the result carries a `draft_terminus` finding at info level
+
+### Requirement: Migrate tool
+`migrate` SHALL take `check?` and SHALL do what `intentions migrate [--check]` does with the same result and refusals, so that a harness can report what a migration would change and the person can run it.
+
+#### Scenario: Migrate check over MCP
+- **WHEN** a client calls `migrate{check: true}` on a 0.1 workspace
+- **THEN** the result lists what would change and no file is modified

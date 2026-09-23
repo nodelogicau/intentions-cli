@@ -69,11 +69,11 @@ Writing verbs SHALL accept `--now <RFC 3339>` and honour `INTENTIONS_NOW`, used 
 - **THEN** the file carries `timestamp: 2026-09-04T09:12:00Z`
 
 ### Requirement: Version verb
-`intentions version` SHALL print the binary version, the format version it implements (`intentions/0.1`), and in JSON mode both as fields.
+`intentions version` SHALL print the binary version, the format version it writes (`intentions/0.2`), and the format versions it reads (`intentions/0.1`, `intentions/0.2`); in JSON mode `version`, `format`, and `reads` as a list.
 
 #### Scenario: Version in JSON
 - **WHEN** `intentions version --json` is run
-- **THEN** stdout is `{"version": <string>, "format": "intentions/0.1"}`
+- **THEN** stdout is `{"version": <string>, "format": "intentions/0.2", "reads": ["intentions/0.1", "intentions/0.2"]}`
 
 ### Requirement: No git operations
 The CLI SHALL NOT run git or modify any git state. Review is the responsibility of the surrounding pull-request workflow.

@@ -7,11 +7,11 @@ Creating, configuring and discovering an Intentions workspace: `init`, the `inte
 ## Requirements
 
 ### Requirement: Workspace initialisation
-`intentions init [dir] [--pointer]` SHALL create `intentions.yaml`, the directories `desires/`, `intentions/`, `availability/`, `commitments/`, `resolutions/`, an empty `index.yaml`, and an `intentions.md` stub. It SHALL require an author (`--author` or `INTENTIONS_AUTHOR`) and SHALL accept `--subject`, `--timezone`, `--hemisphere`, `--availability-horizon`, `--horizon` (`resolver.horizon`, the one planning horizon). There SHALL be no `--generation-horizon`. There SHALL be no `--week-start`. With `--pointer` and an explicit `dir` other than the current directory, it SHALL also write `./.intentions` containing the relative path to `dir`; `--pointer` without such a `dir` SHALL be a usage error. It SHALL refuse with exit code 1 when `intentions.yaml` already exists. A workspace created before `desires/` existed SHALL gain the directory on its first desire write.
+`intentions init [dir] [--pointer]` SHALL create `intentions.yaml` carrying `format: intentions/0.2`, the directories `desires/`, `intentions/`, `availability/`, `commitments/`, `resolutions/`, an empty `index.yaml`, and an `intentions.md` stub. It SHALL require an author (`--author` or `INTENTIONS_AUTHOR`) and SHALL accept `--subject`, `--timezone`, `--hemisphere`, `--availability-horizon`, `--horizon` (`resolver.horizon`, the one planning horizon). There SHALL be no `--generation-horizon`. There SHALL be no `--week-start`. With `--pointer` and an explicit `dir` other than the current directory, it SHALL also write `./.intentions` containing the relative path to `dir`; `--pointer` without such a `dir` SHALL be a usage error. It SHALL refuse with exit code 1 when `intentions.yaml` already exists. A workspace created before `desires/` existed SHALL gain the directory on its first desire write.
 
 #### Scenario: Minimal configuration written
 - **WHEN** `intentions init ./planning --author https://example.com/people/ada --subject https://example.com/people/ada --timezone Australia/Melbourne --hemisphere south` is run
-- **THEN** `planning/intentions.yaml` carries `format: intentions/0.1`, `hash: sha256`, `resolver.timezone: Australia/Melbourne`, `resolver.hemisphere: south`, `availability.default_horizon: P13W`, `resolver.horizon: P4W`, and no `generation` section, `defaults.subject`, and `defaults.source.author`, and no `resolver.week_start`
+- **THEN** `planning/intentions.yaml` carries `format: intentions/0.2`, `hash: sha256`, `resolver.timezone: Australia/Melbourne`, `resolver.hemisphere: south`, `availability.default_horizon: P13W`, `resolver.horizon: P4W`, and no `generation` section, `defaults.subject`, and `defaults.source.author`, and no `resolver.week_start`
 
 #### Scenario: Five type directories
 - **WHEN** `init` runs
@@ -46,7 +46,15 @@ Creating, configuring and discovering an Intentions workspace: `init`, the `inte
 - **THEN** the command exits with code 2 naming an unknown flag
 
 ### Requirement: Configuration file contents
-`intentions.yaml` SHALL declare `format`, `hash`, `resolver.timezone`, `resolver.horizon` (the one planning horizon, shared by resolution and instance generation, absent means `P4W`), `availability.default_horizon`, and `defaults.source.author`. It MAY declare `resolver.hemisphere` (`north` or `south`, absent means `north`), `resolver.step` (an ISO 8601 duration, the candidate grid, absent means `PT15M`), `resolver.scope` (`personal`, `organisation` or `public`, absent means `personal`), and `defaults.subject`. It SHALL NOT declare `resolver.week_start` or `generation.horizon`. Keys this implementation does not know SHALL be preserved when the file is rewritten; an unknown key under `resolver` or `generation` SHALL be ignored and reported by `validate` at info level. Every command SHALL fail with a usage error if `format` is not `intentions/0.1` or `hash` is not `sha256`.
+`intentions.yaml` SHALL declare `format` (one of `intentions/0.1`, `intentions/0.2`; any other value SHALL be refused by every verb naming the file's version and the versions this binary implements), `hash`, `resolver.timezone`, `resolver.horizon` (the one planning horizon, shared by resolution and instance generation, absent means `P4W`), `availability.default_horizon`, and `defaults.source.author`. It MAY declare `resolver.hemisphere` (`north` or `south`, absent means `north`), `resolver.step` (an ISO 8601 duration, the candidate grid, absent means `PT15M`), `resolver.scope` (`personal`, `organisation` or `public`, absent means `personal`), and `defaults.subject`. It SHALL NOT declare `resolver.week_start` or `generation.horizon`. Keys this implementation does not know SHALL be preserved when the file is rewritten; an unknown key under `resolver` or `generation` SHALL be ignored and reported by `validate` at info level. Every command SHALL fail with a usage error if `format` is not `intentions/0.1` or `hash` is not `sha256`.
+
+#### Scenario: Newer format refused
+- **WHEN** `intentions.yaml` carries `format: intentions/0.3`
+- **THEN** every workspace verb exits with code 2 naming `intentions/0.3` and the versions this binary reads
+
+#### Scenario: Older format accepted
+- **WHEN** `intentions.yaml` carries `format: intentions/0.1`
+- **THEN** every verb runs under the 0.1 rules and shapes
 
 #### Scenario: Unsupported hash
 - **WHEN** `intentions.yaml` carries `hash: sha512`
