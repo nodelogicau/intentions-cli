@@ -37,4 +37,4 @@
 - [x] 6.1 Skill: the inbox section, the loop line, the verbs table rows; regenerate the installed copy
 - [x] 6.2 README: verbs table, object types, index and directories; `docs/mcp.md`: six rows, token estimate; SPEC-FEEDBACK line on the reference set count
 - [x] 6.3 CHANGELOG 0.14.0; reply on intentions-cli#7
-- [ ] 6.4 Tag `v0.14.0` and verify the release
+- [x] 6.4 Tag `v0.14.0` and verify the release
