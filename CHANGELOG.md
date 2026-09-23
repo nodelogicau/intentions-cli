@@ -3,7 +3,7 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.15.0] - 2026-09-23
 
 Implements `intentions/0.2` (nodelogicau/intentions 60796e8, change
 `format-version-0-2`, settling SPEC-FEEDBACK item 29) as
@@ -501,6 +501,7 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
+[0.15.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.11.1...v0.12.0

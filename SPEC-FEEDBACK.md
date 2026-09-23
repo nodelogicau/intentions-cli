@@ -74,7 +74,7 @@ projections.
 | 26 | Every intention reaches a terminus | adopted with refinements, implemented in v0.12.0, [#26](https://github.com/nodelogicau/intentions/issues/26) |
 | 27 | A policy authorises nothing until it is firm | adopted with refinements, implemented in v0.13.0, [#27](https://github.com/nodelogicau/intentions/issues/27) |
 | 28 | Adopting a bare desire creates a terminus | adopted with additions, [#28](https://github.com/nodelogicau/intentions/issues/28) |
-| 29 | The origin change alters the commitment projection under intentions/0.1 | adopted with refinements, [#29](https://github.com/nodelogicau/intentions/issues/29) |
+| 29 | The origin change alters the commitment projection under intentions/0.1 | adopted with refinements, implemented in v0.15.0, [#29](https://github.com/nodelogicau/intentions/issues/29) |
 
 ---
 
@@ -823,4 +823,5 @@ counterpart changed only by the migration, regenerates the index and flips
 walk-up comes first. A reader refuses a workspace newer than it knows,
 naming both versions. The CLI work is
 [intentions-cli#9](https://github.com/nodelogicau/intentions-cli/issues/9),
-which supersedes #8.
+which supersedes #8. Implemented in v0.15.0: the binary writes 0.2, reads
+0.1 as it is, migrates as the person's act, and refuses anything newer.

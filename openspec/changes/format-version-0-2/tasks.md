@@ -33,5 +33,5 @@
 
 - [x] 6.1 Skill: 0.2 names, migration guidance (`--check`, walk up, clean checkout), the person's act; regenerate the installed copy
 - [x] 6.2 README (verbs, availability, versions, migration), `docs/mcp.md` (tool row, keys, token estimate), `version` output
-- [ ] 6.3 CHANGELOG 0.15.0; reply on intentions-cli#9
+- [x] 6.3 CHANGELOG 0.15.0; reply on intentions-cli#9
 - [ ] 6.4 Tag `v0.15.0` and verify the release
