@@ -74,7 +74,7 @@ projections.
 | 26 | Every intention reaches a terminus | adopted with refinements, implemented in v0.12.0, [#26](https://github.com/nodelogicau/intentions/issues/26) |
 | 27 | A policy authorises nothing until it is firm | adopted with refinements, implemented in v0.13.0, [#27](https://github.com/nodelogicau/intentions/issues/27) |
 | 28 | Adopting a bare desire creates a terminus | adopted with additions, [#28](https://github.com/nodelogicau/intentions/issues/28) |
-| 29 | The origin change alters the commitment projection under intentions/0.1 | open, [#29](https://github.com/nodelogicau/intentions/issues/29) |
+| 29 | The origin change alters the commitment projection under intentions/0.1 | adopted with refinements, [#29](https://github.com/nodelogicau/intentions/issues/29) |
 
 ---
 
@@ -801,3 +801,26 @@ versions recomputed under `0.2`, acknowledgements against a rewritten
 commitment lapsing once. Or hold the `origin` change for that revision and
 ship the three safe refinements now. Either way the stated rule should
 decide it, or it stops being a rule.
+
+**Resolution (`60796e8`, change `format-version-0-2`):** Option (a),
+with four refinements from the review, one of which changes the rule. The
+error was upstream's: the change's design leaned on the clause that a
+projection change "costs nothing while v0.1 is still undeclared", which
+keyed the freeze to a declaration ceremony when readers key on the version
+string in the file, and files carrying `intentions/0.1` have existed since
+this CLI's first release. So: v0.1 is declared at tag `v0.1` on `54c9a83`,
+the last commit whose projections the first implementation reads, and the
+current text is the `intentions/0.2` draft. The rule is fixed: a projection
+is frozen from the moment any implementation writes the version string into
+a file, and the "costs nothing" clause is gone. 0.2 is the one break: the
+`origin` shape, the unserved refusal deferred by item 26, and two renames
+on availability (`duration` to `capacity`, `conditional` to `activities`).
+Migration is the person's act and un-acknowledges nothing: a 0.2 reader
+accepts a 0.1 workspace under 0.1 rules until `migrate` rewrites shapes and
+names, recomputes versions, rewrites `counterpart_version` wherever the
+counterpart changed only by the migration, regenerates the index and flips
+`format`; it refuses to flip while any intention is unserved, so the
+walk-up comes first. A reader refuses a workspace newer than it knows,
+naming both versions. The CLI work is
+[intentions-cli#9](https://github.com/nodelogicau/intentions-cli/issues/9),
+which supersedes #8.
