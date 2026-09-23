@@ -34,6 +34,8 @@ func oneOf(v string, vs []string) bool {
 // RetirementKinds returns the admitted kinds for a type.
 func RetirementKinds(t Type) []string {
 	switch t {
+	case TypeDesire:
+		return DesireRetirementKinds
 	case TypeIntention:
 		return IntentionRetirementKinds
 	case TypeAvailability:
@@ -108,6 +110,15 @@ func (c *checker) retired(t Type, r *Retired) {
 	if r.SupersededBy != "" && !ValidID(r.SupersededBy) {
 		c.add("invalid", "retired.superseded_by", "%q is not an identifier", r.SupersededBy)
 	}
+	switch {
+	case r.Kind == "adopted" && r.AdoptedAs == "":
+		c.add("adopted_as", "retired.adopted_as", "adopted_as is required when kind is adopted; it names the intention the desire became")
+	case r.Kind != "adopted" && r.AdoptedAs != "":
+		c.add("adopted_as", "retired.adopted_as", "adopted_as is admitted only when kind is adopted")
+	}
+	if r.AdoptedAs != "" && !ValidID(r.AdoptedAs) {
+		c.add("invalid", "retired.adopted_as", "%q is not an identifier", r.AdoptedAs)
+	}
 	if r.Timestamp.IsZero() {
 		c.add("missing", "retired.timestamp", "a retirement record needs a timestamp")
 	}
@@ -142,6 +153,8 @@ func Check(obj Object) Problems {
 	}
 	c.require("id", obj.GetID())
 	switch o := obj.(type) {
+	case *Desire:
+		c.desire(o)
 	case *Intention:
 		c.intention(o)
 	case *Availability:

@@ -53,6 +53,12 @@ func CheckRetirement(g Graph, obj Object, r Retired) error {
 	if !oneOf(r.Kind, kinds) {
 		return refuse("retirement_kind", "%q is not a retirement kind for %s; admitted kinds are %s", r.Kind, obj.GetType(), strings.Join(kinds, ", "))
 	}
+	if r.Kind == "adopted" {
+		return refuse("adopted", "adopted is written only by adoption, which writes the intention the record must name; use `intentions desire adopt`")
+	}
+	if r.AdoptedAs != "" {
+		return refuse("adopted_as", "adopted_as is written only by adoption")
+	}
 	switch {
 	case r.Kind == "superseded" && r.SupersededBy == "":
 		return refuse("superseded_by", "kind superseded requires --superseded-by")

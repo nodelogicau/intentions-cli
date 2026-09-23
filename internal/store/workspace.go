@@ -343,6 +343,17 @@ func (g *Graph) Inbound(id string) []model.Inbound { return g.inbound[id] }
 // Referrers returns the ids of every object with an outbound reference to id.
 func (g *Graph) Referrers(id string) []string { return g.referrers[id] }
 
+// Desires returns every desire in id order.
+func (g *Graph) Desires() []*model.Desire {
+	var out []*model.Desire
+	for _, id := range g.Order {
+		if o, ok := g.Objects[id].(*model.Desire); ok {
+			out = append(out, o)
+		}
+	}
+	return out
+}
+
 // Intentions returns every intention in id order.
 func (g *Graph) Intentions() []*model.Intention {
 	var out []*model.Intention
@@ -417,8 +428,13 @@ func (g *Graph) index() {
 		for _, ref := range obj.Refs() {
 			g.referrers[ref] = append(g.referrers[ref], id)
 		}
-		if in, ok := obj.(*model.Intention); ok {
-			for _, r := range in.Serves {
+		switch o := obj.(type) {
+		case *model.Intention:
+			for _, r := range o.Serves {
+				g.inbound[r.ID] = append(g.inbound[r.ID], model.Inbound{From: id, Role: r.Role})
+			}
+		case *model.Desire:
+			for _, r := range o.Serves {
 				g.inbound[r.ID] = append(g.inbound[r.ID], model.Inbound{From: id, Role: r.Role})
 			}
 		}

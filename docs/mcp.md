@@ -12,7 +12,7 @@ decision. It comes down to whether your harness already has a shell.
 
 | | Always in context | When planning work happens |
 |---|---|---|
-| MCP server | ~12,500 tokens (25 tool schemas ≈ 8,400, instructions ≈ 4,100) | the same |
+| MCP server | ~15,000 tokens (31 tool schemas ≈ 10,300, instructions ≈ 4,700) | the same |
 | Skill + CLI | ~160 tokens (the skill's frontmatter description) | ~3,400 tokens (the body loads when triggered) |
 
 **Use the skill and the CLI in harnesses that have a shell**: Claude Code,
@@ -146,6 +146,12 @@ its result equals the verb's `--json` output. Every optional field may be omitte
 
 | Tool | Parameters | Returns (= CLI `--json`) |
 |---|---|---|
+| `desire_add` | `title`, `subject?`, `activity?`, `description?`, `location[]?`, `reference?`, `serves[{id, role}]?`, `timestamp?`, `source?` | `{id, type, path, version, object, created}` |
+| `desire_edit` | `id`, any of the above, `clear[]?` | `{…, previous_version, projection_changed}` |
+| `desire_adopt` | `id`, `duration?`, `window?`, `timestamp?`, `source?` | `{intention, desire, id, findings?}`: the intention written first, the desire retired as `adopted` second; refuses a retired desire and a bare adoption |
+| `desire_retire` | `id`, `kind` (`abandoned` \| `superseded`), `superseded_by?`, `reason?` | `{…, previous_version, retired}`; `adopted` refused |
+| `desire_show` | `id` | `{…, serves_resolved}` |
+| `desire_list` | `subject?`, `activity?`, `retired?` | `{desires, count}` |
 | `intention_add` | `title`, `subject?`, `duration?`, `window?`, `activity?`, `location[]?`, `parties[]?`, `serves[{id, role}]?`, `cadence?`, `preference?`, `auto_select?`, `auto_firm?`, `stability?`, `policy?`, `reference?`, `description?`, `timestamp?`, `source?` | `{id, type, path, version, object, created, findings?}` |
 | `intention_edit` | `id`, any of the above, `clear[]?` | `{…, previous_version, projection_changed, flags}` |
 | `intention_firm` | `id`, `policy?`, `source?` | `{…, previous_version, policy?, findings?}` |

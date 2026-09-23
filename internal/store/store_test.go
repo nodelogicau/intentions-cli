@@ -27,7 +27,7 @@ func initWS(t *testing.T) *Workspace {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(created) != 7 {
+	if len(created) != 8 {
 		t.Fatalf("created %v", created)
 	}
 	return ws

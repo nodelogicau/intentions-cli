@@ -18,8 +18,9 @@ const Format = "intentions/0.1"
 // Type is an object or record type.
 type Type string
 
-// The four file-backed types.
+// The five file-backed types.
 const (
+	TypeDesire       Type = "desire"
 	TypeIntention    Type = "intention"
 	TypeAvailability Type = "availability"
 	TypeCommitment   Type = "commitment"
@@ -27,11 +28,13 @@ const (
 )
 
 // Types lists the file-backed types in directory order.
-var Types = []Type{TypeIntention, TypeAvailability, TypeCommitment, TypeResolution}
+var Types = []Type{TypeDesire, TypeIntention, TypeAvailability, TypeCommitment, TypeResolution}
 
 // Prefix returns the id prefix for the type.
 func (t Type) Prefix() string {
 	switch t {
+	case TypeDesire:
+		return "des"
 	case TypeIntention:
 		return "int"
 	case TypeAvailability:
@@ -47,6 +50,8 @@ func (t Type) Prefix() string {
 // Dir returns the workspace directory for the type.
 func (t Type) Dir() string {
 	switch t {
+	case TypeDesire:
+		return "desires"
 	case TypeIntention:
 		return "intentions"
 	case TypeAvailability:
@@ -104,6 +109,7 @@ type Retired struct {
 	Kind         string
 	Reason       string
 	SupersededBy string
+	AdoptedAs    string // on a desire retired as adopted: the intention it became
 	Source       Source
 	Timestamp    time.Time
 }
@@ -387,6 +393,8 @@ func (o *Resolution) Refs() []string {
 // NewObject returns an empty object of the type.
 func NewObject(t Type) Object {
 	switch t {
+	case TypeDesire:
+		return &Desire{}
 	case TypeIntention:
 		return &Intention{}
 	case TypeAvailability:

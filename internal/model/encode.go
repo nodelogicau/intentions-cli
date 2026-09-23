@@ -21,6 +21,8 @@ import (
 func Encode(obj Object) ([]byte, error) {
 	var root *yaml.Node
 	switch o := obj.(type) {
+	case *Desire:
+		root = desireNode(o)
 	case *Intention:
 		root = intentionNode(o)
 	case *Availability:
@@ -213,6 +215,7 @@ func retiredNode(r *Retired) *yaml.Node {
 	addStrAlways(m, "kind", r.Kind)
 	addStr(m, "reason", r.Reason)
 	addStr(m, "superseded_by", r.SupersededBy)
+	addStr(m, "adopted_as", r.AdoptedAs)
 	addKV(m, "source", sourceNode(r.Source))
 	addTime(m, "timestamp", r.Timestamp)
 	return m
@@ -255,6 +258,23 @@ func cadenceNode(c *temporal.Cadence) *yaml.Node {
 }
 
 // --- objects --------------------------------------------------------------
+
+func desireNode(o *Desire) *yaml.Node {
+	m := mapping()
+	addHead(m, o.ID, o.Version)
+	addStrAlways(m, "subject", o.Subject)
+	addStrAlways(m, "title", o.Title)
+	addStr(m, "description", o.Description)
+	addStr(m, "activity", o.Activity)
+	addStrList(m, "location", o.Location, false)
+	addKV(m, "serves", refsNode(o.Serves))
+	addStr(m, "reference", o.Reference)
+	addKV(m, "source", sourceNode(o.Source))
+	addTime(m, "timestamp", o.Timestamp)
+	addKV(m, "retired", retiredNode(o.Retired))
+	addExtras(m, o.Extras)
+	return m
+}
 
 func intentionNode(o *Intention) *yaml.Node {
 	m := mapping()

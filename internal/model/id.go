@@ -10,10 +10,10 @@ import (
 )
 
 // idPattern is the lenient on-read form: any prefix_opaque identifier.
-var idPattern = regexp.MustCompile(`^(int|avl|cmt|res)_[A-Za-z0-9-]+$`)
+var idPattern = regexp.MustCompile(`^(des|int|avl|cmt|res)_[A-Za-z0-9-]+$`)
 
 // strictPattern is the minted form: a lowercase canonical UUIDv7.
-var strictPattern = regexp.MustCompile(`^(int|avl|cmt|res)_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+var strictPattern = regexp.MustCompile(`^(des|int|avl|cmt|res)_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
 // MintID mints a new identifier for the type. google/uuid's NewV7 carries a
 // monotonic sub-millisecond sequence, so ids minted by one process sort in

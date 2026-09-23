@@ -113,9 +113,14 @@ intentions intention add --title "Read the board pack" --json
 
 | Verb | What it does |
 |---|---|
-| `init [dir] [--pointer]` | Create `intentions.yaml`, the type directories, `index.yaml`, `intentions.md`; `--pointer` also writes `./.intentions` naming it |
+| `init [dir] [--pointer]` | Create `intentions.yaml`, the five type directories, `index.yaml`, `intentions.md`; `--pointer` also writes `./.intentions` naming it |
 | `workspace` | Print the resolved workspace root, how it was found, and its configuration |
 | `workspace pointer [dir] [--at D] [--force]` | Write a `.intentions` pointer so a directory and everything below it resolves to the workspace |
+| `desire add` | Record a want the person expressed: the inbox, the rung below intention. `--title` is required; no why or when |
+| `desire edit <id>` | Edit a desire in place; only a change of terminus (`--serves <id>:for-the-sake-of`) moves the version |
+| `desire adopt <id> [--duration] [window flags]` | Write a tentative intention from the desire, then retire it as `adopted` naming the intention. Refused when the desire is retired, and when the result would be a terminus (no terminus served and no duration or window) |
+| `desire retire <id>` | Append a retirement record: `--kind abandoned\|superseded [--superseded-by <des id>]`; `adopted` is written only by `adopt` |
+| `desire show <id>`, `desire list` | Show one with the terminus it serves; list active (or `--retired`) with filters |
 | `intention add` | Create an intention. `--title` is required; `subject` defaults from `intentions.yaml`. An intention that is not a terminus should reach one through `--serves`; an unserved write is accepted and its result carries a warning under `findings` |
 | `intention edit <id>` | Edit fields in place. Prose edits leave the version unchanged; `--clear-<field>` removes one |
 | `intention firm <id>` | Set stability to firm. A harness must pass `--policy <int_id>` naming a firm terminus of the subject carrying `auto_firm`; the id is written to `firmed_under`, and a tentative policy is refused by name. On a terminus, refuses any policy and any harness: only the person firms one |
@@ -166,6 +171,15 @@ A window is stored as the person expressed it and never as computed bounds:
 `--duration` is an ISO 8601 duration (`PT90M`) or a range `nominal:min:max`
 (`PT1H:PT30M:PT2H`). `--cadence` is an RRULE using date-level parts only; it
 makes the intention recurring and needs a `--calendar` anchor to expand within.
+
+A **desire** is a want the person has expressed and not yet committed to,
+stored in `desires/` with a `des_` id: title, optional description, activity
+and location as hints, an optional `for-the-sake-of` link to a terminus that
+may still be a draft, and nothing an intention is made of. Nothing resolves,
+checks or grounds it, and two desires may conflict freely. Adopting one
+writes a tentative intention from it and retires it as `adopted` naming the
+intention; adoption is refused bare, since a want with no terminus and no
+duration or window would become a terminus, a self titled as an errand.
 
 A **terminus** is an intention with no window, no duration and no `serves`
 entries: a held self-understanding, or a **policy** when it carries

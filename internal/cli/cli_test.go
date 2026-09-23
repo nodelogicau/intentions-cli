@@ -2078,3 +2078,105 @@ func TestPolicyWithdrawal(t *testing.T) {
 		t.Errorf("after re-firm: %v", v.json["findings"])
 	}
 }
+
+// --- add-desire --------------------------------------------------------------
+
+func TestDesires(t *testing.T) {
+	ws := initWS(t)
+	if _, err := os.Stat(filepath.Join(ws, "desires")); err != nil {
+		t.Error("init did not create desires/")
+	}
+	// A passing remark: no why, no when, no warning.
+	d := mustOK(t, run(t, ws, "", "desire", "add", "--title", "call the accountant", "--activity", "admin", "--harness", "claude"), "desire add")
+	if d.json["created"] != true || !strings.HasPrefix(d.str("id"), "des_") || d.str("path") != "desires/"+d.str("id")+".yaml" {
+		t.Fatalf("add: %v", d.json)
+	}
+	if _, has := d.json["findings"]; has {
+		t.Errorf("a desire warned: %v", d.json)
+	}
+	if v := run(t, ws, "", "validate"); v.code != 0 || int(v.json["counts"].(map[string]any)["warning"].(float64)) != 0 {
+		t.Errorf("validate after desire add: %v", v.json["findings"])
+	}
+	// The generic show reads it; unresolved and check ignore it.
+	if r := run(t, ws, "", "show", d.str("id")); r.code != 0 || r.str("type") != "desire" {
+		t.Errorf("show: %d %v", r.code, r.json)
+	}
+	if u := run(t, ws, "", "unresolved"); int(u.json["count"].(float64)) != 0 {
+		t.Errorf("unresolved lists a desire: %v", u.json)
+	}
+	// Prose edit leaves the version; a serves edit moves it. In-order-to refused.
+	e := mustOK(t, run(t, ws, "", "desire", "edit", d.str("id"), "--description", "mentioned on the way out"), "prose edit")
+	if e.json["projection_changed"] != false {
+		t.Errorf("prose edit moved the version: %v", e.json)
+	}
+	tt := addIntention(t, ws, "--title", "being someone who keeps their affairs in order", "--harness", "claude")
+	if r := run(t, ws, "", "desire", "edit", d.str("id"), "--serves", tt.str("id")+":in-order-to"); r.code != 2 || !strings.Contains(errMsg(r), "for-the-sake-of") {
+		t.Errorf("in-order-to: %d %s", r.code, errMsg(r))
+	}
+	e = mustOK(t, run(t, ws, "", "desire", "edit", d.str("id"), "--serves", tt.str("id")+":for-the-sake-of"), "serves edit")
+	if e.json["projection_changed"] != true {
+		t.Errorf("serves edit left the version: %v", e.json)
+	}
+	s := mustOK(t, run(t, ws, "", "desire", "show", d.str("id")), "desire show")
+	if sr := s.json["serves_resolved"].([]any); len(sr) != 1 || sr[0].(map[string]any)["stability"] != "tentative" {
+		t.Errorf("serves_resolved: %v", s.json["serves_resolved"])
+	}
+	// Bare adoption refused; adoption with a when carries the unserved finding (the terminus is a draft).
+	bare := mustOK(t, run(t, ws, "", "desire", "add", "--title", "learn the cello"), "bare desire")
+	if r := run(t, ws, "", "desire", "adopt", bare.str("id")); r.code != 2 || !strings.Contains(errMsg(r), "a why") {
+		t.Errorf("bare adopt: %d %s", r.code, errMsg(r))
+	}
+	if r := run(t, ws, "", "desire", "retire", bare.str("id"), "--kind", "adopted"); r.code != 2 {
+		t.Errorf("retire as adopted: %d %s", r.code, errMsg(r))
+	}
+	a := mustOK(t, run(t, ws, "", "desire", "adopt", d.str("id"), "--duration", "PT30M", "--calendar", "2026-W40", "--harness", "claude"), "adopt")
+	in := a.json["intention"].(map[string]any)
+	de := a.json["desire"].(map[string]any)
+	inObj := in["object"].(map[string]any)
+	if !strings.HasPrefix(in["id"].(string), "int_") || inObj["stability"] != "tentative" || inObj["title"] != "call the accountant" || inObj["activity"] != "admin" || inObj["duration"] != "PT30M" || inObj["description"] != "mentioned on the way out" {
+		t.Errorf("adopted intention: %v", inObj)
+	}
+	if ret := de["object"].(map[string]any)["retired"].(map[string]any); ret["kind"] != "adopted" || ret["adopted_as"] != in["id"] {
+		t.Errorf("adopted desire: %v", de)
+	}
+	if fs, _ := a.json["findings"].([]any); len(fs) != 1 || fs[0].(map[string]any)["code"] != "unserved" || !strings.Contains(fs[0].(map[string]any)["message"].(string), "draft terminus "+tt.str("id")) {
+		t.Errorf("adoption findings: %v", a.json["findings"])
+	}
+	if r := run(t, ws, "", "desire", "adopt", d.str("id"), "--duration", "PT30M"); r.code != 2 || !strings.Contains(errMsg(r), "retired") {
+		t.Errorf("adopt twice: %d %s", r.code, errMsg(r))
+	}
+	if r := run(t, ws, "", "desire", "edit", d.str("id"), "--title", "x"); r.code != 2 {
+		t.Errorf("edit retired desire: %d", r.code)
+	}
+	// A why and no when: adopted into an intention unresolved reports as incomplete.
+	why := mustOK(t, run(t, ws, "", "desire", "add", "--title", "sort the filing", "--serves", tt.str("id")+":for-the-sake-of"), "desire with a why")
+	a2 := mustOK(t, run(t, ws, "", "desire", "adopt", why.str("id")), "adopt with a why")
+	u := run(t, ws, "", "unresolved")
+	found := false
+	for _, x := range u.json["entries"].([]any) {
+		if x.(map[string]any)["id"] == a2.json["intention"].(map[string]any)["id"] && x.(map[string]any)["status"] == "incomplete" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("adopted intention with no when not incomplete: %v", u.json)
+	}
+	// Retire and list.
+	mustOK(t, run(t, ws, "", "desire", "retire", bare.str("id"), "--kind", "abandoned", "--reason", "not really"), "abandon")
+	l := mustOK(t, run(t, ws, "", "desire", "list"), "list")
+	lr := mustOK(t, run(t, ws, "", "desire", "list", "--retired"), "list retired")
+	if int(l.json["count"].(float64)) != 0 || int(lr.json["count"].(float64)) != 3 {
+		t.Errorf("list: active %v retired %v", l.json["count"], lr.json["count"])
+	}
+	body := readFile(t, ws, "desires/"+bare.str("id")+".yaml")
+	if !strings.HasPrefix(body, "id: "+bare.str("id")+"\nversion: sha256:") || !strings.Contains(body, "retired:\n  kind: abandoned\n  reason: not really\n") {
+		t.Errorf("retired file:\n%s", body)
+	}
+	if v := run(t, ws, "", "validate"); v.code != 0 {
+		t.Errorf("validate at the end: %v", v.json["findings"])
+	}
+	// The index carries the type.
+	if idx := readFile(t, ws, "index.yaml"); !strings.Contains(idx, "type: desire") || !strings.Contains(idx, "retired: adopted") {
+		t.Errorf("index:\n%s", idx)
+	}
+}

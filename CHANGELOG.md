@@ -3,6 +3,42 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+Implements DESIRE, the fourth object type the specification added in
+`add-desire` and `adoption-makes-a-plan`
+([#7](https://github.com/nodelogicau/intentions-cli/issues/7); SPEC-FEEDBACK
+item 28 for the adoption refusal).
+
+### Added
+
+- **Desires: the inbox.** A want the person expressed and has not committed
+  to, stored in `desires/` with a `des_` id: `subject`, `title`,
+  `description`, `activity` and `location` as hints, `serves` admitting only
+  `for-the-sake-of` to a terminus of the subject that may still be a draft,
+  `reference`, `source`, `timestamp`, `retired`. It carries none of an
+  intention's temporal or deontic fields, and a file that does is a
+  validation error naming the field. Nothing resolves, checks, lists as
+  unresolved, or grounds a desire; two may conflict freely. Projection:
+  `subject`, `serves`, `retired.kind`.
+- **Six verbs and six tools.** `desire add | edit | adopt | retire | show |
+  list` and `desire_add`, `desire_edit`, `desire_adopt`, `desire_retire`,
+  `desire_show`, `desire_list`; the reference tool set is thirty-one.
+- **Adoption.** `desire adopt` writes a tentative intention carrying the
+  desire's subject, title, description, serves, reference, activity and
+  location plus the supplied duration and window, then retires the desire as
+  `adopted` with `adopted_as` naming it. The intention is the record. Refused
+  when the desire is retired, and when the result would be a terminus, that
+  is no terminus served and neither a duration nor a window, naming what is
+  missing: a why or a when. The result carries both objects and the
+  intention's `findings`.
+- **Retirement.** Desire kinds `abandoned`, `superseded` (naming a desire)
+  and `adopted`, the last written only by adoption; `retire --kind adopted`
+  is refused on every type. `adopted_as` sits in the retired block after
+  `superseded_by` and validation checks it names an intention.
+- **`init` creates `desires/`**; the index carries `type: desire`; the skill
+  gains an inbox section and reads it each session.
+
 ## [0.13.0] - 2026-09-23
 
 Aligns with the upstream settlement of SPEC-FEEDBACK item 27 (spec commit

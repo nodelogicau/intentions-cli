@@ -20,6 +20,7 @@ import (
 // Fields lists the projection field set per type for intentions/0.1. It is
 // frozen: a change to any set is a new format version.
 var Fields = map[model.Type][]string{
+	model.TypeDesire:       {"subject", "serves", "retired.kind"},
 	model.TypeIntention:    {"subject", "duration", "window", "stability", "activity", "location", "parties", "serves", "cadence", "occurrence", "placement", "retired.kind"},
 	model.TypeAvailability: {"subject", "duration", "window", "conditional", "location", "cadence", "valid_until", "retired.kind"},
 	model.TypeCommitment:   {"parties", "placement", "intention", "origin", "transparent", "external", "retired.kind"},
@@ -57,6 +58,10 @@ func Project(obj model.Object) map[string]any {
 		p[k] = v
 	}
 	switch o := obj.(type) {
+	case *model.Desire:
+		put("subject", o.Subject)
+		put("serves", refs(o.Serves))
+		put("retired", retired(o.Retired))
 	case *model.Intention:
 		put("subject", o.Subject)
 		put("duration", durationSpec(o.Duration))

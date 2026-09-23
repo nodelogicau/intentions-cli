@@ -26,6 +26,7 @@ Before you write anything about the person's time:
 
 ```
 intentions workspace --json                  # which workspace, found how (exit 5 = none)
+intentions desire list --json                # the inbox: wants not yet committed to
 intentions intention list --json             # what they already mean to do
 intentions availability list --json          # what capacity they have declared
 intentions unresolved --json                 # what still needs a placement, and why
@@ -105,6 +106,9 @@ modifiers inside double quotes, so `"$id:in-order-to"` silently corrupts the id.
 | What is intended | `intentions intention list [--subject <uri>] [--activity <term>] [--stability tentative\|firm] [--recurring] [--retired] --json` → `{intentions, count}` |
 | What capacity exists | `intentions availability list [--subject <uri>] [--conditional <term>] [--scope <s>] [--retired] --json` |
 | One object | `intentions show <id> --json` → `{object, version, path}`; `intention show` adds `serves_resolved` |
+| Record a want | `intentions desire add --title "<what they said>" [--activity <term>] [--location <uri>]... [--serves <terminus>:for-the-sake-of] --json` — a passing remark; no why or when required |
+| Adopt a want | `intentions desire adopt <id> [--duration PT30M] [--calendar <edtf\|deictic>] [--clock HH:MM/HH:MM] --json` → `{intention, desire, findings?}`; refused bare (no why and no when) |
+| Let a want go | `intentions desire retire <id> --kind abandoned\|superseded [--superseded-by <des id>] --json`; never `adopted`, which only adopt writes |
 | Record an intention | `intentions intention add --title "<what>" [--duration PT90M] [--calendar <edtf\|deictic>] [--clock HH:MM/HH:MM] [--relative <id>:<RELATION>[:min[:max]]] [--activity <term>] [--location <uri>]... [--party <uri>]... [--serves <id>:in-order-to\|for-the-sake-of]... [--description "<prose>"] --json` |
 | Multi-line prose | add `--description-file -` and pipe the text on stdin |
 | Make it recurring | add `--cadence "FREQ=WEEKLY;BYDAY=TU"` with a `--calendar` anchor for it to expand within |
@@ -181,6 +185,34 @@ On failure stderr carries `{"error": {"code", "message"}}`; a refused write says
   settling, a title fix: `intention edit`. Prose edits leave the version
   unchanged; the result's `projection_changed` tells you whether the
   scheduling projection moved.
+
+## The inbox: desires
+
+A want the person expressed and has not committed to is a **desire**, the
+rung below intention: a world-to-mind pro-attitude, not a commissive act. It
+has no duration, no window, no stability; nothing resolves it, checks it, or
+asks what it is for, and two desires may contradict each other freely. It is
+where a passing remark goes.
+
+- **"Call the accountant" is `desire add`, not `intention add`.** Recording
+  an intention is a commitment to a plan and costs a why; recording a want
+  costs nothing. Do not promote a remark to an intention because it sounds
+  actionable.
+- **Only what they said they wanted.** A desire is the person's word, never
+  your inference from a calendar, a message, or a pattern. List before you
+  add; edit the want that exists.
+- **Read the inbox each session.** `desire list` is the first read after the
+  workspace. Ask about what is there; do not act on it unasked.
+- **Adopt when it has a why or a when.** `desire adopt <id>` writes a
+  tentative intention carrying the want's title, activity, location and
+  terminus plus the duration and window you pass, then retires the desire as
+  `adopted` naming it. A bare adoption, no terminus and no when, is refused,
+  because it would write a terminus, a self titled as an errand. An adopted
+  intention obeys every intention rule: if its terminus is a draft, the
+  result carries the `unserved` warning, which is the moment to ask the
+  person to firm their terminus.
+- **Let go by `retire --kind abandoned`.** The record stays; the want does
+  not clutter the inbox. Never retire a desire as `adopted` by hand.
 
 ## Every intention reaches a terminus
 

@@ -149,6 +149,24 @@ func (v *validator) referential() {
 			}
 		}
 		switch o := obj.(type) {
+		case *model.Desire:
+			for i, r := range o.Serves {
+				f := fmt.Sprintf("serves[%d]", i)
+				check(f, r.ID, model.TypeIntention)
+				if t, ok := v.g.Get(r.ID); ok {
+					if ti, ok := t.(*model.Intention); ok {
+						if !ti.IsTerminus() {
+							v.add(SeverityError, "serves_target", id, "%s names %s, which is not a terminus; a desire serves only who the person is", f, r.ID)
+						} else if ti.Subject != o.Subject {
+							v.add(SeverityError, "serves_target", id, "%s names %s, a terminus of %s, not of %s", f, r.ID, ti.Subject, o.Subject)
+						}
+					}
+				}
+			}
+			if o.Retired != nil {
+				check("retired.superseded_by", o.Retired.SupersededBy, model.TypeDesire)
+				check("retired.adopted_as", o.Retired.AdoptedAs, model.TypeIntention)
+			}
 		case *model.Intention:
 			for i, r := range o.Serves {
 				check(fmt.Sprintf("serves[%d]", i), r.ID, model.TypeIntention)
@@ -221,16 +239,22 @@ func (v *validator) graph() {
 			v.add(SeverityWarning, "unserved", in.ID, "%s", msg)
 		}
 	}
-	for _, in := range v.g.Intentions() {
-		for _, r := range in.Serves {
+	sink := func(from string, serves []model.Ref) {
+		for _, r := range serves {
 			if r.Role != model.RoleForTheSakeOf {
 				continue
 			}
 			target, _ := v.g.Get(r.ID)
 			if t, ok := target.(*model.Intention); ok && len(t.Serves) > 0 {
-				v.add(SeverityError, "terminus", t.ID, "targeted for-the-sake-of by %s but carries serves entries; a terminus is a sink", in.ID)
+				v.add(SeverityError, "terminus", t.ID, "targeted for-the-sake-of by %s but carries serves entries; a terminus is a sink", from)
 			}
 		}
+	}
+	for _, in := range v.g.Intentions() {
+		sink(in.ID, in.Serves)
+	}
+	for _, d := range v.g.Desires() {
+		sink(d.ID, d.Serves)
 	}
 }
 
@@ -426,6 +450,11 @@ func (v *validator) terms() {
 	for _, in := range v.g.Intentions() {
 		if in.Activity != "" {
 			users[in.Activity] = append(users[in.Activity], in.ID)
+		}
+	}
+	for _, d := range v.g.Desires() {
+		if d.Activity != "" {
+			users[d.Activity] = append(users[d.Activity], d.ID)
 		}
 	}
 	for _, av := range v.g.Availabilities() {

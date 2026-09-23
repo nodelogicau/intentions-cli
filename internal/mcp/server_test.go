@@ -172,7 +172,7 @@ func TestInstructionsPromptAndTools(t *testing.T) {
 	for _, tl := range tools.Tools {
 		names[tl.Name] = tl
 	}
-	want := []string{"workspace_status", "intention_add", "intention_edit", "intention_firm", "intention_retire", "intention_show", "intention_list", "availability_add", "availability_renew", "availability_supersede", "availability_retire", "availability_list", "commitment_accept", "commitment_decline", "commitment_cancel", "commitment_show", "commitment_list", "generate", "resolve", "select", "unresolved", "check", "acknowledge", "bounds", "validate"}
+	want := []string{"workspace_status", "desire_add", "desire_edit", "desire_adopt", "desire_retire", "desire_show", "desire_list", "intention_add", "intention_edit", "intention_firm", "intention_retire", "intention_show", "intention_list", "availability_add", "availability_renew", "availability_supersede", "availability_retire", "availability_list", "commitment_accept", "commitment_decline", "commitment_cancel", "commitment_show", "commitment_list", "generate", "resolve", "select", "unresolved", "check", "acknowledge", "bounds", "validate"}
 	if len(names) != len(want) {
 		t.Errorf("%d tools, want %d", len(names), len(want))
 	}
@@ -197,6 +197,7 @@ func TestInstructionsPromptAndTools(t *testing.T) {
 	// (issue #4). Add tools carry them although their inputs are embedded in
 	// edit and supersede, where every field is optional.
 	required := map[string][]string{
+		"desire_add": {"title"}, "desire_edit": {"id"}, "desire_adopt": {"id"}, "desire_retire": {"id", "kind"}, "desire_show": {"id"},
 		"intention_add": {"title"}, "intention_edit": {"id"}, "intention_firm": {"id"}, "intention_retire": {"id", "kind"}, "intention_show": {"id"},
 		"availability_add": {"subject", "duration", "window"}, "availability_renew": {"id", "valid_until"}, "availability_supersede": {"id"}, "availability_retire": {"id", "kind"},
 		"commitment_accept": {"id"}, "commitment_decline": {"id"}, "commitment_cancel": {"id"}, "commitment_show": {"id"},
@@ -556,5 +557,41 @@ func TestEveryIntentionReachesATerminus(t *testing.T) {
 	v := h.ok("validate", map[string]any{})
 	if int(v["counts"].(map[string]any)["warning"].(float64)) < 1 || v["ok"] != true {
 		t.Errorf("validate: %v", v)
+	}
+}
+
+func TestDesiresOverMCP(t *testing.T) {
+	h := newHarness(t, "claude-ai", Options{})
+	d := h.ok("desire_add", map[string]any{"title": "call the accountant", "activity": "admin"})
+	if d["created"] != true || !strings.HasPrefix(str(d, "id"), "des_") {
+		t.Fatalf("add: %v", d)
+	}
+	h.rejected("desire_add", map[string]any{}, "title")
+	if msg := h.fail("desire_adopt", map[string]any{"id": str(d, "id")}, "refused"); !strings.Contains(msg, "a why") {
+		t.Errorf("bare adopt: %s", msg)
+	}
+	h.fail("desire_retire", map[string]any{"id": str(d, "id"), "kind": "adopted"}, "refused")
+	a := h.ok("desire_adopt", map[string]any{"id": str(d, "id"), "duration": "PT30M", "window": map[string]any{"calendar": "2026-W40"}})
+	in := a["intention"].(map[string]any)
+	if !strings.HasPrefix(str(in, "id"), "int_") || obj(in)["stability"] != "tentative" || obj(in)["activity"] != "admin" {
+		t.Errorf("adopted: %v", in)
+	}
+	if !strings.Contains(h.file("desires/"+str(d, "id")+".yaml"), "adopted_as: "+str(in, "id")) {
+		t.Error("desire not retired as adopted")
+	}
+	if fs, _ := a["findings"].([]any); len(fs) != 1 || fs[0].(map[string]any)["code"] != "unserved" {
+		t.Errorf("adoption findings: %v", a["findings"])
+	}
+	h.fail("desire_adopt", map[string]any{"id": str(d, "id"), "duration": "PT30M"}, "refused")
+	e := h.ok("desire_add", map[string]any{"title": "learn the cello"})
+	h.ok("desire_retire", map[string]any{"id": str(e, "id"), "kind": "abandoned"})
+	l := h.ok("desire_list", map[string]any{})
+	lr := h.ok("desire_list", map[string]any{"retired": true})
+	if int(l["count"].(float64)) != 0 || int(lr["count"].(float64)) != 2 {
+		t.Errorf("list: %v %v", l["count"], lr["count"])
+	}
+	u := h.ok("unresolved", map[string]any{})
+	if int(u["count"].(float64)) != 1 {
+		t.Errorf("unresolved should hold only the adopted intention: %v", u)
 	}
 }

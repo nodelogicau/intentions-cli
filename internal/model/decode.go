@@ -77,6 +77,8 @@ func Decode(data []byte, t Type) (Object, Problems, error) {
 	d := &decoder{}
 	var obj Object
 	switch t {
+	case TypeDesire:
+		obj = d.desire(root)
 	case TypeIntention:
 		obj = d.intention(root)
 	case TypeAvailability:
@@ -471,6 +473,8 @@ func (d *decoder) retired(field string, v *yaml.Node) *Retired {
 			r.Reason = d.str(field+".reason", c)
 		case "superseded_by":
 			r.SupersededBy = d.str(field+".superseded_by", c)
+		case "adopted_as":
+			r.AdoptedAs = d.str(field+".adopted_as", c)
 		case "source":
 			r.Source = d.source(field+".source", c)
 		case "timestamp":
@@ -524,6 +528,48 @@ func (d *decoder) acknowledgements(field string, v *yaml.Node) []Acknowledgement
 }
 
 // --- objects --------------------------------------------------------------
+
+func (d *decoder) desire(root *yaml.Node) *Desire {
+	o := &Desire{Serves: nil}
+	o.Extras = pairs(root, func(k string, v *yaml.Node) bool {
+		switch k {
+		case "id":
+			o.ID = d.str(k, v)
+		case "subject":
+			o.Subject = d.str(k, v)
+		case "title":
+			o.Title = d.str(k, v)
+		case "description":
+			o.Description = d.str(k, v)
+		case "activity":
+			o.Activity = d.str(k, v)
+		case "location":
+			o.Location = d.strList(k, v)
+		case "serves":
+			o.Serves = d.refs(k, v)
+		case "reference":
+			o.Reference = d.str(k, v)
+		case "source":
+			o.Source = d.source(k, v)
+		case "timestamp":
+			o.Timestamp = d.timestamp(k, v)
+		case "retired":
+			o.Retired = d.retired(k, v)
+		case "version":
+			o.Version = d.str(k, v)
+		default:
+			if oneOf(k, desireForbidden) {
+				// Named, not kept: a desire carries none of what makes an
+				// intention an intention.
+				d.problem("forbidden_field", k, "a desire may not carry %s; that is what makes an intention an intention, and a want with one is adopted, not annotated", k)
+				return true
+			}
+			return false
+		}
+		return true
+	})
+	return o
+}
 
 func (d *decoder) intention(root *yaml.Node) *Intention {
 	o := &Intention{Serves: nil}

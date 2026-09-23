@@ -166,6 +166,7 @@ without a policy the person holds.`,
 	root.AddCommand(
 		a.initCmd(),
 		a.workspaceCmd(),
+		a.desireCmd(),
 		a.intentionCmd(),
 		a.availabilityCmd(),
 		a.commitmentCmd(),

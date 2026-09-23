@@ -53,6 +53,7 @@ func (s *Server) registerTools() {
 		Description: "Every availability (active by default), filtered by subject, conditional, scope, or retired, each with its effective validity horizon."},
 		s.availabilityList)
 	s.registerCommitmentTools()
+	s.registerDesireTools()
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "generate", Annotations: additive,
 		Description: "Materialise instances of recurring intentions over a horizon (default resolver.horizon from now). Idempotent on (recurring, occurrence); a retired instance is never regenerated. Use it when the person asks to plan a named period, narrowed with `horizon` and `recurring`; `resolve` already materialises what its own range needs, so creating a recurring intention should not be followed by a generate."},
 		s.generate)
@@ -459,7 +460,7 @@ func (s *Server) intentionFirm(ctx context.Context, req *sdk.CallToolRequest, in
 
 type retireIn struct {
 	ID           string    `json:"id"`
-	Kind         string    `json:"kind" jsonschema:"intentions: fulfilled | abandoned | superseded; availability: retracted | superseded"`
+	Kind         string    `json:"kind" jsonschema:"intentions: fulfilled | abandoned | superseded; availability: retracted | superseded; desires: abandoned | superseded (adopted is written only by desire_adopt)"`
 	SupersededBy string    `json:"superseded_by,omitempty" jsonschema:"the replacing object; required with kind superseded"`
 	Reason       string    `json:"reason,omitempty"`
 	Timestamp    string    `json:"timestamp,omitempty"`
@@ -498,6 +499,10 @@ func (s *Server) retire(req *sdk.CallToolRequest, in retireIn, want model.Type) 
 	prev, _ := projection.Version(obj)
 	var updated model.Object
 	switch o := obj.(type) {
+	case *model.Desire:
+		c := *o
+		c.Retired = &r
+		updated = &c
 	case *model.Intention:
 		c := *o
 		c.Retired = &r
