@@ -237,7 +237,7 @@ func checkIntentionWrite(g *store.Graph, before, o *model.Intention, act model.S
 	if o.Stability != "firm" {
 		o.FirmedUnder = ""
 	}
-	return nil
+	return query.RefuseUnserved(g, o)
 }
 
 func (a *app) intentionAddCmd() *cobra.Command {

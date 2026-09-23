@@ -17,14 +17,24 @@ import (
 	"github.com/nodelogicau/intentions-cli/internal/temporal"
 )
 
-// Fields lists the projection field set per type for intentions/0.1. It is
-// frozen: a change to any set is a new format version.
-var Fields = map[model.Type][]string{
-	model.TypeDesire:       {"subject", "serves", "retired.kind"},
-	model.TypeIntention:    {"subject", "duration", "window", "stability", "activity", "location", "parties", "serves", "cadence", "occurrence", "placement", "retired.kind"},
-	model.TypeAvailability: {"subject", "duration", "window", "conditional", "location", "cadence", "valid_until", "retired.kind"},
-	model.TypeCommitment:   {"parties", "placement", "intention", "origin", "transparent", "external", "retired.kind"},
-	model.TypeResolution:   {"intention", "placement", "selector", "displaced"},
+// Fields lists the projection field set per format version and type. Each
+// set is frozen from the moment any implementation wrote its version string
+// into a file: a change to any set is a new format version.
+var Fields = map[string]map[model.Type][]string{
+	model.Format01: {
+		model.TypeDesire:       {"subject", "serves", "retired.kind"},
+		model.TypeIntention:    {"subject", "duration", "window", "stability", "activity", "location", "parties", "serves", "cadence", "occurrence", "placement", "retired.kind"},
+		model.TypeAvailability: {"subject", "duration", "window", "conditional", "location", "cadence", "valid_until", "retired.kind"},
+		model.TypeCommitment:   {"parties", "placement", "intention", "origin", "transparent", "external", "retired.kind"},
+		model.TypeResolution:   {"intention", "placement", "selector", "displaced"},
+	},
+	model.Format02: {
+		model.TypeDesire:       {"subject", "serves", "retired.kind"},
+		model.TypeIntention:    {"subject", "duration", "window", "stability", "activity", "location", "parties", "serves", "cadence", "occurrence", "placement", "retired.kind"},
+		model.TypeAvailability: {"subject", "capacity", "window", "activities", "location", "cadence", "valid_until", "retired.kind"},
+		model.TypeCommitment:   {"parties", "placement", "intention", "origin", "resolution", "transparent", "external", "retired.kind"},
+		model.TypeResolution:   {"intention", "placement", "selector", "displaced"},
+	},
 }
 
 // Algorithm is the only hash this format version admits.
@@ -77,9 +87,15 @@ func Project(obj model.Object) map[string]any {
 		put("retired", retired(o.Retired))
 	case *model.Availability:
 		put("subject", o.Subject)
-		put("duration", durationSpec(o.Duration))
-		put("window", window(o.Window))
-		put("conditional", model.SortStrings(o.Conditional))
+		if o.Format() == model.Format01 {
+			put("duration", durationSpec(o.Capacity))
+			put("window", window(o.Window))
+			put("conditional", model.SortStrings(o.Activities))
+		} else {
+			put("capacity", durationSpec(o.Capacity))
+			put("window", window(o.Window))
+			put("activities", model.SortStrings(o.Activities))
+		}
 		put("location", model.SortStrings(o.Location))
 		put("cadence", cadence(o.Cadence))
 		put("valid_until", validUntil(o.ValidUntil))
@@ -88,10 +104,14 @@ func Project(obj model.Object) map[string]any {
 		put("parties", parties(o.Parties))
 		put("placement", placement(o.Placement))
 		put("intention", o.Intention)
-		if o.Origin.Import {
-			put("origin", "import")
-		} else if o.Origin.Resolution != "" {
-			put("origin", map[string]any{"resolution": o.Origin.Resolution})
+		switch {
+		case o.Format() == model.Format01 && o.Origin == model.OriginResolution:
+			put("origin", map[string]any{"resolution": o.Resolution})
+		case o.Format() == model.Format01:
+			put("origin", o.Origin)
+		default:
+			put("origin", o.Origin)
+			put("resolution", o.Resolution)
 		}
 		if o.IsTransparent() {
 			put("transparent", true)

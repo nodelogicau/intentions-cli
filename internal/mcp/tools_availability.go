@@ -22,9 +22,11 @@ type availabilityIn struct {
 	Subject     string    `json:"subject,omitempty" jsonschema:"URI of the particular whose availability this is (required on add; no default applies)"`
 	Title       string    `json:"title,omitempty"`
 	Description string    `json:"description,omitempty"`
-	Duration    any       `json:"duration,omitempty" jsonschema:"capacity offered per occasion: ISO 8601 duration or {nominal, min, max} (required on add)"`
+	Capacity    any       `json:"capacity,omitempty" jsonschema:"capacity offered per occasion: ISO 8601 duration or {nominal, min, max} (required on add)"`
+	Duration    any       `json:"duration,omitempty" jsonschema:"deprecated 0.1 spelling of capacity"`
 	Window      *windowIn `json:"window,omitempty" jsonschema:"calendar and/or clock; a cadence needs a calendar anchor"`
-	Conditional []string  `json:"conditional,omitempty" jsonschema:"activity terms this supply is good for; absent means anything"`
+	Activities  []string  `json:"activities,omitempty" jsonschema:"activity terms this supply is good for; absent means anything"`
+	Conditional []string  `json:"conditional,omitempty" jsonschema:"deprecated 0.1 spelling of activities"`
 	Location    []string  `json:"location,omitempty" jsonschema:"URIs at which this capacity holds; absent means anywhere"`
 	Cadence     string    `json:"cadence,omitempty" jsonschema:"RRULE with date-level parts only"`
 	ValidUntil  string    `json:"valid_until,omitempty" jsonschema:"an EDTF expression or RFC 3339 datetime"`
@@ -43,12 +45,18 @@ func (s *Server) applyAvailability(in availabilityIn, o *model.Availability, g *
 	if in.Description != "" {
 		o.Description = in.Description
 	}
-	if in.Duration != nil {
-		d, err := durationIn(in.Duration)
+	if in.Capacity == nil {
+		in.Capacity = in.Duration
+	}
+	if in.Activities == nil {
+		in.Activities = in.Conditional
+	}
+	if in.Capacity != nil {
+		d, err := durationIn(in.Capacity)
 		if err != nil {
 			return err
 		}
-		o.Duration = d
+		o.Capacity = d
 	}
 	w, err := window(in.Window, o.Window, ctx, g)
 	if err != nil {
@@ -57,8 +65,8 @@ func (s *Server) applyAvailability(in availabilityIn, o *model.Availability, g *
 	if w != nil {
 		o.Window = w
 	}
-	if in.Conditional != nil {
-		o.Conditional = model.SortStrings(in.Conditional)
+	if in.Activities != nil {
+		o.Activities = model.SortStrings(in.Activities)
 	}
 	if in.Location != nil {
 		if err := checkURIs("location", in.Location); err != nil {
@@ -128,8 +136,8 @@ func (s *Server) availabilityAdd(ctx context.Context, req *sdk.CallToolRequest, 
 	if Clean(in.Subject) == "" {
 		return errResult(apperr.Usage("subject is required: availability names its particular explicitly")), nil, nil
 	}
-	if in.Duration == nil {
-		return errResult(apperr.Usage("duration is required: the capacity offered per occasion")), nil, nil
+	if in.Capacity == nil && in.Duration == nil {
+		return errResult(apperr.Usage("capacity is required: the capacity offered per occasion")), nil, nil
 	}
 	if in.Window == nil {
 		return errResult(apperr.Usage("a window is required: calendar and/or clock")), nil, nil
@@ -253,7 +261,7 @@ func (s *Server) availabilitySupersede(ctx context.Context, req *sdk.CallToolReq
 	}
 	n := *old
 	n.ID, n.Source, n.Timestamp, n.Retired, n.Version, n.Extras = model.MintID(model.TypeAvailability), src, ts, nil, "", nil
-	n.Conditional = append([]string(nil), old.Conditional...)
+	n.Activities = append([]string(nil), old.Activities...)
 	n.Location = append([]string(nil), old.Location...)
 	if old.Window != nil {
 		w := *old.Window
@@ -295,7 +303,8 @@ func (s *Server) availabilityRetire(ctx context.Context, req *sdk.CallToolReques
 
 type availabilityListIn struct {
 	Subject     string `json:"subject,omitempty"`
-	Conditional string `json:"conditional,omitempty"`
+	Activities  string `json:"activities,omitempty" jsonschema:"filter by an activities term"`
+	Conditional string `json:"conditional,omitempty" jsonschema:"deprecated alias of activities"`
 	Scope       string `json:"scope,omitempty"`
 	Retired     bool   `json:"retired,omitempty"`
 	Now         string `json:"now,omitempty"`
@@ -313,7 +322,7 @@ func (s *Server) availabilityList(ctx context.Context, req *sdk.CallToolRequest,
 	e := resolve.NewEnv(s.ws, g, at)
 	list := []map[string]any{}
 	for _, o := range g.Availabilities() {
-		if (o.Retired != nil) != in.Retired || (in.Subject != "" && o.Subject != in.Subject) || (in.Scope != "" && o.Scope != in.Scope) || (in.Conditional != "" && !has(o.Conditional, in.Conditional)) {
+		if (o.Retired != nil) != in.Retired || (in.Subject != "" && o.Subject != in.Subject) || (in.Scope != "" && o.Scope != in.Scope) || ((in.Activities != "" && !has(o.Activities, in.Activities)) || (in.Conditional != "" && !has(o.Activities, in.Conditional))) {
 			continue
 		}
 		m, err := model.ToMap(o)

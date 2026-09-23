@@ -15,6 +15,7 @@ import (
 func newWS(t *testing.T) *store.Workspace {
 	t.Helper()
 	cfg := store.NewConfig()
+	cfg.Format = model.Format01
 	cfg.Resolver.Timezone = "Australia/Melbourne"
 	cfg.Defaults.Subject = "https://example.com/people/ada"
 	cfg.Defaults.Source.Author = "https://example.com/people/ada"

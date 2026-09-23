@@ -199,7 +199,7 @@ func (v *validator) referential() {
 			}
 		case *model.Commitment:
 			check("intention", o.Intention, model.TypeIntention)
-			check("origin.resolution", o.Origin.Resolution, model.TypeResolution)
+			check("resolution", o.Resolution, model.TypeResolution)
 		case *model.Resolution:
 			check("intention", o.Intention, model.TypeIntention)
 			for i, d := range o.Displaced {
@@ -236,7 +236,7 @@ func (v *validator) graph() {
 			termini[in.Subject] = model.FirmTermini(v.g.Intentions(), in.Subject)
 		}
 		if msg := model.Unserved(v.g, in, termini[in.Subject]); msg != "" {
-			v.add(SeverityWarning, "unserved", in.ID, "%s", msg)
+			v.add(UnservedSeverity(v.g.Format), "unserved", in.ID, "%s", msg)
 		}
 	}
 	sink := func(from string, serves []model.Ref) {
@@ -458,7 +458,7 @@ func (v *validator) terms() {
 		}
 	}
 	for _, av := range v.g.Availabilities() {
-		for _, t := range av.Conditional {
+		for _, t := range av.Activities {
 			users[t] = append(users[t], av.ID)
 		}
 	}

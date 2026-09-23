@@ -235,10 +235,10 @@ func (c *checker) intention(o *Intention) {
 func (c *checker) availability(o *Availability) {
 	c.require("subject", o.Subject)
 	c.uri("subject", o.Subject)
-	if o.Duration == nil {
-		c.add("missing", "duration", "duration is required")
-	} else if err := o.Duration.Validate(); err != nil {
-		c.add("ranged_duration", "duration", "%v", err)
+	if o.Capacity == nil {
+		c.add("missing", "capacity", "capacity is required: the capacity offered per occasion")
+	} else if err := o.Capacity.Validate(); err != nil {
+		c.add("ranged_duration", "capacity", "%v", err)
 	}
 	if o.Window == nil {
 		c.add("missing", "window", "window is required")
@@ -248,8 +248,8 @@ func (c *checker) availability(o *Availability) {
 	if o.Cadence != nil && (o.Window == nil || o.Window.Calendar == nil) {
 		c.add("cadence_anchor", "cadence", "a cadence needs a window with a calendar anchor to expand within")
 	}
-	for i, t := range o.Conditional {
-		c.term(fmt.Sprintf("conditional[%d]", i), t)
+	for i, t := range o.Activities {
+		c.term(fmt.Sprintf("activities[%d]", i), t)
 	}
 	c.uris("location", o.Location)
 	c.enum("scope", o.Scope, Scopes, true)
@@ -282,14 +282,18 @@ func (c *checker) commitment(o *Commitment) {
 		c.add("invalid", "intention", "%q is not an identifier", o.Intention)
 	}
 	switch {
-	case o.Origin.Import && o.Origin.Resolution != "":
-		c.add("invalid", "origin", "origin is either import or a resolution, not both")
-	case !o.Origin.Import && o.Origin.Resolution == "":
-		c.add("missing", "origin", "origin is required: import or {resolution: res_…}")
-	case o.Origin.Resolution != "" && !ValidID(o.Origin.Resolution):
-		c.add("invalid", "origin.resolution", "%q is not an identifier", o.Origin.Resolution)
+	case o.Origin == "":
+		c.add("missing", "origin", "origin is required: resolution or import")
+	case o.Origin != OriginResolution && o.Origin != OriginImport:
+		c.add("invalid", "origin", "origin must be resolution or import, not %q", o.Origin)
+	case o.Origin == OriginImport && o.Resolution != "":
+		c.add("invalid", "resolution", "resolution is admitted only when origin is resolution")
+	case o.Origin == OriginResolution && o.Resolution == "":
+		c.add("missing", "resolution", "origin is resolution but no resolution names the record")
+	case o.Resolution != "" && !ValidID(o.Resolution):
+		c.add("invalid", "resolution", "%q is not an identifier", o.Resolution)
 	}
-	if o.IsTransparent() && !o.Origin.Import {
+	if o.IsTransparent() && o.Origin != OriginImport {
 		c.add("transparent_origin", "transparent", "a commitment born of a resolution consumed supply to exist and cannot be transparent")
 	}
 	if o.External != nil {

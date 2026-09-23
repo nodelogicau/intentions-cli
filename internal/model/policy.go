@@ -169,10 +169,10 @@ func CheckAvailabilityTerms(old, edited *Availability) error {
 	if err := changed("window", oldW, newW); err != nil {
 		return err
 	}
-	if err := changed("duration", durationString(old.Duration), durationString(edited.Duration)); err != nil {
+	if err := changed("capacity", durationString(old.Capacity), durationString(edited.Capacity)); err != nil {
 		return err
 	}
-	if err := changed("conditional", strings.Join(SortStrings(old.Conditional), ","), strings.Join(SortStrings(edited.Conditional), ",")); err != nil {
+	if err := changed("activities", strings.Join(SortStrings(old.Activities), ","), strings.Join(SortStrings(edited.Activities), ",")); err != nil {
 		return err
 	}
 	return changed("location", strings.Join(SortStrings(old.Location), ","), strings.Join(SortStrings(edited.Location), ","))

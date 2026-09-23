@@ -29,6 +29,7 @@ type fixture struct {
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	cfg := store.NewConfig()
+	cfg.Format = model.Format01 // the suite exercises the 0.1 rules; 0.2 has its own tests
 	cfg.Resolver.Timezone = "Australia/Melbourne"
 	cfg.Defaults.Subject = ada
 	cfg.Defaults.Source.Author = ada
@@ -106,7 +107,7 @@ func intention(title string, d, cal, clock string) *model.Intention {
 }
 
 func availability(subject, d, cal, clock, cadence string) *model.Availability {
-	o := &model.Availability{ID: model.MintID(model.TypeAvailability), Subject: subject, Duration: dur(d), Window: win(cal, clock), Scope: "personal",
+	o := &model.Availability{ID: model.MintID(model.TypeAvailability), Subject: subject, Capacity: dur(d), Window: win(cal, clock), Scope: "personal",
 		Source: model.Source{Author: ada}, Timestamp: now}
 	if cadence != "" {
 		o.Cadence = cad(cadence)
@@ -351,7 +352,7 @@ func TestResolveEligibility(t *testing.T) {
 	}
 	// Conditional.
 	deep := availability(ada, "PT3H", "2026-W38", "09:00/12:00", "")
-	deep.Conditional = []string{"deep-work"}
+	deep.Activities = []string{"deep-work"}
 	f.write(deep)
 	meeting := intention("Meeting", "PT1H", "2026-W38", "")
 	meeting.Activity = "meeting"
@@ -501,7 +502,7 @@ func TestRankingAndPreference(t *testing.T) {
 	// Transparent overlap is free.
 	tr := true
 	cmt := &model.Commitment{ID: model.MintID(model.TypeCommitment), Parties: []model.Party{{URI: ada, Status: "accepted"}}, Placement: placement("2026-09-15T15:30:00+10:00", "PT1H"),
-		Origin: model.Origin{Import: true}, Transparent: &tr, Source: model.Source{Author: ada}, Timestamp: now, Acknowledgements: []model.Acknowledgement{}}
+		Origin: model.OriginImport, Transparent: &tr, Source: model.Source{Author: ada}, Timestamp: now, Acknowledgements: []model.Acknowledgement{}}
 	f.write(cmt)
 	res, _ = Resolve(f.env(), x, Options{})
 	for _, c := range res.All() {
@@ -538,7 +539,7 @@ func TestSelect(t *testing.T) {
 	if sel.Intention.Placement == nil || sel.Intention.Placement.Location != off {
 		t.Errorf("placement/location: %+v", sel.Intention.Placement)
 	}
-	if sel.Commitment == nil || len(sel.Commitment.Parties) != 2 || sel.Commitment.Parties[0].Status != "tentative" || sel.Commitment.Origin.Resolution != rec.ID || sel.Commitment.Intention != in.ID || sel.Commitment.Transparent != nil {
+	if sel.Commitment == nil || len(sel.Commitment.Parties) != 2 || sel.Commitment.Parties[0].Status != "tentative" || sel.Commitment.Resolution != rec.ID || sel.Commitment.Intention != in.ID || sel.Commitment.Transparent != nil {
 		t.Errorf("commitment: %+v", sel.Commitment)
 	}
 	// The first candidate is the earliest rank-1: 10:00, after the tentative one; nothing displaced.

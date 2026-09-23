@@ -38,6 +38,8 @@ func TestGoldenRoundTrip(t *testing.T) {
 		if len(probs) > 0 {
 			t.Fatalf("%s: problems %v", name, probs)
 		}
+		// The spec's example files are intentions/0.1.
+		obj.SetFormat(Format01)
 		if ps := Check(obj); len(ps) > 0 {
 			t.Errorf("%s: check %v", name, ps)
 		}
@@ -50,6 +52,7 @@ func TestGoldenRoundTrip(t *testing.T) {
 		}
 		// Second pass is byte-identical too.
 		obj2, _, _ := Decode(out, typ)
+		obj2.SetFormat(Format01)
 		out2, _ := Encode(obj2)
 		if !bytes.Equal(out, out2) {
 			t.Errorf("%s: second pass differs", name)
@@ -194,11 +197,11 @@ func TestCheckRules(t *testing.T) {
 	// Commitment: transparent on a resolution-born commitment.
 	tr := true
 	c := &Commitment{ID: "cmt_a", Parties: []Party{{URI: "https://x/", Status: "accepted"}}, Placement: &temporal.Placement{Start: s, Duration: temporal.DurationSpec{Nominal: temporal.Duration{Days: 1}}},
-		Origin: Origin{Resolution: "res_a"}, Transparent: &tr, Timestamp: time.Now(), Acknowledgements: []Acknowledgement{}}
+		Origin: OriginResolution, Resolution: "res_a", Transparent: &tr, Timestamp: time.Now(), Acknowledgements: []Acknowledgement{}}
 	if got := fieldOf(Check(c)); got != "transparent:transparent_origin" {
 		t.Errorf("transparent: %s", got)
 	}
-	c.Origin = Origin{Import: true}
+	c.Origin, c.Resolution = OriginImport, ""
 	if ps := Check(c); len(ps) > 0 {
 		t.Errorf("import transparent: %v", ps)
 	}
@@ -353,14 +356,14 @@ func TestFirmPolicy(t *testing.T) {
 func TestAvailabilityTerms(t *testing.T) {
 	d := temporal.DurationSpec{Nominal: temporal.Duration{Hours: 3}}
 	c, _ := temporal.ParseCalendar("2026-09")
-	old := &Availability{ID: "avl_a", Duration: &d, Window: &temporal.Window{Calendar: &c}, Conditional: []string{"deep-work"}, Scope: "personal"}
+	old := &Availability{ID: "avl_a", Capacity: &d, Window: &temporal.Window{Calendar: &c}, Activities: []string{"deep-work"}, Scope: "personal"}
 	edited := *old
 	edited.Title = "renamed"
 	if err := CheckAvailabilityTerms(old, &edited); err != nil {
 		t.Errorf("prose: %v", err)
 	}
 	edited = *old
-	edited.Conditional = []string{"writing"}
+	edited.Activities = []string{"writing"}
 	if err := CheckAvailabilityTerms(old, &edited); err == nil || !strings.Contains(err.Error(), "supersede") {
 		t.Errorf("conditional: %v", err)
 	}

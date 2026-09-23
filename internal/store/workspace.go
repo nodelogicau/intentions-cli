@@ -167,7 +167,7 @@ func Init(dir string, cfg Config) (*Workspace, []string, error) {
 		created = append(created, t.Dir()+"/")
 	}
 	ws := &Workspace{Root: abs, Config: cfg}
-	if err := ws.WriteIndex(&Index{Format: model.Format}); err != nil {
+	if err := ws.WriteIndex(&Index{Format: cfg.Format}); err != nil {
 		return nil, nil, err
 	}
 	created = append(created, IndexFile)
@@ -247,12 +247,16 @@ func (w *Workspace) ReadObject(id string) (model.Object, model.Problems, error) 
 	if err != nil {
 		return nil, nil, apperr.Runtime(fmt.Errorf("%s: %v", RelPath(t, id), err))
 	}
+	obj.SetFormat(w.Config.Format)
 	return obj, probs, nil
 }
 
 // WriteObject stamps the object's version, serialises it, writes the file
 // atomically, and upserts the index entry.
 func (w *Workspace) WriteObject(obj model.Object) error {
+	// An object is written in its workspace's format, whatever it was built
+	// as: a new object in a 0.1 workspace is a 0.1 object.
+	obj.SetFormat(w.Config.Format)
 	if _, err := projection.Stamp(obj); err != nil {
 		return err
 	}
@@ -269,8 +273,9 @@ func (w *Workspace) WriteObject(obj model.Object) error {
 	}
 	idx, err := w.ReadIndex()
 	if err != nil {
-		idx = &Index{Format: model.Format}
+		idx = &Index{Format: w.Config.Format}
 	}
+	idx.Format = w.Config.Format
 	idx.Upsert(EntryFor(obj))
 	return w.WriteIndex(idx)
 }
@@ -323,6 +328,7 @@ type Loaded struct {
 
 // Graph is the whole workspace in memory.
 type Graph struct {
+	Format     string // the workspace's format version every object was read under
 	Objects    map[string]model.Object
 	Loaded     map[string]*Loaded
 	Order      []string // ids sorted
@@ -446,7 +452,7 @@ func (g *Graph) index() {
 // whose id disagrees with their name are loaded under the file's id so that
 // validation can report the mismatch.
 func (w *Workspace) Load() (*Graph, error) {
-	g := &Graph{Objects: map[string]model.Object{}, Loaded: map[string]*Loaded{}}
+	g := &Graph{Format: w.Config.Format, Objects: map[string]model.Object{}, Loaded: map[string]*Loaded{}}
 	for _, t := range model.Types {
 		dir := filepath.Join(w.Root, t.Dir())
 		entries, err := os.ReadDir(dir)
@@ -473,6 +479,7 @@ func (w *Workspace) Load() (*Graph, error) {
 				g.Unreadable = append(g.Unreadable, FileProblem{Path: rel, ID: fileID, Err: err.Error()})
 				continue
 			}
+			obj.SetFormat(w.Config.Format)
 			key := fileID
 			if _, dup := g.Objects[key]; dup {
 				g.Unreadable = append(g.Unreadable, FileProblem{Path: rel, ID: fileID, Err: "duplicate id across directories"})

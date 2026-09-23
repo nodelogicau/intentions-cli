@@ -18,8 +18,8 @@ import (
 
 type availabilityFields struct {
 	subject, title, description, descriptionFile string
-	duration, cadence, validUntil, scope         string
-	conditional, location                        []string
+	capacity, cadence, validUntil, scope         string
+	activities, location                         []string
 	window                                       windowFlags
 }
 
@@ -28,8 +28,13 @@ func addAvailabilityFieldFlags(cmd *cobra.Command, f *availabilityFields) {
 	cmd.Flags().StringVar(&f.title, "title", "", "prose title")
 	cmd.Flags().StringVar(&f.description, "description", "", "prose description")
 	cmd.Flags().StringVar(&f.descriptionFile, "description-file", "", "read the description from a file, or - for piped stdin")
-	cmd.Flags().StringVar(&f.duration, "duration", "", "capacity offered per occasion: ISO 8601 duration or nominal:min:max (required)")
-	cmd.Flags().StringArrayVar(&f.conditional, "conditional", nil, "activity term this supply is good for (repeatable; absent means anything)")
+	cmd.Flags().StringVar(&f.capacity, "capacity", "", "capacity offered per occasion: ISO 8601 duration or nominal:min:max (required)")
+	cmd.Flags().StringArrayVar(&f.activities, "activities", nil, "activity term this supply is good for (repeatable; absent means anything)")
+	// The 0.1 spellings stay as hidden aliases; the file names are what changed.
+	cmd.Flags().StringVar(&f.capacity, "duration", "", "alias of --capacity")
+	cmd.Flags().StringArrayVar(&f.activities, "conditional", nil, "alias of --activities")
+	_ = cmd.Flags().MarkHidden("duration")
+	_ = cmd.Flags().MarkHidden("conditional")
 	cmd.Flags().StringArrayVar(&f.location, "location", nil, "URI at which this capacity holds (repeatable; absent means anywhere)")
 	cmd.Flags().StringVar(&f.cadence, "cadence", "", "RRULE with date-level parts only; makes this recurring")
 	cmd.Flags().StringVar(&f.validUntil, "valid-until", "", "validity horizon: an EDTF expression or RFC 3339 datetime")
@@ -62,12 +67,12 @@ func (a *app) applyAvailabilityFields(cmd *cobra.Command, f availabilityFields, 
 		}
 		o.Description = d
 	}
-	if changed("duration") {
-		d, err := parseDurationFlag(f.duration)
+	if changed("capacity") || changed("duration") {
+		d, err := parseDurationFlag(f.capacity)
 		if err != nil {
 			return err
 		}
-		o.Duration = d
+		o.Capacity = d
 	}
 	w, err := applyWindow(cmd, f.window, o.Window, ctx, g)
 	if err != nil {
@@ -76,8 +81,8 @@ func (a *app) applyAvailabilityFields(cmd *cobra.Command, f availabilityFields, 
 	if w != nil || changed("calendar") || changed("clock") || changed("relative") {
 		o.Window = w
 	}
-	if changed("conditional") {
-		o.Conditional = model.SortStrings(f.conditional)
+	if changed("activities") || changed("conditional") {
+		o.Activities = model.SortStrings(f.activities)
 	}
 	if changed("location") {
 		if err := checkURIs("location", f.location); err != nil {
@@ -168,8 +173,8 @@ func (a *app) availabilityAddCmd() *cobra.Command {
 			if f.subject == "" {
 				return usageErr("--subject is required: availability names its particular explicitly")
 			}
-			if f.duration == "" {
-				return usageErr("--duration is required: the capacity offered per occasion")
+			if f.capacity == "" {
+				return usageErr("--capacity is required: the capacity offered per occasion")
 			}
 			if f.window.calendar == "" && f.window.clock == "" && f.window.relative == "" {
 				return usageErr("a window is required: pass at least one of --calendar, --clock, --relative")
@@ -283,14 +288,15 @@ func (a *app) availabilityEditCmd() *cobra.Command {
 	cmd.Flags().StringVar(&scope, "scope", "", "widen to organisation or public; narrowing is refused")
 	// Terms flags are accepted so the refusal can name supersede rather than
 	// cobra reporting an unknown flag.
-	for _, name := range []string{"calendar", "clock", "relative", "duration", "cadence", "valid-until"} {
+	for _, name := range []string{"calendar", "clock", "relative", "capacity", "duration", "cadence", "valid-until"} {
 		cmd.Flags().String(name, "", "not admitted on edit: a change of terms is a supersession")
 	}
+	cmd.Flags().StringArray("activities", nil, "not admitted on edit: a change of terms is a supersession")
 	cmd.Flags().StringArray("conditional", nil, "not admitted on edit: a change of terms is a supersession")
 	cmd.Flags().StringArray("location", nil, "not admitted on edit: a change of terms is a supersession")
 	pre := cmd.RunE
 	cmd.RunE = func(c *cobra.Command, args []string) error {
-		for _, name := range []string{"calendar", "clock", "relative", "duration", "cadence", "conditional", "location"} {
+		for _, name := range []string{"calendar", "clock", "relative", "capacity", "duration", "cadence", "activities", "conditional", "location"} {
 			if c.Flags().Changed(name) {
 				return refusedErr("--%s changes the availability's terms and is not admitted on edit; use `intentions availability supersede %s --%s ...` to create a new availability and retire this one as superseded", name, args[0], name)
 			}
@@ -409,7 +415,7 @@ func (a *app) availabilitySupersedeCmd() *cobra.Command {
 			n.Retired = nil
 			n.Version = ""
 			n.Extras = nil
-			n.Conditional = append([]string(nil), old.Conditional...)
+			n.Activities = append([]string(nil), old.Activities...)
 			n.Location = append([]string(nil), old.Location...)
 			if old.Window != nil {
 				w := *old.Window
@@ -559,7 +565,7 @@ func (a *app) availabilityShowCmd() *cobra.Command {
 }
 
 func (a *app) availabilityListCmd() *cobra.Command {
-	var subject, conditional, scope string
+	var subject, activities, scope string
 	var retired bool
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -585,10 +591,10 @@ func (a *app) availabilityListCmd() *cobra.Command {
 				if scope != "" && o.Scope != scope {
 					continue
 				}
-				if conditional != "" {
+				if activities != "" {
 					found := false
-					for _, c := range o.Conditional {
-						if c == conditional {
+					for _, c := range o.Activities {
+						if c == activities {
 							found = true
 						}
 					}
@@ -615,7 +621,7 @@ func (a *app) availabilityListCmd() *cobra.Command {
 					if o.Retired != nil {
 						flags += " retired:" + o.Retired.Kind
 					}
-					fmt.Fprintf(w, "%s  %-6s %-30s %s%s\n", o.ID, durationText(o.Duration), oneLine(windowText(o.Window), 30), oneLine(firstNonEmpty(o.Title, o.Subject), 50), flags)
+					fmt.Fprintf(w, "%s  %-6s %-30s %s%s\n", o.ID, durationText(o.Capacity), oneLine(windowText(o.Window), 30), oneLine(firstNonEmpty(o.Title, o.Subject), 50), flags)
 				}
 				if len(items) == 0 {
 					fmt.Fprintln(w, "(no availability)")
@@ -624,7 +630,9 @@ func (a *app) availabilityListCmd() *cobra.Command {
 		}),
 	}
 	cmd.Flags().StringVar(&subject, "subject", "", "filter by subject URI")
-	cmd.Flags().StringVar(&conditional, "conditional", "", "filter by a conditional term")
+	cmd.Flags().StringVar(&activities, "activities", "", "filter by an activities term")
+	cmd.Flags().StringVar(&activities, "conditional", "", "alias of --activities")
+	_ = cmd.Flags().MarkHidden("conditional")
 	cmd.Flags().StringVar(&scope, "scope", "", "filter by scope")
 	cmd.Flags().BoolVar(&retired, "retired", false, "list retired availability instead of active")
 	return cmd

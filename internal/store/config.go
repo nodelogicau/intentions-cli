@@ -96,8 +96,8 @@ func ParseConfig(data []byte) (Config, error) {
 
 // Validate checks the configuration this implementation depends on.
 func (c Config) Validate() error {
-	if c.Format != model.Format {
-		return fmt.Errorf("%s: format %q is not supported; this implementation reads %s", ConfigFile, c.Format, model.Format)
+	if !model.KnownFormat(c.Format) {
+		return fmt.Errorf("%s: format %q is not one this implementation reads (%s); a newer binary wrote this workspace, or the key is wrong", ConfigFile, c.Format, strings.Join(model.KnownFormats, ", "))
 	}
 	if c.Hash != "sha256" {
 		return fmt.Errorf("%s: hash %q is not admitted; this format version admits only sha256", ConfigFile, c.Hash)

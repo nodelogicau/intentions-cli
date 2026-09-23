@@ -57,8 +57,8 @@ func (e Env) Eligible(av *model.Availability, in *model.Intention) (bool, string
 	if e.Expired(av) {
 		return false, "expired at " + fmtTime(e.EffectiveValidUntil(av))
 	}
-	if !ConditionalAdmits(av, in.Activity) {
-		return false, fmt.Sprintf("conditional %v does not include activity %q", av.Conditional, in.Activity)
+	if !ActivitiesAdmit(av, in.Activity) {
+		return false, fmt.Sprintf("activities %v do not include activity %q", av.Activities, in.Activity)
 	}
 	if !LocationsIntersect(av.Location, in.Location) {
 		return false, fmt.Sprintf("location %v shares nothing with the intention's %v", av.Location, in.Location)
@@ -88,13 +88,13 @@ func involves(parties []string, uri string) bool {
 	return false
 }
 
-// ConditionalAdmits reports whether an availability's conditional admits the
+// ActivitiesAdmit reports whether an availability's activities admit the
 // activity: absent means anything.
-func ConditionalAdmits(av *model.Availability, activity string) bool {
-	if len(av.Conditional) == 0 {
+func ActivitiesAdmit(av *model.Availability, activity string) bool {
+	if len(av.Activities) == 0 {
 		return true
 	}
-	for _, t := range av.Conditional {
+	for _, t := range av.Activities {
 		if t == activity {
 			return true
 		}
@@ -120,16 +120,16 @@ func LocationsIntersect(avail, intent []string) bool {
 
 // OccasionsOf returns the availability's occasions within r.
 func (e Env) OccasionsOf(av *model.Availability, r temporal.Interval) ([]Occasion, error) {
-	if av.Window == nil || av.Duration == nil {
+	if av.Window == nil || av.Capacity == nil {
 		return nil, nil
 	}
 	ivs, err := temporal.Occasions(*av.Window, av.Cadence, e.Ctx, r)
 	if err != nil {
 		return nil, err
 	}
-	capD := av.Duration.Nominal
-	if av.Duration.Max != nil {
-		capD = *av.Duration.Max
+	capD := av.Capacity.Nominal
+	if av.Capacity.Max != nil {
+		capD = *av.Capacity.Max
 	}
 	out := make([]Occasion, 0, len(ivs))
 	for _, iv := range ivs {

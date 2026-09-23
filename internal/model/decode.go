@@ -643,12 +643,12 @@ func (d *decoder) availability(root *yaml.Node) *Availability {
 			o.Title = d.str(k, v)
 		case "description":
 			o.Description = d.str(k, v)
-		case "duration":
-			o.Duration = d.durationSpec(k, v)
+		case "capacity", "duration":
+			o.Capacity = d.durationSpec(k, v)
 		case "window":
 			o.Window = d.window(k, v)
-		case "conditional":
-			o.Conditional = d.strList(k, v)
+		case "activities", "conditional":
+			o.Activities = d.strList(k, v)
 		case "location":
 			o.Location = d.strList(k, v)
 		case "cadence":
@@ -694,25 +694,33 @@ func (d *decoder) commitment(root *yaml.Node) *Commitment {
 		case "intention":
 			o.Intention = d.str(k, v)
 		case "origin":
+			// 0.2 writes a plain value with a sibling resolution field; 0.1
+			// wrote import or {resolution: res_…}. Both are read anywhere.
 			switch v.Kind {
 			case yaml.ScalarNode:
-				if d.str(k, v) == "import" {
-					o.Origin.Import = true
-				} else {
-					d.problem("invalid", k, "must be import or {resolution: res_…}")
+				switch d.str(k, v) {
+				case OriginImport:
+					o.Origin = OriginImport
+				case OriginResolution:
+					o.Origin = OriginResolution
+				default:
+					d.problem("invalid", k, "must be resolution or import")
 				}
 			case yaml.MappingNode:
+				o.Origin = OriginResolution
 				pairs(v, func(ok string, ov *yaml.Node) bool {
 					if ok == "resolution" {
-						o.Origin.Resolution = d.str(k+".resolution", ov)
+						o.Resolution = d.str(k+".resolution", ov)
 					} else {
 						d.problem("invalid", k+"."+ok, "unknown origin field")
 					}
 					return true
 				})
 			default:
-				d.problem("invalid", k, "must be import or {resolution: res_…}")
+				d.problem("invalid", k, "must be resolution or import")
 			}
+		case "resolution":
+			o.Resolution = d.str(k, v)
 		case "transparent":
 			o.Transparent = d.boolean(k, v)
 		case "external":

@@ -311,9 +311,15 @@ func availabilityNode(o *Availability) *yaml.Node {
 	addStrAlways(m, "subject", o.Subject)
 	addStr(m, "title", o.Title)
 	addStr(m, "description", o.Description)
-	addKV(m, "duration", durationSpecNode(o.Duration))
-	addKV(m, "window", windowNode(o.Window))
-	addStrList(m, "conditional", o.Conditional, false)
+	if o.Format() == Format01 {
+		addKV(m, "duration", durationSpecNode(o.Capacity))
+		addKV(m, "window", windowNode(o.Window))
+		addStrList(m, "conditional", o.Activities, false)
+	} else {
+		addKV(m, "capacity", durationSpecNode(o.Capacity))
+		addKV(m, "window", windowNode(o.Window))
+		addStrList(m, "activities", o.Activities, false)
+	}
 	addStrList(m, "location", o.Location, false)
 	addKV(m, "cadence", cadenceNode(o.Cadence))
 	addStr(m, "valid_until", o.ValidUntil.String())
@@ -331,12 +337,16 @@ func commitmentNode(o *Commitment) *yaml.Node {
 	addKV(m, "parties", partiesNode(o.Parties))
 	addKV(m, "placement", placementNode(o.Placement))
 	addStr(m, "intention", o.Intention)
-	if o.Origin.Import {
-		addKV(m, "origin", scalar("import"))
-	} else {
+	switch {
+	case o.Format() == Format01 && o.Origin == OriginResolution:
 		om := mapping()
-		addStrAlways(om, "resolution", o.Origin.Resolution)
+		addStrAlways(om, "resolution", o.Resolution)
 		addKV(m, "origin", om)
+	case o.Format() == Format01:
+		addKV(m, "origin", scalar(OriginImport))
+	default:
+		addStrAlways(m, "origin", o.Origin)
+		addStr(m, "resolution", o.Resolution)
 	}
 	// A boolean equal to its documented default is omitted; absent means false.
 	if o.Transparent != nil && *o.Transparent {

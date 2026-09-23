@@ -28,9 +28,14 @@ type harness struct {
 	cs *sdk.ClientSession
 }
 
+// harnessFormat is the workspace format newHarness creates; tests that need
+// 0.2 set it around their call.
+var harnessFormat = model.Format01
+
 func newHarness(t *testing.T, clientName string, opts Options) *harness {
 	t.Helper()
 	cfg := store.NewConfig()
+	cfg.Format = harnessFormat
 	cfg.Defaults.Source.Author = ada
 	cfg.Defaults.Subject = ada
 	cfg.Resolver.Timezone = "Australia/Melbourne"

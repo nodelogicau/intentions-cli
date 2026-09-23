@@ -14,6 +14,7 @@ import (
 // version, subject, title, description, activity, location, serves,
 // reference, source, timestamp, retired.
 type Desire struct {
+	format      string
 	ID          string
 	Subject     string
 	Title       string
@@ -44,6 +45,8 @@ func (o *Desire) GetSource() Source     { return o.Source }
 func (o *Desire) GetRetired() *Retired  { return o.Retired }
 func (o *Desire) SubjectURI() string    { return o.Subject }
 func (o *Desire) CachedVersion() string { return o.Version }
+func (o *Desire) Format() string        { return formatOf(o.format) }
+func (o *Desire) SetFormat(f string)    { o.format = f }
 func (o *Desire) SetVersion(v string)   { o.Version = v }
 func (o *Desire) Refs() []string {
 	var ids []string

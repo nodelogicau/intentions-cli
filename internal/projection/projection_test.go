@@ -24,7 +24,35 @@ func load(t *testing.T, name string, typ model.Type) model.Object {
 	if err != nil || len(probs) > 0 {
 		t.Fatalf("%s: %v %v", name, err, probs)
 	}
+	// The spec's example files are intentions/0.1; the vectors are recorded under it.
+	obj.SetFormat(model.Format01)
 	return obj
+}
+
+// The same objects project under intentions/0.2 with the renamed keys and
+// the plain origin, and hash differently.
+func TestProjectionUnder02(t *testing.T) {
+	av := load(t, "availability.yaml", model.TypeAvailability)
+	v1, _ := Version(av)
+	av.SetFormat(model.Format02)
+	p := Project(av)
+	if _, ok := p["capacity"]; !ok || p["duration"] != nil || p["conditional"] != nil {
+		t.Errorf("availability under 0.2: %v", p)
+	}
+	if v2, _ := Version(av); v2 == v1 {
+		t.Error("availability version did not move between formats")
+	}
+	cm := load(t, "commitment.yaml", model.TypeCommitment)
+	cm.SetFormat(model.Format02)
+	p = Project(cm)
+	if p["origin"] != model.OriginResolution || p["resolution"] == nil {
+		t.Errorf("commitment under 0.2: %v", p)
+	}
+	for f, want := range map[string]int{model.Format01: 8, model.Format02: 8} {
+		if got := len(Fields[f][model.TypeAvailability]); got != want {
+			t.Errorf("%s availability fields: %d", f, got)
+		}
+	}
 }
 
 // TestGoldenVectors pins the canonical JSON and version of the spec's example
@@ -138,7 +166,7 @@ func TestProjectionScenarios(t *testing.T) {
 	f, tr := false, true
 	s, _ := temporal.ParsePlacementStart("2026-09-15T10:00:00+10:00")
 	pl := &temporal.Placement{Start: s, Duration: d}
-	c1 := &model.Commitment{ID: "cmt_a", Parties: []model.Party{{URI: "https://x/", Status: "accepted"}}, Placement: pl, Origin: model.Origin{Import: true}}
+	c1 := &model.Commitment{ID: "cmt_a", Parties: []model.Party{{URI: "https://x/", Status: "accepted"}}, Placement: pl, Origin: model.OriginImport}
 	c2 := *c1
 	c2.Transparent = &f
 	if MustVersion(c1) != MustVersion(&c2) {

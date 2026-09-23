@@ -66,7 +66,7 @@ func (ix *Index) sort() {
 
 // Rebuild derives the whole index from a loaded graph.
 func Rebuild(g *Graph) *Index {
-	ix := &Index{Format: model.Format, Entries: []Entry{}}
+	ix := &Index{Format: g.Format, Entries: []Entry{}}
 	// An object with value-level problems still gets an entry so the index
 	// stays complete; its version reflects what parsed.
 	for _, id := range g.Order {

@@ -235,8 +235,8 @@ func grounds(e resolve.Env, p resolve.Placed) ([]Flag, error) {
 				verdicts = append(verdicts, verdict{av, ExpiredGround, "retired (" + av.Retired.Kind + ")"})
 			case e.Expired(av):
 				verdicts = append(verdicts, verdict{av, ExpiredGround, "expired at " + fmtT(e.EffectiveValidUntil(av))})
-			case !resolve.ConditionalAdmits(av, activity):
-				verdicts = append(verdicts, verdict{av, ConditionMismatch, fmt.Sprintf("conditional %v does not include activity %q", av.Conditional, activity)})
+			case !resolve.ActivitiesAdmit(av, activity):
+				verdicts = append(verdicts, verdict{av, ConditionMismatch, fmt.Sprintf("activities %v do not include activity %q", av.Activities, activity)})
 			case len(av.Location) > 0 && p.Location != "" && !contains(av.Location, p.Location):
 				verdicts = append(verdicts, verdict{av, LocationMismatch, fmt.Sprintf("placement location %s is outside the availability's %v", p.Location, av.Location)})
 			default:

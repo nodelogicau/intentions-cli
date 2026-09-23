@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/nodelogicau/intentions-cli/internal/model"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,6 +74,22 @@ func initWS(t *testing.T, extra ...string) string {
 	if r.code != 0 {
 		t.Fatalf("init: %d %s %s", r.code, r.stdout, r.stderr)
 	}
+	// The suite exercises the 0.1 rules and shapes; the 0.2 tests use initWS02.
+	cfgPath := filepath.Join(dir, "intentions.yaml")
+	cfg, _ := os.ReadFile(cfgPath)
+	_ = os.WriteFile(cfgPath, []byte(strings.Replace(string(cfg), "format: "+model.Format02, "format: "+model.Format01, 1)), 0o644)
+	return dir
+}
+
+// initWS02 is initWS with the format init writes, intentions/0.2.
+func initWS02(t *testing.T, extra ...string) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "planning")
+	args := append([]string{"init", dir, "--author", ada, "--subject", ada, "--timezone", "Australia/Melbourne"}, extra...)
+	r := run(t, "", "", args...)
+	if r.code != 0 {
+		t.Fatalf("init: %d %s %s", r.code, r.stdout, r.stderr)
+	}
 	return dir
 }
 
@@ -110,7 +127,7 @@ func addIntention(t *testing.T, ws string, args ...string) result {
 func TestJSONContractAndExitCodes(t *testing.T) {
 	ws := initWS(t)
 	r := run(t, ws, "", "version")
-	if r.code != 0 || r.str("format") != "intentions/0.1" || r.stderr != "" {
+	if r.code != 0 || r.str("format") != "intentions/0.2" || r.stderr != "" {
 		t.Errorf("version: %+v", r)
 	}
 	// Failure in JSON mode: stdout empty, stderr one object.
@@ -183,9 +200,9 @@ func TestStdinAndAttribution(t *testing.T) {
 // --- workspace -------------------------------------------------------------
 
 func TestInitAndDiscovery(t *testing.T) {
-	ws := initWS(t)
+	ws := initWS02(t)
 	cfg := readFile(t, ws, "intentions.yaml")
-	for _, want := range []string{"format: intentions/0.1", "hash: sha256", "timezone: Australia/Melbourne", "default_horizon: P13W", "horizon: P4W", "subject: " + ada, "author: " + ada} {
+	for _, want := range []string{"format: intentions/0.2", "hash: sha256", "timezone: Australia/Melbourne", "default_horizon: P13W", "horizon: P4W", "subject: " + ada, "author: " + ada} {
 		if !strings.Contains(cfg, want) {
 			t.Errorf("config missing %q", want)
 		}
@@ -619,8 +636,8 @@ timestamp: 2026-09-04T09:20:00Z
 		t.Errorf("explicit horizon: %s", r.str("effective_valid_until"))
 	}
 	// Missing duration, missing window, malformed conditional, unknown subject accepted.
-	if r := run(t, ws, "", "availability", "add", "--subject", ada, "--calendar", "2026-W37"); r.code != 2 || !strings.Contains(errMsg(r), "duration") {
-		t.Errorf("missing duration: %d %s", r.code, errMsg(r))
+	if r := run(t, ws, "", "availability", "add", "--subject", ada, "--calendar", "2026-W37"); r.code != 2 || !strings.Contains(errMsg(r), "capacity") {
+		t.Errorf("missing capacity: %d %s", r.code, errMsg(r))
 	}
 	if r := run(t, ws, "", "availability", "add", "--subject", ada, "--duration", "PT1H"); r.code != 2 || !strings.Contains(errMsg(r), "window") {
 		t.Errorf("missing window: %d %s", r.code, errMsg(r))

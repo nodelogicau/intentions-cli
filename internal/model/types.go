@@ -12,8 +12,33 @@ import (
 	"github.com/nodelogicau/intentions-cli/internal/temporal"
 )
 
-// Format is the format version this implementation writes and reads.
-const Format = "intentions/0.1"
+// Format versions. Format is the one this implementation writes; it reads
+// every entry in KnownFormats, each object under the format of its workspace.
+const (
+	Format01 = "intentions/0.1"
+	Format02 = "intentions/0.2"
+	Format   = Format02
+)
+
+// KnownFormats lists the format versions this implementation reads, oldest first.
+var KnownFormats = []string{Format01, Format02}
+
+// KnownFormat reports whether f is a format version this implementation reads.
+func KnownFormat(f string) bool { return oneOf(f, KnownFormats) }
+
+// formatOf returns the object's format, the current one when unset.
+func formatOf(f string) string {
+	if f == "" {
+		return Format
+	}
+	return f
+}
+
+// Commitment origins.
+const (
+	OriginResolution = "resolution"
+	OriginImport     = "import"
+)
 
 // Type is an object or record type.
 type Type string
@@ -148,12 +173,6 @@ var Preferences = []string{"earliest", "latest", "adjacent", "spread"}
 // Scope values, in widening order.
 var Scopes = []string{"personal", "organisation", "public"}
 
-// Origin is a commitment's origin: a resolution id, or import.
-type Origin struct {
-	Resolution string
-	Import     bool
-}
-
 // External is the single link to an external calendar object.
 type External struct {
 	System string
@@ -175,6 +194,7 @@ type Extra struct {
 // preference, auto_select, auto_firm, reference, source, timestamp,
 // acknowledgements, retired.
 type Intention struct {
+	format           string
 	ID               string
 	Subject          string
 	Title            string
@@ -206,13 +226,14 @@ type Intention struct {
 // version, subject, title, description, duration, window, conditional, location,
 // cadence, valid_until, scope, source, timestamp, retired.
 type Availability struct {
+	format      string
 	ID          string
 	Subject     string
 	Title       string
 	Description string
-	Duration    *temporal.DurationSpec
+	Capacity    *temporal.DurationSpec // the capacity offered per occasion; spelled duration under intentions/0.1
 	Window      *temporal.Window
-	Conditional []string
+	Activities  []string // activity terms this supply is good for; spelled conditional under intentions/0.1
 	Location    []string
 	Cadence     *temporal.Cadence
 	ValidUntil  temporal.ValidUntil
@@ -228,11 +249,13 @@ type Availability struct {
 // placement, intention, origin, transparent, external, title, description,
 // source, timestamp, acknowledgements, retired.
 type Commitment struct {
+	format           string
 	ID               string
 	Parties          []Party
 	Placement        *temporal.Placement
 	Intention        string
-	Origin           Origin
+	Origin           string // OriginResolution or OriginImport
+	Resolution       string // the RESOLUTION record's id, present iff Origin is OriginResolution
 	Transparent      *bool
 	External         *External
 	Title            string
@@ -248,6 +271,7 @@ type Commitment struct {
 // Resolution is the record of a selection. Canonical order: id, version, intention,
 // placement, selector, candidates_considered, displaced, source, timestamp.
 type Resolution struct {
+	format               string
 	ID                   string
 	Intention            string
 	Placement            *temporal.Placement
@@ -278,6 +302,10 @@ type Object interface {
 	Refs() []string
 	// SubjectURI is the subject, or empty for types that have none.
 	SubjectURI() string
+	// Format is the format version the object was read under or will be
+	// written under; SetFormat changes it, which is what migration does.
+	Format() string
+	SetFormat(f string)
 	// CachedVersion is the version field as read from the file.
 	CachedVersion() string
 	SetVersion(v string)
@@ -289,6 +317,8 @@ func (o *Intention) GetSource() Source     { return o.Source }
 func (o *Intention) GetRetired() *Retired  { return o.Retired }
 func (o *Intention) SubjectURI() string    { return o.Subject }
 func (o *Intention) CachedVersion() string { return o.Version }
+func (o *Intention) Format() string        { return formatOf(o.format) }
+func (o *Intention) SetFormat(f string)    { o.format = f }
 func (o *Intention) SetVersion(v string)   { o.Version = v }
 func (o *Intention) Refs() []string {
 	var ids []string
@@ -338,6 +368,8 @@ func (o *Availability) GetSource() Source     { return o.Source }
 func (o *Availability) GetRetired() *Retired  { return o.Retired }
 func (o *Availability) SubjectURI() string    { return o.Subject }
 func (o *Availability) CachedVersion() string { return o.Version }
+func (o *Availability) Format() string        { return formatOf(o.format) }
+func (o *Availability) SetFormat(f string)    { o.format = f }
 func (o *Availability) SetVersion(v string)   { o.Version = v }
 func (o *Availability) Refs() []string {
 	var ids []string
@@ -356,14 +388,16 @@ func (o *Commitment) GetSource() Source     { return o.Source }
 func (o *Commitment) GetRetired() *Retired  { return o.Retired }
 func (o *Commitment) SubjectURI() string    { return "" }
 func (o *Commitment) CachedVersion() string { return o.Version }
+func (o *Commitment) Format() string        { return formatOf(o.format) }
+func (o *Commitment) SetFormat(f string)    { o.format = f }
 func (o *Commitment) SetVersion(v string)   { o.Version = v }
 func (o *Commitment) Refs() []string {
 	var ids []string
 	if o.Intention != "" {
 		ids = append(ids, o.Intention)
 	}
-	if o.Origin.Resolution != "" {
-		ids = append(ids, o.Origin.Resolution)
+	if o.Resolution != "" {
+		ids = append(ids, o.Resolution)
 	}
 	if o.Retired != nil && o.Retired.SupersededBy != "" {
 		ids = append(ids, o.Retired.SupersededBy)
@@ -380,6 +414,8 @@ func (o *Resolution) GetSource() Source     { return o.Source }
 func (o *Resolution) GetRetired() *Retired  { return nil }
 func (o *Resolution) SubjectURI() string    { return "" }
 func (o *Resolution) CachedVersion() string { return o.Version }
+func (o *Resolution) Format() string        { return formatOf(o.format) }
+func (o *Resolution) SetFormat(f string)    { o.format = f }
 func (o *Resolution) SetVersion(v string)   { o.Version = v }
 func (o *Resolution) Refs() []string {
 	ids := []string{}

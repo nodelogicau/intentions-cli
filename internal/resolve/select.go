@@ -133,7 +133,7 @@ func Select(e Env, in *model.Intention, opts SelectOptions) (Selection, Result, 
 		}
 		cmt := &model.Commitment{
 			ID: model.MintID(model.TypeCommitment), Parties: model.SortParties(parties), Placement: placement, Intention: in.ID,
-			Origin: model.Origin{Resolution: rec.ID}, Title: in.Title, Source: opts.Source, Timestamp: opts.Timestamp, Acknowledgements: []model.Acknowledgement{},
+			Origin: model.OriginResolution, Resolution: rec.ID, Title: in.Title, Source: opts.Source, Timestamp: opts.Timestamp, Acknowledgements: []model.Acknowledgement{},
 		}
 		if err := e.WS.WriteObject(cmt); err != nil {
 			return sel, res, err

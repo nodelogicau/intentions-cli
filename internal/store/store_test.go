@@ -14,6 +14,7 @@ import (
 
 func testConfig() Config {
 	c := NewConfig()
+	c.Format = model.Format01
 	c.Resolver.Timezone = "Australia/Melbourne"
 	c.Defaults.Subject = "https://example.com/people/ada"
 	c.Defaults.Source.Author = "https://example.com/people/ada"

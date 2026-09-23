@@ -294,7 +294,7 @@ func checkWrite(g *store.Graph, before, o *model.Intention, act model.Source, po
 	if o.Stability != "firm" {
 		o.FirmedUnder = ""
 	}
-	return nil
+	return query.RefuseUnserved(g, o)
 }
 
 func (s *Server) flagsOn(e resolve.Env, id string) []consistency.Flag {

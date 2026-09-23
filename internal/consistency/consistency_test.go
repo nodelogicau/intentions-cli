@@ -18,6 +18,7 @@ var now = time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC)
 func newWS(t *testing.T) *store.Workspace {
 	t.Helper()
 	cfg := store.NewConfig()
+	cfg.Format = model.Format01
 	cfg.Resolver.Timezone = "Australia/Melbourne"
 	cfg.Defaults.Subject = ada
 	cfg.Defaults.Source.Author = ada
@@ -82,13 +83,13 @@ func intention(title, d, cal string, at string) *model.Intention {
 }
 
 func availability(d, cal, clock string) *model.Availability {
-	return &model.Availability{ID: model.MintID(model.TypeAvailability), Subject: ada, Duration: dur(d), Window: win(cal, clock), Scope: "personal",
+	return &model.Availability{ID: model.MintID(model.TypeAvailability), Subject: ada, Capacity: dur(d), Window: win(cal, clock), Scope: "personal",
 		Source: model.Source{Author: ada}, Timestamp: now}
 }
 
 func commitment(at, d string, transparent bool) *model.Commitment {
 	c := &model.Commitment{ID: model.MintID(model.TypeCommitment), Parties: []model.Party{{URI: ada, Status: "accepted"}}, Placement: placement(at, d),
-		Origin: model.Origin{Import: true}, Source: model.Source{Author: ada}, Timestamp: now, Acknowledgements: []model.Acknowledgement{}}
+		Origin: model.OriginImport, Source: model.Source{Author: ada}, Timestamp: now, Acknowledgements: []model.Acknowledgement{}}
 	if transparent {
 		tr := true
 		c.Transparent = &tr
@@ -134,7 +135,7 @@ func TestClashesAndGrounds(t *testing.T) {
 	// Condition mismatch: the only containing availability is conditional on deep-work.
 	ws2 := newWS(t)
 	deep := availability("PT3H", "2026-09-15", "09:00/12:00")
-	deep.Conditional = []string{"deep-work"}
+	deep.Activities = []string{"deep-work"}
 	meeting := intention("Meeting", "PT1H", "2026-09-15", "2026-09-15T09:00:00+10:00")
 	meeting.Activity = "meeting"
 	write(t, ws2, deep, meeting)
