@@ -72,7 +72,7 @@ it.
 | 25 | A party the workspace does not track | adopted with refinements, [#25](https://github.com/nodelogicau/intentions/issues/25) |
 | 26 | Every intention reaches a terminus | adopted with refinements, implemented in v0.12.0, [#26](https://github.com/nodelogicau/intentions/issues/26) |
 | 27 | A policy authorises nothing until it is firm | adopted with refinements, implemented in v0.13.0, [#27](https://github.com/nodelogicau/intentions/issues/27) |
-| 28 | Adopting a bare desire creates a terminus | open, [#28](https://github.com/nodelogicau/intentions/issues/28) |
+| 28 | Adopting a bare desire creates a terminus | adopted with additions, [#28](https://github.com/nodelogicau/intentions/issues/28) |
 
 ---
 
@@ -745,3 +745,20 @@ yet a when, which the format admits and `unresolved` reports as incomplete.
 Set aside: requiring a duration or a window on every adoption, which would
 make adoption stricter than `intention_add`; the skill says when to adopt,
 the rule says only what adoption may not produce.
+
+**Resolution (`ee432d9`, change `adoption-makes-a-plan`):** Adopted as
+proposed, with two additions from the review. The text says the refusal is
+permanent: a terminus is exempt from the grounding rule because it is the
+ground, so no later refusal of unserved intentions ever reaches the errand
+terminus a bare adoption would write, and this rule is the only thing that
+closes the path. And it names the asymmetry with the ordinary intention
+write as intended: `intention_add` with a bare title still drafts a
+terminus, a self the person may firm, because drafting a self and promoting
+a want are different acts. The refusal is stated by the shape of what
+adoption would write, empty `serves` with neither `duration` nor `window`,
+and names what is missing, a why or a when; both stay optional on the tool.
+Folded in from the same requirement: `desire_retire` refuses `kind:
+adopted`, since only adoption writes the intention the pointer must name,
+and `superseded_by` on a desire naming anything but a desire is a validation
+error. The refinements are on
+[intentions-cli#7](https://github.com/nodelogicau/intentions-cli/issues/7).
