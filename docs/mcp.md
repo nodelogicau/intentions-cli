@@ -12,7 +12,7 @@ decision. It comes down to whether your harness already has a shell.
 
 | | Always in context | When planning work happens |
 |---|---|---|
-| MCP server | ~15,000 tokens (31 tool schemas ≈ 10,300, instructions ≈ 4,700) | the same |
+| MCP server | ~16,000 tokens (32 tool schemas ≈ 10,700, instructions ≈ 5,300) | the same |
 | Skill + CLI | ~160 tokens (the skill's frontmatter description) | ~3,400 tokens (the body loads when triggered) |
 
 **Use the skill and the CLI in harnesses that have a shell**: Claude Code,
@@ -139,7 +139,9 @@ These names are the Intentions Format's [Reference Tool
 Set](https://github.com/nodelogicau/intentions#reference-tool-set), one per
 CLI operation, which this implementation exposes as listed: a listed name
 keeps the semantics and accepts the parameters the specification states, and
-its result equals the verb's `--json` output. Every optional field may be omitted;
+its result equals the verb's `--json` output. The keys are the `intentions/0.2`
+names; a 0.1 workspace is read and written under its own names and the tools
+take the same keys either way. Every optional field may be omitted;
 `source` is `{author?, harness?, model?}`; a `window` is
 `{calendar?, clock?, relative?: {target, relation, gap?: {min?, max?}}}`; a
 `duration` is an ISO 8601 string or `{nominal, min?, max?}`.
@@ -158,11 +160,11 @@ its result equals the verb's `--json` output. Every optional field may be omitte
 | `intention_retire` | `id`, `kind`, `superseded_by?`, `reason?` | `{…, retired}` |
 | `intention_show` | `id`, `now?` | `{…, serves_resolved, flags}` |
 | `intention_list` | `subject?`, `activity?`, `stability?`, `recurring?`, `placed?`, `unplaced?`, `instances_of?`, `retired?` | `{intentions, count}` |
-| `availability_add` | `subject`, `duration`, `window`, `title?`, `conditional[]?`, `location[]?`, `cadence?`, `valid_until?`, `scope?`, `description?`, `timestamp?`, `source?` | `{…, effective_valid_until, effective_valid_until_from, flags, created}` |
+| `availability_add` | `subject`, `capacity`, `window`, `title?`, `activities[]?`, `location[]?`, `cadence?`, `valid_until?`, `scope?`, `description?`, `timestamp?`, `source?` | `{…, effective_valid_until, effective_valid_until_from, flags, created}` |
 | `availability_renew` | `id`, `valid_until` | `{…, previous_version}` |
 | `availability_supersede` | `id`, changed terms, `reason?` | `{…, created, superseded: {id, version}}` |
 | `availability_retire` | `id`, `kind`, `superseded_by?`, `reason?` | `{…, retired}` |
-| `availability_list` | `subject?`, `conditional?`, `scope?`, `retired?`, `now?` | `{availability, count}` |
+| `availability_list` | `subject?`, `activities?`, `scope?`, `retired?`, `now?` | `{availability, count}` |
 | `generate` | `horizon?`, `recurring[]?`, `now?` | `{created, skipped, count, range}` |
 | `resolve` | `id`, `limit?`, `step?`, `scope?`, `now?` | `{intention, candidates, candidates_considered, generated, range?, reason?, blocked_on?, no_supply?, presumed?, excluded?}` |
 | `select` | `id`, `candidate` **or** `policy`, `replace?`, `scope?`, `now?` | `{resolution, intention, candidate, commitment?, replaced?, flags, policy?}` |
@@ -175,6 +177,7 @@ its result equals the verb's `--json` output. Every optional field may be omitte
 | `acknowledge` | `id`, `kind`, `counterpart?`, `reason?`, `now?` | `{…, acknowledgement, flags}` |
 | `bounds` | `id?`, `calendar?`, `clock?`, `timezone?`, `hemisphere?`, `now?` | `{window, timezone, hemisphere, intervals, count}` |
 | `validate` | | `{findings, counts, ok}` |
+| `migrate` | `check?` | `{format_before, format_after, objects, acknowledgements, rewritten, applied}`; refused while any intention is unserved, naming them |
 | `workspace_status` | | root, subject, author, timezone, counts, `validate` summary, flag count, and inside a git checkout `git.uncommitted` (read-only) |
 
 Errors are tool results with `isError: true`, a text line `<code>: <message>`,
@@ -189,7 +192,7 @@ terminus of its subject (`unserved`, a warning) or is a tentative terminus
 (`draft_terminus`, info), and omit the key otherwise. One class of error
 never reaches a verb: each tool's `inputSchema.required`
 names the parameters its verb refuses to run without (`title` on
-`intention_add`; `subject`, `duration` and `window` on `availability_add`;
+`intention_add`; `subject`, `capacity` and `window` on `availability_add`;
 `id` on every tool that takes one), and a call missing one is rejected against
 the schema with a text result naming the missing property and no structured
 `error`.

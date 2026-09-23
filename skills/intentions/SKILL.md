@@ -103,7 +103,7 @@ modifiers inside double quotes, so `"$id:in-order-to"` silently corrupts the id.
 |---|---|
 | Where am I | `intentions workspace --json` → `{root, found_by, config}` |
 | What is intended | `intentions intention list [--subject <uri>] [--activity <term>] [--stability tentative\|firm] [--recurring] [--retired] --json` → `{intentions, count}` |
-| What capacity exists | `intentions availability list [--subject <uri>] [--conditional <term>] [--scope <s>] [--retired] --json` |
+| What capacity exists | `intentions availability list [--subject <uri>] [--activities <term>] [--scope <s>] [--retired] --json` |
 | One object | `intentions show <id> --json` → `{object, version, path}`; `intention show` adds `serves_resolved` |
 | Record a want | `intentions desire add --title "<what they said>" [--activity <term>] [--location <uri>]... [--serves <terminus>:for-the-sake-of] --json` — a passing remark; no why or when required |
 | Adopt a want | `intentions desire adopt <id> [--duration PT30M] [--calendar <edtf\|deictic>] [--clock HH:MM/HH:MM] --json` → `{intention, desire, findings?}`; refused bare (no why and no when) |
@@ -114,9 +114,9 @@ modifiers inside double quotes, so `"$id:in-order-to"` silently corrupts the id.
 | Fill the plan in | `intentions intention edit <id> [same flags] [--clear-<field>] --json` → `{previous_version, version, projection_changed}` |
 | Firm (person's act) | `intentions intention firm <id> --json` — only when the person says so |
 | Firm (under a policy) | `intentions intention firm <id> --policy <terminus id> --json` — the only way a harness may firm; refused otherwise |
-| Record capacity | `intentions availability add --subject <uri> --duration PT3H --calendar <edtf> [--clock HH:MM/HH:MM] [--conditional <term>]... [--location <uri>]... [--cadence <rrule>] [--valid-until <edtf>] [--scope personal\|organisation\|public] --json` |
+| Record capacity | `intentions availability add --subject <uri> --capacity PT3H --calendar <edtf> [--clock HH:MM/HH:MM] [--activities <term>]... [--location <uri>]... [--cadence <rrule>] [--valid-until <edtf>] [--scope personal\|organisation\|public] --json` |
 | Extend capacity | `intentions availability renew <id> --valid-until <edtf> --json` |
-| Change capacity terms | `intentions availability supersede <id> [changed flags] --json` — never `edit` for window, duration, conditional or location |
+| Change capacity terms | `intentions availability supersede <id> [changed flags] --json` — never `edit` for window, capacity, activities or location |
 | Withdraw | `intentions intention retire <id> --kind fulfilled\|abandoned\|superseded [--superseded-by <id>] --reason "<why>" --json`; `intentions availability retire <id> --kind retracted\|superseded …` |
 | What a window means | `intentions bounds <id> --json` or `intentions bounds --calendar this-week --clock 09:00/12:00 --json`; writes nothing |
 | Generate instances | `intentions generate --horizon <P…> [--recurring <id>] --json` → `{created, skipped}`; idempotent. Only when the person asks to plan a named period, and narrow it to that period |
@@ -163,14 +163,16 @@ On failure stderr carries `{"error": {"code", "message"}}`; a refused write says
   because they said to, or because a policy they hold covers it. A terminus
   is the exception with no policy: no policy applies to one, and `firm` on a
   terminus is refused for any source carrying a harness. You may draft a
-  terminus; only the person firms it. That includes a policy: one you draft
+  terminus; only the person firms it. The person's own act is recorded by
+  absence on an object and by name on a record: no `firmed_under` means the
+  person firmed, `selector: person` means the person selected. That includes a policy: one you draft
   is tentative and authorises nothing until the person firms it, and
   `--policy` naming a draft is refused with the command they run. Setting a
   firm policy tentative suspends it, retiring it ends it, and either
   withdraws what rested on it: `validate` then reports every intention
   firmed under it until the person re-firms it or sets it tentative.
 - **Activity terms are lowercase kebab-case** and matched exactly against an
-  availability's `conditional`. Reuse terms already in the workspace
+  availability's `activities`. Reuse terms already in the workspace
   (`intentions.md` lists them; `validate` reports a term used once at info
   level). Do not invent near-synonyms.
 - **Locations and parties are URIs.** A place is whatever URI the person
@@ -306,7 +308,7 @@ finding under `findings` in its result. The next revision refuses both.
   workspace tracks. One availability per intention is a sign you are
   fabricating: real capacity is broader than the plans that draw on it.
 - **Terms change by supersession.** Window (including clock), duration,
-  conditional and location define the disposition. `availability edit`
+  activities and location define the disposition. `availability edit`
   refuses to change them; `availability supersede` creates the new one and
   retires the old as superseded, keeping every reference valid.
 - **Renewal advances `valid_until` only.** Recurring availability without one
@@ -364,6 +366,26 @@ When you write a branch up, say what each intention is for and what changed in
 its window, not just which files moved. A reviewer reading `firmed_under` on a
 diff should find the policy named in the PR body.
 
+## Formats and migration
+
+This binary writes `intentions/0.2` and reads `intentions/0.1` as it is: a
+0.1 workspace keeps its old spellings (`duration` and `conditional` on
+availability, the map-shaped `origin`) and its rules (an unserved intention
+is a warning) until the person migrates it. Under 0.2 the file names are
+`capacity` and `activities`, `origin` is a plain value with a `resolution`
+field, and an intention that reaches no firm terminus is refused on write and
+an error on `validate`. The same flags and tools work under both.
+
+- **Migration is the person's act.** Run `intentions migrate --check` and
+  report what it would change: which files, which versions, which
+  acknowledgements it carries across so nothing lapses. If it refuses, it
+  names intentions that reach no firm terminus; walk those up first.
+- **Never run `migrate` unasked.** When the person says to, run it on a clean
+  checkout and hand them the diff to review: only shapes, names, versions,
+  the index and `format` move, nothing a person wrote.
+- **A newer format is refused by name.** If a workspace names a format this
+  binary does not read, say so and stop; a newer binary wrote it.
+
 ## Example session
 
 ```sh
@@ -382,8 +404,8 @@ intentions intention add --title "Draft the Q4 budget narrative" \
 
 # They also said Tuesday mornings are their deep-work time until December.
 intentions availability add --subject https://example.com/people/ada \
-  --title "Tuesday mornings for deep work" --duration PT3H \
-  --calendar 2026-09/2026-12 --clock 09:00/12:00 --conditional deep-work \
+  --title "Tuesday mornings for deep work" --capacity PT3H \
+  --calendar 2026-09/2026-12 --clock 09:00/12:00 --activities deep-work \
   --cadence "FREQ=WEEKLY;BYDAY=TU" --valid-until 2026-12 --json
 
 intentions validate --json

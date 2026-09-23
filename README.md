@@ -85,9 +85,9 @@ intentions intention add --title "Draft the Q4 budget narrative" \
 
 # 3. Say what capacity you have
 intentions availability add --subject https://example.com/people/ada \
-    --title "Tuesday mornings for deep work" --duration PT3H \
+    --title "Tuesday mornings for deep work" --capacity PT3H \
     --calendar 2026-09/2026-12 --clock 09:00/12:00 \
-    --conditional deep-work --cadence "FREQ=WEEKLY;BYDAY=TU"
+    --activities deep-work --cadence "FREQ=WEEKLY;BYDAY=TU"
 
 # 4. Rank candidate placements; nothing is chosen
 intentions resolve int_01a0…
@@ -126,7 +126,7 @@ intentions intention add --title "Read the board pack" --json
 | `intention firm <id>` | Set stability to firm. A harness must pass `--policy <int_id>` naming a firm terminus of the subject carrying `auto_firm`; the id is written to `firmed_under`, and a tentative policy is refused by name. On a terminus, refuses any policy and any harness: only the person firms one |
 | `intention retire <id>` | Append a retirement record: `--kind fulfilled\|abandoned\|superseded [--superseded-by id]` |
 | `intention show <id>`, `intention list` | Show one with its version and resolved serves targets; list active (or `--retired`, `--recurring`) with filters |
-| `availability add` | Create an availability. `--subject`, `--duration` and a window are required |
+| `availability add` | Create an availability. `--subject`, `--capacity` and a window are required; `--activities` names the terms it is good for (`--duration` and `--conditional` still work as aliases) |
 | `availability edit <id>` | Edit prose or widen `--scope`. A change of terms is refused: use `supersede` |
 | `availability renew <id>` | Advance `--valid-until` on the same object |
 | `availability supersede <id>` | Create a new availability with changed terms and retire this one as superseded |
@@ -146,9 +146,10 @@ intentions intention add --title "Read the board pack" --json
 | `bounds [<id>] [--calendar] [--clock]` | Clock-time bounds of a window in the resolver context, with overrides |
 | `validate` | Check the whole workspace; exits 4 on any error. An intention reaching no firm terminus of its subject is a warning (`unserved`) naming the fix; a record selected under a policy since withdrawn is a warning (`selector_withdrawn`); a tentative terminus is info (`draft_terminus`) |
 | `index [--check]` | Rebuild `index.yaml`, or verify it and exit 4 on drift |
+| `migrate [--check]` | Move a `intentions/0.1` workspace to `intentions/0.2`: the person's act, refused while any intention is unserved; `--check` reports and writes nothing |
 | `skill show\|install` | Print or install the embedded agent skill for a harness; `install --check` for CI |
 | `serve --mcp [--workspace D]` | Serve the workspace to an MCP client over stdio (see [docs/mcp.md](docs/mcp.md)) |
-| `version` | Binary version and the format version it implements |
+| `version` | Binary version, the format version it writes (`intentions/0.2`) and the ones it reads |
 
 ### Windows
 
@@ -200,7 +201,7 @@ history and only warns.
 ### Resolution
 
 `resolve` takes an intention's duration and window, intersects the eligible
-availability of the subject and every party (unretired, unexpired, conditional
+availability of the subject and every party (unretired, unexpired, activities
 admitting the activity, location sharing a URI, scope visible), enumerates
 candidates on a `resolver.step` grid within each occasion's remaining
 capacity, and ranks them: rank 1 displaces nothing, rank 2 only tentative
@@ -321,6 +322,25 @@ edit changed the projection, and the computed value is always authoritative.
 `timestamp` and acknowledgements are never in the projection; editing them
 leaves the version unchanged. The golden vectors in
 `internal/projection/testdata` pin the canonical bytes for the spec's examples.
+
+### Formats
+
+This binary writes `intentions/0.2` and reads `intentions/0.1` and `0.2`. Each
+object is read, projected and written under the format its workspace names,
+so a 0.1 workspace keeps its spellings (`duration` and `conditional` on
+availability, `origin: {resolution: …}` on a commitment), its versions and
+its rules until migrated; loading and re-saving a 0.1 file changes nothing.
+Under 0.2 those fields are `capacity` and `activities`, `origin` is
+`resolution` or `import` with a sibling `resolution` field, and an intention
+that reaches no firm terminus is refused on write and an error on `validate`.
+A workspace naming a format this binary does not read is refused, naming both.
+
+`intentions migrate` moves a workspace from 0.1 to 0.2. It refuses while any
+intention is unserved, naming them; otherwise it rewrites the shapes and
+names, recomputes every version, carries every acknowledgement across whose
+counterpart changed only by the migration so nothing lapses, rebuilds the
+index and rewrites `format` last. Nothing a person wrote moves. Run
+`migrate --check` first, then migrate on a clean checkout and review the diff.
 
 ## Review workflow
 

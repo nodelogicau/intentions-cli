@@ -3,6 +3,51 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+Implements `intentions/0.2` (nodelogicau/intentions 60796e8, change
+`format-version-0-2`, settling SPEC-FEEDBACK item 29) as
+[#9](https://github.com/nodelogicau/intentions-cli/issues/9). **Nothing
+happens to an existing workspace until its owner runs `intentions migrate`.**
+
+### Changed
+
+- **New workspaces are `intentions/0.2`; 0.1 is read as it is.** Every object
+  is read, projected and written under the format its workspace names. A 0.1
+  workspace keeps its spellings, its versions and its rules until migrated,
+  and re-saving any of its files changes nothing. A workspace naming a format
+  this binary does not read is refused, naming both versions. `version`
+  prints what the binary writes and reads.
+- **The four 0.2 breaks.** Availability's `duration` is `capacity` and
+  `conditional` is `activities` (`--capacity`, `--activities`; the old flags
+  stay as hidden aliases; the MCP keys are the new names only). A
+  commitment's `origin` is `resolution` or `import` with a sibling
+  `resolution` field, both projected. An intention that reaches no firm
+  terminus is a validation error under 0.2, and a write that would leave one
+  unserved is refused; under 0.1 both stay warnings.
+- **Timestamp is the time of the last write.** Every verb that rewrites an
+  object file sets its `timestamp` to the act's time (`--timestamp` where
+  offered, else now): the edits, `firm`, the retirements, `renew`,
+  `supersede`, `select`'s placement write, cancel's freeing write, the
+  commitment answers and `acknowledge`. Records keep the time of the act.
+  Versions are unaffected.
+- **The skill** uses the 0.2 names, states the person's act (absence of
+  `firmed_under` on an object, `selector: person` on a record), and says how
+  a workspace migrates: `--check` first, walk up, then the person runs it.
+
+### Added
+
+- **`migrate [--check]`, a verb and a tool.** Moves a 0.1 workspace to 0.2 as
+  the person's act. Refused while any intention is unserved, naming them.
+  Otherwise rewrites each commitment's `origin` shape and the availability
+  names, recomputes every version, rewrites `counterpart_version` on every
+  acknowledgement whose counterpart changed only by the migration so nothing
+  lapses, rebuilds the index, and rewrites `format` last. Nothing a person
+  wrote moves. `--check` reports and writes nothing; a 0.2 workspace is a
+  no-op. The reference tool set is thirty-two.
+- **`parties` on a desire**, bare URIs kept as a hint and carried onto the
+  intention on adoption (`--party`, `parties` over MCP).
+
 ## [0.14.0] - 2026-09-23
 
 Implements DESIRE, the fourth object type the specification added in
