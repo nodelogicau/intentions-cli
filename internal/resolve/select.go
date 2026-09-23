@@ -99,6 +99,7 @@ func Select(e Env, in *model.Intention, opts SelectOptions) (Selection, Result, 
 	}
 	updated := *in
 	updated.Placement = placement
+	updated.Timestamp = opts.Timestamp
 	if err := e.WS.WriteObject(&updated); err != nil {
 		return sel, res, err
 	}
@@ -117,6 +118,7 @@ func Select(e Env, in *model.Intention, opts SelectOptions) (Selection, Result, 
 			}
 			cancelled := *c
 			cancelled.Retired = &model.Retired{Kind: "cancelled", Reason: "superseded by " + rec.ID, Source: opts.Source, Timestamp: opts.Timestamp}
+			cancelled.Timestamp = opts.Timestamp
 			if err := e.WS.WriteObject(&cancelled); err != nil {
 				return sel, res, err
 			}

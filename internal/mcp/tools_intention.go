@@ -37,7 +37,7 @@ func (s *Server) registerTools() {
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_list", Annotations: readOnly,
 		Description: "Every intention (active by default), filtered by subject, activity, stability, recurring, placed, unplaced, instances_of, or retired. Call this before intention_add."},
 		s.intentionList)
-	sdk.AddTool(s.srv, &sdk.Tool{Name: "availability_add", Annotations: additive, InputSchema: requiring[availabilityIn]("subject", "duration", "window"),
+	sdk.AddTool(s.srv, &sdk.Tool{Name: "availability_add", Annotations: additive, InputSchema: requiring[availabilityIn]("subject", "capacity", "window"),
 		Description: "Record capacity: a standing statement that a particular (a person, a room, anything with a URI) has a duration of capacity within a window, optionally for certain activities (conditional), at certain places, recurring by cadence. Capacity is a fact about the person: record what they told you, never what an empty calendar suggests and never to make a resolution succeed. Only for the people this workspace tracks, not for external parties."},
 		s.availabilityAdd)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "availability_renew", Annotations: additive,
@@ -78,6 +78,9 @@ func (s *Server) registerTools() {
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "validate", Annotations: readOnly,
 		Description: "Check the whole workspace against the format: errors, warnings, info. Results equal `intentions validate --json`; ok is false when any error is found."},
 		s.validateTool)
+	sdk.AddTool(s.srv, &sdk.Tool{Name: "migrate", Annotations: additive,
+		Description: "Move the workspace from intentions/0.1 to intentions/0.2, the person's act: rewrites each commitment's origin shape and the availability field names, recomputes every version, carries every acknowledgement across so nothing lapses, rebuilds the index and rewrites format last. Refused while any intention reaches no firm terminus, naming them. Call with check to report what would change and write nothing; report that to the person and let them run the migration, on a clean checkout, reviewing the diff. Results equal `intentions migrate --json`."},
+		s.migrateTool)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "workspace_status", Annotations: readOnly,
 		Description: "The bound workspace: root, default subject, object counts, validate summary, flag count, and, inside a git checkout, workspace files not yet committed (read-only; never runs a git command that writes)."},
 		s.workspaceStatus)
@@ -393,6 +396,11 @@ func (s *Server) intentionEdit(ctx context.Context, req *sdk.CallToolRequest, in
 		return errResult(err), nil, nil
 	}
 	prev, _ := projection.Version(before)
+	if ts, err := writeTime(in.Timestamp); err != nil {
+		return errResult(err), nil, nil
+	} else {
+		o.Timestamp = ts
+	}
 	if err := s.write(&o); err != nil {
 		return errResult(err), nil, nil
 	}
@@ -442,6 +450,11 @@ func (s *Server) intentionFirm(ctx context.Context, req *sdk.CallToolRequest, in
 	o := *before
 	o.Stability, o.FirmedUnder, o.Source = "firm", fu, src
 	prev, _ := projection.Version(before)
+	if ts, err := writeTime(""); err != nil {
+		return errResult(err), nil, nil
+	} else {
+		o.Timestamp = ts
+	}
 	if err := s.write(&o); err != nil {
 		return errResult(err), nil, nil
 	}
@@ -502,14 +515,17 @@ func (s *Server) retire(req *sdk.CallToolRequest, in retireIn, want model.Type) 
 	case *model.Desire:
 		c := *o
 		c.Retired = &r
+		c.Timestamp = ts
 		updated = &c
 	case *model.Intention:
 		c := *o
 		c.Retired = &r
+		c.Timestamp = ts
 		updated = &c
 	case *model.Availability:
 		c := *o
 		c.Retired = &r
+		c.Timestamp = ts
 		updated = &c
 	}
 	if err := s.write(updated); err != nil {

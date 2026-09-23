@@ -345,6 +345,11 @@ func (a *app) intentionEditCmd() *cobra.Command {
 				return err
 			}
 			prev, _ := projection.Version(before)
+			if ts, err := actTime(act); err != nil {
+				return err
+			} else {
+				o.Timestamp = ts
+			}
 			if err := writeObject(ws, &o); err != nil {
 				return err
 			}
@@ -413,6 +418,11 @@ func (a *app) intentionFirmCmd() *cobra.Command {
 			o := *before
 			o.Stability, o.FirmedUnder, o.Source = "firm", fu, src
 			prev, _ := projection.Version(before)
+			if ts, err := actTime(act); err != nil {
+				return err
+			} else {
+				o.Timestamp = ts
+			}
 			if err := writeObject(ws, &o); err != nil {
 				return err
 			}
@@ -475,6 +485,7 @@ func (a *app) intentionRetireCmd() *cobra.Command {
 			o := *before
 			o.Retired = &r
 			prev, _ := projection.Version(before)
+			o.Timestamp = ts
 			if err := writeObject(ws, &o); err != nil {
 				return err
 			}

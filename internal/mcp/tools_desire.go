@@ -42,6 +42,7 @@ type desireIn struct {
 	Subject     string     `json:"subject,omitempty" jsonschema:"URI of the particular whose desire this is (add only; default: the workspace's defaults.subject)"`
 	Activity    string     `json:"activity,omitempty" jsonschema:"activity term, a hint carried onto the intention on adoption"`
 	Location    []string   `json:"location,omitempty" jsonschema:"URIs, hints carried onto the intention on adoption"`
+	Parties     []string   `json:"parties,omitempty" jsonschema:"URIs of other particulars the want involves, a hint carried onto the intention on adoption"`
 	Serves      []servesIn `json:"serves,omitempty" jsonschema:"for-the-sake-of only, each naming a terminus of the subject, which may be a draft"`
 	Reference   string     `json:"reference,omitempty" jsonschema:"informal pointer to a DKF claim"`
 	Timestamp   string     `json:"timestamp,omitempty"`
@@ -51,7 +52,7 @@ type desireIn struct {
 type desireEditIn struct {
 	ID string `json:"id" jsonschema:"the desire to edit"`
 	desireIn
-	Clear []string `json:"clear,omitempty" jsonschema:"optional fields to remove: description, activity, location, serves, reference"`
+	Clear []string `json:"clear,omitempty" jsonschema:"optional fields to remove: description, activity, location, parties, serves, reference"`
 }
 
 type adoptIn struct {
@@ -106,6 +107,12 @@ func applyDesire(in desireIn, clear []string, o *model.Desire) error {
 	}
 	if cleared("location") {
 		o.Location = nil
+	}
+	if in.Parties != nil {
+		o.Parties = model.SortStrings(in.Parties)
+	}
+	if cleared("parties") {
+		o.Parties = nil
 	}
 	if in.Serves != nil {
 		refs := make([]model.Ref, 0, len(in.Serves))
@@ -202,6 +209,11 @@ func (s *Server) desireEdit(ctx context.Context, req *sdk.CallToolRequest, in de
 		return errResult(err), nil, nil
 	}
 	prev, _ := projection.Version(before)
+	if ts, err := writeTime(in.Timestamp); err != nil {
+		return errResult(err), nil, nil
+	} else {
+		o.Timestamp = ts
+	}
 	if err := s.write(&o); err != nil {
 		return errResult(err), nil, nil
 	}
@@ -264,6 +276,7 @@ func (s *Server) desireAdopt(ctx context.Context, req *sdk.CallToolRequest, in a
 	g.Add(o)
 	retired := *d
 	retired.Retired = &r
+	retired.Timestamp = ts
 	if err := s.write(&retired); err != nil {
 		return errResult(err), nil, nil
 	}

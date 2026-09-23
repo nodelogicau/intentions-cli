@@ -16,6 +16,21 @@ import (
 
 type emptyIn struct{}
 
+type migrateIn struct {
+	Check bool `json:"check,omitempty" jsonschema:"report what would change and write nothing"`
+}
+
+func (s *Server) migrateTool(ctx context.Context, req *sdk.CallToolRequest, in migrateIn) (*sdk.CallToolResult, any, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	plan, err := s.ws.Migrate(in.Check)
+	if err != nil {
+		return errResult(err), nil, nil
+	}
+	out := map[string]any{"format_before": plan.FormatBefore, "format_after": plan.FormatAfter, "objects": plan.Objects, "acknowledgements": plan.Acknowledgements, "rewritten": plan.Rewritten(), "applied": plan.Applied, "check": in.Check}
+	return okResult(strings.TrimSpace(plan.String())), out, nil
+}
+
 func (s *Server) validateTool(ctx context.Context, req *sdk.CallToolRequest, _ emptyIn) (*sdk.CallToolResult, any, error) {
 	g, err := s.ws.Load()
 	if err != nil {

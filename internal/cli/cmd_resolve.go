@@ -439,10 +439,12 @@ func (a *app) acknowledgeCmd() *cobra.Command {
 			case *model.Intention:
 				c := *o
 				c.Acknowledgements = append(append([]model.Acknowledgement(nil), o.Acknowledgements...), ack)
+				c.Timestamp = ack.Timestamp
 				updated = &c
 			case *model.Commitment:
 				c := *o
 				c.Acknowledgements = append(append([]model.Acknowledgement(nil), o.Acknowledgements...), ack)
+				c.Timestamp = ack.Timestamp
 				updated = &c
 			default:
 				return usageErr("%s is a %s; only intentions and commitments carry acknowledgements", obj.GetID(), obj.GetType())
@@ -594,6 +596,11 @@ party is an iTIP reply, which arrives by import.`,
 			o := *c
 			o.Parties = append([]model.Party(nil), c.Parties...)
 			o.Parties[i].Status = status
+			if ts, err := actTime(act); err != nil {
+				return err
+			} else {
+				o.Timestamp = ts
+			}
 			if err := writeObject(ws, &o); err != nil {
 				return err
 			}
@@ -674,6 +681,7 @@ resolution again. The RESOLUTION record is left as history.`,
 			}
 			o := *c
 			o.Retired = &r
+			o.Timestamp = ts
 			if err := writeObject(ws, &o); err != nil {
 				return err
 			}
@@ -690,6 +698,7 @@ resolution again. The RESOLUTION record is left as history.`,
 					if in, ok := in.(*model.Intention); ok && in.Retired == nil && in.Placement != nil {
 						freed := *in
 						freed.Placement = nil
+						freed.Timestamp = ts
 						if err := writeObject(ws, &freed); err != nil {
 							return err
 						}

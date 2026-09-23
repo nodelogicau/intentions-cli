@@ -269,10 +269,12 @@ func (s *Server) acknowledgeTool(ctx context.Context, req *sdk.CallToolRequest, 
 	case *model.Intention:
 		c := *o
 		c.Acknowledgements = append(append([]model.Acknowledgement(nil), o.Acknowledgements...), ack)
+		c.Timestamp = ack.Timestamp
 		updated = &c
 	case *model.Commitment:
 		c := *o
 		c.Acknowledgements = append(append([]model.Acknowledgement(nil), o.Acknowledgements...), ack)
+		c.Timestamp = ack.Timestamp
 		updated = &c
 	default:
 		return errResult(apperr.Usage("%s is a %s; only intentions and commitments carry acknowledgements", obj.GetID(), obj.GetType())), nil, nil

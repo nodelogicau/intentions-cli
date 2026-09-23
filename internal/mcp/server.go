@@ -97,7 +97,7 @@ func (s *Server) instructions() string {
 		fmt.Fprintf(&b, ", whose default subject is %s", subj)
 	}
 	b.WriteString(". Everything you write lands as YAML files there for a person to review, typically through a git pull request; nothing is committed for you.\n\n")
-	b.WriteString("Tool names are the Intentions Format's Reference Tool Set (README, Reference Tool Set), exposed here as listed: desire_*, intention_*, availability_*, commitment_*, generate, resolve, select, unresolved, check, acknowledge, bounds, validate, workspace_status. Every result equals the corresponding CLI verb's --json output.\n")
+	b.WriteString("Tool names are the Intentions Format's Reference Tool Set (README, Reference Tool Set), exposed here as listed: desire_*, intention_*, availability_*, commitment_*, generate, resolve, select, unresolved, check, acknowledge, bounds, validate, migrate, workspace_status. Every result equals the corresponding CLI verb's --json output.\n")
 	b.Write(skill.Body())
 	if content, err := os.ReadFile(filepath.Join(s.ws.Root, store.ConventionsFile)); err == nil && len(strings.TrimSpace(string(content))) > 0 {
 		b.WriteString("\n\n## Workspace conventions (" + store.ConventionsFile + ")\n\n")
@@ -191,6 +191,16 @@ func now(in string) (time.Time, error) {
 		return time.Time{}, apperr.Usage("now: %v", err)
 	}
 	return t, nil
+}
+
+// writeTime is the time a tool stamps on the object it rewrites: the call's
+// timestamp when given, else now.
+func writeTime(in string) (time.Time, error) {
+	at, err := now("")
+	if err != nil {
+		return time.Time{}, err
+	}
+	return timestamp(in, at)
 }
 
 func timestamp(in string, def time.Time) (time.Time, error) {

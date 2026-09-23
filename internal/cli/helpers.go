@@ -300,6 +300,16 @@ func getAvailability(g *store.Graph, id string) (*model.Availability, error) {
 }
 
 // writeObject checks the single-object rules, then writes.
+// actTime is the time an act stamps on the object it rewrites: --timestamp
+// when given, else now. An object's timestamp is the time of its last write.
+func actTime(act actFlags) (time.Time, error) {
+	now, err := resolveNow(act)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return resolveTimestamp(act, now)
+}
+
 func writeObject(ws *store.Workspace, obj model.Object) error {
 	if ps := model.Check(obj); len(ps) > 0 {
 		return ps

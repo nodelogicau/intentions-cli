@@ -267,6 +267,7 @@ func desireNode(o *Desire) *yaml.Node {
 	addStr(m, "description", o.Description)
 	addStr(m, "activity", o.Activity)
 	addStrList(m, "location", o.Location, false)
+	addStrList(m, "parties", o.Parties, false)
 	addKV(m, "serves", refsNode(o.Serves))
 	addStr(m, "reference", o.Reference)
 	addKV(m, "source", sourceNode(o.Source))

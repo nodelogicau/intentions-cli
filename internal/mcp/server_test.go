@@ -177,7 +177,7 @@ func TestInstructionsPromptAndTools(t *testing.T) {
 	for _, tl := range tools.Tools {
 		names[tl.Name] = tl
 	}
-	want := []string{"workspace_status", "desire_add", "desire_edit", "desire_adopt", "desire_retire", "desire_show", "desire_list", "intention_add", "intention_edit", "intention_firm", "intention_retire", "intention_show", "intention_list", "availability_add", "availability_renew", "availability_supersede", "availability_retire", "availability_list", "commitment_accept", "commitment_decline", "commitment_cancel", "commitment_show", "commitment_list", "generate", "resolve", "select", "unresolved", "check", "acknowledge", "bounds", "validate"}
+	want := []string{"workspace_status", "desire_add", "desire_edit", "desire_adopt", "desire_retire", "desire_show", "desire_list", "intention_add", "intention_edit", "intention_firm", "intention_retire", "intention_show", "intention_list", "availability_add", "availability_renew", "availability_supersede", "availability_retire", "availability_list", "commitment_accept", "commitment_decline", "commitment_cancel", "commitment_show", "commitment_list", "generate", "resolve", "select", "unresolved", "check", "acknowledge", "bounds", "validate", "migrate"}
 	if len(names) != len(want) {
 		t.Errorf("%d tools, want %d", len(names), len(want))
 	}
@@ -204,7 +204,7 @@ func TestInstructionsPromptAndTools(t *testing.T) {
 	required := map[string][]string{
 		"desire_add": {"title"}, "desire_edit": {"id"}, "desire_adopt": {"id"}, "desire_retire": {"id", "kind"}, "desire_show": {"id"},
 		"intention_add": {"title"}, "intention_edit": {"id"}, "intention_firm": {"id"}, "intention_retire": {"id", "kind"}, "intention_show": {"id"},
-		"availability_add": {"subject", "duration", "window"}, "availability_renew": {"id", "valid_until"}, "availability_supersede": {"id"}, "availability_retire": {"id", "kind"},
+		"availability_add": {"subject", "capacity", "window"}, "availability_renew": {"id", "valid_until"}, "availability_supersede": {"id"}, "availability_retire": {"id", "kind"},
 		"commitment_accept": {"id"}, "commitment_decline": {"id"}, "commitment_cancel": {"id"}, "commitment_show": {"id"},
 		"resolve": {"id"}, "select": {"id"}, "acknowledge": {"id", "kind"},
 	}
@@ -295,8 +295,8 @@ func TestIntentionLifecycle(t *testing.T) {
 
 func TestAvailabilityLifecycle(t *testing.T) {
 	h := newHarness(t, "claude-ai", Options{})
-	h.rejected("availability_add", map[string]any{"duration": "PT3H", "window": map[string]any{"clock": "09:00/12:00"}}, "subject")
-	a := h.ok("availability_add", map[string]any{"subject": ada, "title": "Tuesday mornings", "duration": "PT3H", "window": map[string]any{"calendar": "2026-09/2026-12", "clock": "09:00/12:00"}, "conditional": []string{"deep-work"}, "cadence": "FREQ=WEEKLY;BYDAY=TU"})
+	h.rejected("availability_add", map[string]any{"capacity": "PT3H", "window": map[string]any{"clock": "09:00/12:00"}}, "subject")
+	a := h.ok("availability_add", map[string]any{"subject": ada, "title": "Tuesday mornings", "capacity": "PT3H", "window": map[string]any{"calendar": "2026-09/2026-12", "clock": "09:00/12:00"}, "activities": []string{"deep-work"}, "cadence": "FREQ=WEEKLY;BYDAY=TU"})
 	id := str(a, "id")
 	if !strings.HasPrefix(id, "avl_") || a["effective_valid_until_from"] != "default_horizon" || obj(a)["scope"] != "personal" {
 		t.Fatalf("add: %v", a)
@@ -306,7 +306,7 @@ func TestAvailabilityLifecycle(t *testing.T) {
 		t.Errorf("renew: %v", rn)
 	}
 	h.fail("availability_renew", map[string]any{"id": id, "valid_until": "2026-10"}, "refused")
-	sp := h.ok("availability_supersede", map[string]any{"id": id, "duration": "PT2H", "reason": "less time"})
+	sp := h.ok("availability_supersede", map[string]any{"id": id, "capacity": "PT2H", "reason": "less time"})
 	nid := str(sp, "id")
 	if nid == id || obj(sp)["duration"] != "PT2H" || sp["superseded"].(map[string]any)["id"] != id || obj(sp)["window"].(map[string]any)["clock"] != "09:00/12:00" {
 		t.Errorf("supersede: %v", sp)
@@ -334,9 +334,9 @@ func TestResolutionLoop(t *testing.T) {
 		args["subject"], args["window"].(map[string]any)["calendar"] = ada, "2026-09/2026-12"
 		return h.ok("availability_add", args)
 	}
-	av(map[string]any{"title": "Tuesday mornings", "duration": "PT3H", "window": map[string]any{"clock": "09:00/12:00"}, "conditional": []string{"deep-work"}, "cadence": "FREQ=WEEKLY;BYDAY=TU"})
-	av(map[string]any{"title": "Weekday afternoons", "duration": "PT4H", "window": map[string]any{"clock": "13:00/17:00"}, "conditional": []string{"meeting"}, "cadence": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"})
-	h.ok("availability_add", map[string]any{"subject": room, "duration": "PT8H", "window": map[string]any{"calendar": "2026-09/2026-12", "clock": "08:00/18:00"}, "cadence": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"})
+	av(map[string]any{"title": "Tuesday mornings", "capacity": "PT3H", "window": map[string]any{"clock": "09:00/12:00"}, "activities": []string{"deep-work"}, "cadence": "FREQ=WEEKLY;BYDAY=TU"})
+	av(map[string]any{"title": "Weekday afternoons", "capacity": "PT4H", "window": map[string]any{"clock": "13:00/17:00"}, "activities": []string{"meeting"}, "cadence": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"})
+	h.ok("availability_add", map[string]any{"subject": room, "capacity": "PT8H", "window": map[string]any{"calendar": "2026-09/2026-12", "clock": "08:00/18:00"}, "cadence": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"})
 
 	a := h.ok("intention_add", map[string]any{"title": "Draft the budget narrative", "duration": "PT90M", "window": map[string]any{"calendar": "2026-W38"}, "activity": "deep-work"})
 	r := h.ok("resolve", map[string]any{"id": str(a, "id"), "limit": 4})
@@ -483,8 +483,8 @@ func TestConcurrentWrites(t *testing.T) {
 
 func TestCommitmentTools(t *testing.T) {
 	h := newHarness(t, "claude-ai", Options{})
-	h.ok("availability_add", map[string]any{"subject": ada, "duration": "PT4H", "window": map[string]any{"calendar": "2026-09/2026-12", "clock": "13:00/17:00"}, "conditional": []string{"meeting"}, "cadence": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"})
-	h.ok("availability_add", map[string]any{"subject": room, "duration": "PT8H", "window": map[string]any{"calendar": "2026-09/2026-12", "clock": "08:00/18:00"}, "cadence": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"})
+	h.ok("availability_add", map[string]any{"subject": ada, "capacity": "PT4H", "window": map[string]any{"calendar": "2026-09/2026-12", "clock": "13:00/17:00"}, "activities": []string{"meeting"}, "cadence": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"})
+	h.ok("availability_add", map[string]any{"subject": room, "capacity": "PT8H", "window": map[string]any{"calendar": "2026-09/2026-12", "clock": "08:00/18:00"}, "cadence": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"})
 	in := h.ok("intention_add", map[string]any{"title": "Review in room 3", "duration": "PT1H", "window": map[string]any{"calendar": "2026-W38"}, "activity": "meeting", "parties": []string{room}})
 	sel := h.ok("select", map[string]any{"id": str(in, "id"), "candidate": 1})
 	cmt := sel["commitment"].(map[string]any)["id"].(string)
@@ -598,5 +598,30 @@ func TestDesiresOverMCP(t *testing.T) {
 	u := h.ok("unresolved", map[string]any{})
 	if int(u["count"].(float64)) != 1 {
 		t.Errorf("unresolved should hold only the adopted intention: %v", u)
+	}
+}
+
+func TestMigrateAndZeroTwoOverMCP(t *testing.T) {
+	h := newHarness(t, "claude-ai", Options{})
+	p := h.ok("migrate", map[string]any{"check": true})
+	if p["format_before"] != "intentions/0.1" || p["applied"] != false {
+		t.Errorf("migrate check: %v", p)
+	}
+	if !strings.Contains(h.file("intentions.yaml"), "intentions/0.1") {
+		t.Error("check wrote")
+	}
+	m := h.ok("migrate", map[string]any{})
+	if m["applied"] != true || !strings.Contains(h.file("intentions.yaml"), "intentions/0.2") {
+		t.Errorf("migrate: %v", m)
+	}
+	// Under 0.2 an unserved write is refused and the availability keys are the new ones.
+	h.fail("intention_add", map[string]any{"title": "Bare", "duration": "PT1H", "window": map[string]any{"calendar": "2026-W40"}}, "refused")
+	a := h.ok("availability_add", map[string]any{"subject": ada, "capacity": "PT2H", "window": map[string]any{"calendar": "2026-W40"}, "activities": []string{"deep-work"}})
+	if !strings.Contains(h.file("availability/"+str(a, "id")+".yaml"), "capacity: PT2H") {
+		t.Error("availability not written under 0.2")
+	}
+	h.rejected("availability_add", map[string]any{"subject": ada, "window": map[string]any{"calendar": "2026-W41"}}, "capacity")
+	if l := h.ok("availability_list", map[string]any{"activities": "deep-work"}); int(l["count"].(float64)) != 1 {
+		t.Errorf("list by activities: %v", l)
 	}
 }

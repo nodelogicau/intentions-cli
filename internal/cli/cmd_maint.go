@@ -47,6 +47,37 @@ func (a *app) validateCmd() *cobra.Command {
 	}
 }
 
+func (a *app) migrateCmd() *cobra.Command {
+	var check bool
+	cmd := &cobra.Command{
+		Use:   "migrate [--check]",
+		Short: "Move a workspace from intentions/0.1 to intentions/0.2: the person's act, refused while any intention is unserved",
+		Long: `migrate rewrites a 0.1 workspace under 0.2: each commitment's origin as a
+plain value with a resolution field, availability's duration as capacity and
+conditional as activities, every version recomputed, every acknowledgement
+whose counterpart changed only by the migration carried across so nothing
+lapses, the index rebuilt, and format rewritten last. Nothing else moves. It
+refuses while any intention reaches no firm terminus, naming them, so the
+walk-up comes first. Run it on a clean checkout and review the diff;
+--check reports what would change and writes nothing.`,
+		Args: cobra.NoArgs,
+		RunE: a.run(func(cmd *cobra.Command, args []string) error {
+			ws, err := a.openWorkspace()
+			if err != nil {
+				return err
+			}
+			plan, err := ws.Migrate(check)
+			if err != nil {
+				return err
+			}
+			out := map[string]any{"format_before": plan.FormatBefore, "format_after": plan.FormatAfter, "objects": plan.Objects, "acknowledgements": plan.Acknowledgements, "rewritten": plan.Rewritten(), "applied": plan.Applied, "check": check}
+			return a.emit(out, func(w io.Writer) { fmt.Fprint(w, plan.String()) })
+		}),
+	}
+	cmd.Flags().BoolVar(&check, "check", false, "report what would change and write nothing")
+	return cmd
+}
+
 func (a *app) indexCmd() *cobra.Command {
 	var check bool
 	cmd := &cobra.Command{

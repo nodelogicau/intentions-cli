@@ -17,11 +17,11 @@ import (
 type desireFields struct {
 	title, description, descriptionFile string
 	subject, activity, reference        string
-	location, serves                    []string
+	location, parties, serves           []string
 	clear                               map[string]*bool
 }
 
-var clearableDesireFields = []string{"description", "activity", "location", "serves", "reference"}
+var clearableDesireFields = []string{"description", "activity", "location", "parties", "serves", "reference"}
 
 func addDesireFieldFlags(cmd *cobra.Command, f *desireFields, edit bool) {
 	cmd.Flags().StringVar(&f.title, "title", "", "prose title (required on add): what the person said they wanted")
@@ -29,6 +29,7 @@ func addDesireFieldFlags(cmd *cobra.Command, f *desireFields, edit bool) {
 	cmd.Flags().StringVar(&f.descriptionFile, "description-file", "", "read the description from a file, or - for piped stdin")
 	cmd.Flags().StringVar(&f.activity, "activity", "", "activity term, a hint carried onto the intention on adoption")
 	cmd.Flags().StringArrayVar(&f.location, "location", nil, "URI, a hint carried onto the intention on adoption (repeatable)")
+	cmd.Flags().StringArrayVar(&f.parties, "party", nil, "URI of another particular the want involves, a hint carried onto the intention on adoption (repeatable)")
 	cmd.Flags().StringArrayVar(&f.serves, "serves", nil, "<terminus id>:for-the-sake-of, the only role a desire admits; the terminus may be a draft (repeatable)")
 	cmd.Flags().StringVar(&f.reference, "reference", "", "informal pointer to a DKF claim; never validated")
 	if !edit {
@@ -96,6 +97,15 @@ func (a *app) applyDesireFields(cmd *cobra.Command, f desireFields, o *model.Des
 	}
 	if cleared("location") {
 		o.Location = nil
+	}
+	if changed("party") {
+		if err := checkURIs("party", f.parties); err != nil {
+			return err
+		}
+		o.Parties = model.SortStrings(f.parties)
+	}
+	if cleared("parties") {
+		o.Parties = nil
 	}
 	if changed("serves") {
 		refs, err := parseServesFlags(f.serves)
@@ -214,6 +224,11 @@ func (a *app) desireEditCmd() *cobra.Command {
 				return err
 			}
 			prev, _ := projection.Version(before)
+			if ts, err := actTime(act); err != nil {
+				return err
+			} else {
+				o.Timestamp = ts
+			}
 			if err := writeObject(ws, &o); err != nil {
 				return err
 			}
@@ -298,6 +313,7 @@ func (a *app) desireAdoptCmd() *cobra.Command {
 			g.Add(in)
 			retired := *d
 			retired.Retired = &r
+			retired.Timestamp = ts
 			if err := writeObject(ws, &retired); err != nil {
 				return err
 			}
@@ -361,6 +377,7 @@ func (a *app) desireRetireCmd() *cobra.Command {
 			o := *before
 			o.Retired = &r
 			prev, _ := projection.Version(before)
+			o.Timestamp = ts
 			if err := writeObject(ws, &o); err != nil {
 				return err
 			}

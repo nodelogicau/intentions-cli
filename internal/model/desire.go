@@ -21,6 +21,7 @@ type Desire struct {
 	Description string
 	Activity    string
 	Location    []string
+	Parties     []string // URIs of other particulars the want involves, a hint outside the projection
 	Serves      []Ref
 	Reference   string
 	Source      Source
@@ -37,7 +38,7 @@ var DesireRetirementKinds = []string{"abandoned", "superseded", "adopted"}
 // desireForbidden are an intention's temporal and deontic fields, which a
 // desire may not carry. The decoder names each rather than keeping it as
 // an unknown extra, so validation reports it and a write is refused.
-var desireForbidden = []string{"duration", "window", "stability", "firmed_under", "parties", "cadence", "occurrence", "placement", "preference", "auto_select", "auto_firm", "acknowledgements"}
+var desireForbidden = []string{"duration", "window", "stability", "firmed_under", "cadence", "occurrence", "placement", "preference", "auto_select", "auto_firm", "acknowledgements"}
 
 func (o *Desire) GetID() string         { return o.ID }
 func (o *Desire) GetType() Type         { return TypeDesire }
@@ -65,6 +66,7 @@ func (c *checker) desire(o *Desire) {
 	c.require("title", o.Title)
 	c.term("activity", o.Activity)
 	c.uris("location", o.Location)
+	c.uris("parties", o.Parties)
 	if o.Serves == nil {
 		c.add("missing", "serves", "serves is required, possibly empty")
 	}
@@ -137,6 +139,7 @@ func Adopt(d *Desire, duration *temporal.DurationSpec, window *temporal.Window, 
 		Stability:        "tentative",
 		Activity:         d.Activity,
 		Location:         append([]string(nil), d.Location...),
+		Parties:          append([]string(nil), d.Parties...),
 		Serves:           append([]Ref{}, d.Serves...),
 		Reference:        d.Reference,
 		Source:           act,

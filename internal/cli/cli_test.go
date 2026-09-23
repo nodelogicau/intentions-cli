@@ -2197,3 +2197,163 @@ func TestDesires(t *testing.T) {
 		t.Errorf("index:\n%s", idx)
 	}
 }
+
+// --- format-version-0-2 ------------------------------------------------------
+
+func TestMigrateToZeroTwo(t *testing.T) {
+	ws := initWS(t) // intentions/0.1
+	tt := addIntention(t, ws, "--title", "being someone who follows through")
+	mustOK(t, run(t, ws, "", "intention", "firm", tt.str("id")), "firm terminus")
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--title", "Weekdays", "--duration", "PT8H", "--calendar", "2026-09/2026-12", "--clock", "09:00/17:00", "--conditional", "deep-work", "--cadence", "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"), "availability")
+	avl := mustOK(t, run(t, ws, "", "availability", "list"), "list")
+	avlID := avl.json["availability"].([]any)[0].(map[string]any)["id"].(string)
+	if f := readFile(t, ws, "availability/"+avlID+".yaml"); !strings.Contains(f, "\nduration: PT8H\n") || !strings.Contains(f, "\nconditional:\n") {
+		t.Fatalf("0.1 spelling expected:\n%s", f)
+	}
+	// A resolution-born commitment: an intention with an untracked party.
+	a := addIntention(t, ws, "--title", "Plan with Priya", "--duration", "PT1H", "--calendar", "2026-W38", "--activity", "deep-work", "--party", "https://example.com/people/priya", "--serves", tt.str("id")+":for-the-sake-of")
+	sa := mustOK(t, run(t, ws, "", "select", a.str("id"), "--candidate", "1", "--now", rnow), "select a")
+	cmt := sa.json["commitment"].(map[string]any)
+	cmtID := cmt["id"].(string)
+	if f := readFile(t, ws, "commitments/"+cmtID+".yaml"); !strings.Contains(f, "\norigin:\n  resolution: res_") {
+		t.Fatalf("0.1 origin shape expected:\n%s", f)
+	}
+	// A clash the person acknowledges against that commitment.
+	b := addIntention(t, ws, "--title", "Same hour", "--duration", "PT1H", "--calendar", "2026-W38", "--clock", "09:00/10:00", "--activity", "deep-work", "--serves", tt.str("id")+":for-the-sake-of")
+	mustOK(t, run(t, ws, "", "select", b.str("id"), "--candidate", "1", "--now", rnow), "select b")
+	ack := mustOK(t, run(t, ws, "", "acknowledge", b.str("id"), "--kind", "window-clash", "--counterpart", cmtID, "--reason", "fine", "--now", rnow), "acknowledge")
+	oldCV := ack.json["acknowledgement"].(map[string]any)["counterpart_version"].(string)
+	before := mustOK(t, run(t, ws, "", "check", "--now", rnow), "check before")
+	// An unserved intention blocks migration by name.
+	u := addIntention(t, ws, "--title", "Unserved", "--duration", "PT1H", "--calendar", "2026-W40")
+	if r := run(t, ws, "", "migrate", "--check"); r.code != 2 || !strings.Contains(errMsg(r), u.str("id")) {
+		t.Fatalf("migrate with unserved: %d %s", r.code, errMsg(r))
+	}
+	if !strings.Contains(readFile(t, ws, "intentions.yaml"), "format: intentions/0.1") {
+		t.Fatal("refused migration touched format")
+	}
+	mustOK(t, run(t, ws, "", "intention", "edit", u.str("id"), "--serves", tt.str("id")+":for-the-sake-of"), "serve u")
+	// Check writes nothing.
+	chk := mustOK(t, run(t, ws, "", "migrate", "--check"), "migrate --check")
+	if chk.json["applied"] != false || chk.str("format_before") != "intentions/0.1" || int(chk.json["rewritten"].(float64)) < 2 || len(chk.json["acknowledgements"].([]any)) != 1 {
+		t.Errorf("check plan: %v", chk.json)
+	}
+	if f := readFile(t, ws, "commitments/"+cmtID+".yaml"); !strings.Contains(f, "\norigin:\n  resolution: res_") || !strings.Contains(readFile(t, ws, "intentions.yaml"), "intentions/0.1") {
+		t.Fatal("--check wrote")
+	}
+	// Migrate.
+	mig := mustOK(t, run(t, ws, "", "migrate"), "migrate")
+	if mig.json["applied"] != true {
+		t.Fatalf("migrate: %v", mig.json)
+	}
+	if !strings.Contains(readFile(t, ws, "intentions.yaml"), "format: intentions/0.2") {
+		t.Error("format not rewritten")
+	}
+	if f := readFile(t, ws, "availability/"+avlID+".yaml"); !strings.Contains(f, "\ncapacity: PT8H\n") || !strings.Contains(f, "\nactivities:\n") || strings.Contains(f, "conditional") {
+		t.Errorf("availability under 0.2:\n%s", f)
+	}
+	if f := readFile(t, ws, "commitments/"+cmtID+".yaml"); !strings.Contains(f, "\norigin: resolution\nresolution: res_") {
+		t.Errorf("commitment under 0.2:\n%s", f)
+	}
+	cv := mustOK(t, run(t, ws, "", "version-of", cmtID), "version-of")
+	bs := mustOK(t, run(t, ws, "", "intention", "show", b.str("id")), "show b")
+	acks := bs.obj()["acknowledgements"].([]any)
+	if got := acks[0].(map[string]any)["counterpart_version"]; got != cv.str("version") || got == oldCV {
+		t.Errorf("acknowledgement not carried: %v (old %s, new %s)", got, oldCV, cv.str("version"))
+	}
+	after := mustOK(t, run(t, ws, "", "check", "--now", rnow), "check after")
+	if after.json["count"] != before.json["count"] {
+		t.Errorf("check moved across migration: %v -> %v", before.json["count"], after.json["count"])
+	}
+	if v := run(t, ws, "", "validate"); v.code != 0 || int(v.json["counts"].(map[string]any)["error"].(float64)) != 0 {
+		t.Errorf("validate after migrate: %v", v.json["findings"])
+	}
+	if r := run(t, ws, "", "index", "--check"); r.code != 0 {
+		t.Errorf("index drift after migrate: %s", r.stdout)
+	}
+	if !strings.Contains(readFile(t, ws, "index.yaml"), "format: intentions/0.2") {
+		t.Error("index format not rewritten")
+	}
+	// Idempotent; writes under 0.2 from now on.
+	again := mustOK(t, run(t, ws, "", "migrate"), "migrate again")
+	if again.json["applied"] != false {
+		t.Errorf("second migrate applied: %v", again.json)
+	}
+	// Under 0.2 an unserved write is refused.
+	if r := run(t, ws, "", "intention", "add", "--title", "Bare", "--duration", "PT1H", "--calendar", "2026-W41"); r.code != 2 || !strings.Contains(errMsg(r), "terminus") {
+		t.Errorf("unserved under 0.2: %d %s", r.code, errMsg(r))
+	}
+}
+
+func TestZeroTwoWorkspace(t *testing.T) {
+	ws := initWS02(t)
+	if !strings.Contains(readFile(t, ws, "intentions.yaml"), "format: intentions/0.2") || !strings.Contains(readFile(t, ws, "index.yaml"), "format: intentions/0.2") {
+		t.Fatal("init did not write 0.2")
+	}
+	v := run(t, "", "", "version")
+	if reads, _ := v.json["reads"].([]any); v.str("format") != "intentions/0.2" || len(reads) != 2 {
+		t.Errorf("version: %v", v.json)
+	}
+	// An unserved write is refused; a draft terminus and a served intention are fine.
+	if r := run(t, ws, "", "intention", "add", "--title", "Bare", "--duration", "PT1H", "--calendar", "2026-W40"); r.code != 2 || !strings.Contains(errMsg(r), "refused") {
+		t.Errorf("unserved refused: %d %s", r.code, errMsg(r))
+	}
+	if fi, _ := os.ReadDir(filepath.Join(ws, "intentions")); len(fi) != 0 {
+		t.Error("refused write left a file")
+	}
+	tt := addIntention(t, ws, "--title", "being someone who follows through")
+	mustOK(t, run(t, ws, "", "intention", "firm", tt.str("id")), "firm")
+	addIntention(t, ws, "--title", "A", "--duration", "PT1H", "--calendar", "2026-W40", "--serves", tt.str("id")+":for-the-sake-of")
+	// A merged unserved file is an error under 0.2.
+	raw := "id: int_01a06d10-4c2e-7a91-b3f0-2d8e1a7c5b44\nsubject: " + ada + "\ntitle: Merged\nduration: PT1H\nwindow:\n  calendar: 2026-W40\nstability: tentative\nserves: []\nsource:\n  author: " + ada + "\ntimestamp: 2026-09-04T09:12:00Z\nacknowledgements: []\n"
+	_ = os.WriteFile(filepath.Join(ws, "intentions", "int_01a06d10-4c2e-7a91-b3f0-2d8e1a7c5b44.yaml"), []byte(raw), 0o644)
+	if r := run(t, ws, "", "validate"); r.code != 4 {
+		t.Errorf("unserved under 0.2 should be an error: %d %v", r.code, r.json["counts"])
+	}
+	_ = os.Remove(filepath.Join(ws, "intentions", "int_01a06d10-4c2e-7a91-b3f0-2d8e1a7c5b44.yaml"))
+	// Availability writes the 0.2 spelling, old flags included.
+	av := mustOK(t, run(t, ws, "", "availability", "add", "--subject", ada, "--duration", "PT2H", "--calendar", "2026-W40", "--conditional", "deep-work"), "availability add via aliases")
+	if f := readFile(t, ws, av.str("path")); !strings.Contains(f, "\ncapacity: PT2H\n") || !strings.Contains(f, "\nactivities:\n  - deep-work\n") {
+		t.Errorf("0.2 spelling:\n%s", f)
+	}
+	if l := mustOK(t, run(t, ws, "", "availability", "list", "--activities", "deep-work"), "list by activities"); int(l.json["count"].(float64)) != 1 {
+		t.Errorf("list --activities: %v", l.json)
+	}
+	// A newer format is refused by name.
+	cfg := readFile(t, ws, "intentions.yaml")
+	_ = os.WriteFile(filepath.Join(ws, "intentions.yaml"), []byte(strings.Replace(cfg, "intentions/0.2", "intentions/0.3", 1)), 0o644)
+	if r := run(t, ws, "", "validate"); r.code != 2 || !strings.Contains(errMsg(r), "intentions/0.3") || !strings.Contains(errMsg(r), "intentions/0.1") {
+		t.Errorf("newer format: %d %s", r.code, errMsg(r))
+	}
+}
+
+func TestTimestampIsLastWrite(t *testing.T) {
+	ws := initWS(t)
+	tt := addIntention(t, ws, "--title", "being someone who follows through")
+	mustOK(t, run(t, ws, "", "intention", "firm", tt.str("id"), "--now", "2026-09-11T00:00:00Z"), "firm")
+	if !strings.Contains(readFile(t, ws, tt.str("path")), "timestamp: 2026-09-11T00:00:00Z") {
+		t.Error("firm did not move the timestamp")
+	}
+	a := addIntention(t, ws, "--title", "A", "--duration", "PT1H", "--calendar", "2026-W40", "--serves", tt.str("id")+":for-the-sake-of")
+	e := mustOK(t, run(t, ws, "", "intention", "edit", a.str("id"), "--description", "later", "--now", "2026-09-12T00:00:00Z"), "prose edit")
+	if !strings.Contains(readFile(t, ws, a.str("path")), "timestamp: 2026-09-12T00:00:00Z") || e.json["projection_changed"] != false {
+		t.Errorf("edit: timestamp or version wrong: %v", e.json)
+	}
+	e = mustOK(t, run(t, ws, "", "intention", "edit", a.str("id"), "--title", "A2", "--timestamp", "2026-09-13T00:00:00Z"), "explicit timestamp")
+	if !strings.Contains(readFile(t, ws, a.str("path")), "timestamp: 2026-09-13T00:00:00Z") {
+		t.Error("--timestamp not honoured on edit")
+	}
+	mustOK(t, run(t, ws, "", "intention", "retire", a.str("id"), "--kind", "abandoned", "--now", "2026-09-14T00:00:00Z"), "retire")
+	if f := readFile(t, ws, a.str("path")); !strings.Contains(f, "\ntimestamp: 2026-09-14T00:00:00Z\n") {
+		t.Errorf("retire did not move the timestamp:\n%s", f)
+	}
+	// A desire carries parties onto the intention it becomes.
+	d := mustOK(t, run(t, ws, "", "desire", "add", "--title", "lunch with Priya", "--party", "https://example.com/people/priya"), "desire with party")
+	ad := mustOK(t, run(t, ws, "", "desire", "adopt", d.str("id"), "--duration", "PT1H", "--calendar", "2026-W41"), "adopt")
+	if ps, _ := ad.json["intention"].(map[string]any)["object"].(map[string]any)["parties"].([]any); len(ps) != 1 || ps[0] != "https://example.com/people/priya" {
+		t.Errorf("parties not carried: %v", ad.json["intention"])
+	}
+	if v := run(t, ws, "", "validate"); v.code != 0 {
+		t.Errorf("validate: %v", v.json["findings"])
+	}
+}

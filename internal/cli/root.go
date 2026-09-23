@@ -181,6 +181,7 @@ without a policy the person holds.`,
 		a.boundsCmd(),
 		a.validateCmd(),
 		a.indexCmd(),
+		a.migrateCmd(),
 		a.skillCmd(),
 		a.serveCmd(),
 		a.versionCmd(),
@@ -194,8 +195,8 @@ func (a *app) versionCmd() *cobra.Command {
 		Short: "Print the binary version and the format version it implements",
 		Args:  cobra.NoArgs,
 		RunE: a.run(func(cmd *cobra.Command, args []string) error {
-			return a.emit(map[string]any{"version": version, "format": model.Format}, func(w io.Writer) {
-				fmt.Fprintf(w, "intentions %s (%s)\n", version, model.Format)
+			return a.emit(map[string]any{"version": version, "format": model.Format, "reads": model.KnownFormats}, func(w io.Writer) {
+				fmt.Fprintf(w, "intentions %s (writes %s; reads %s)\n", version, model.Format, strings.Join(model.KnownFormats, ", "))
 			})
 		}),
 	}

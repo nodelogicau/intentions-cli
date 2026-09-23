@@ -545,6 +545,8 @@ func (d *decoder) desire(root *yaml.Node) *Desire {
 			o.Activity = d.str(k, v)
 		case "location":
 			o.Location = d.strList(k, v)
+		case "parties":
+			o.Parties = d.strList(k, v)
 		case "serves":
 			o.Serves = d.refs(k, v)
 		case "reference":

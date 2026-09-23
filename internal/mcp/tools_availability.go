@@ -23,10 +23,8 @@ type availabilityIn struct {
 	Title       string    `json:"title,omitempty"`
 	Description string    `json:"description,omitempty"`
 	Capacity    any       `json:"capacity,omitempty" jsonschema:"capacity offered per occasion: ISO 8601 duration or {nominal, min, max} (required on add)"`
-	Duration    any       `json:"duration,omitempty" jsonschema:"deprecated 0.1 spelling of capacity"`
 	Window      *windowIn `json:"window,omitempty" jsonschema:"calendar and/or clock; a cadence needs a calendar anchor"`
 	Activities  []string  `json:"activities,omitempty" jsonschema:"activity terms this supply is good for; absent means anything"`
-	Conditional []string  `json:"conditional,omitempty" jsonschema:"deprecated 0.1 spelling of activities"`
 	Location    []string  `json:"location,omitempty" jsonschema:"URIs at which this capacity holds; absent means anywhere"`
 	Cadence     string    `json:"cadence,omitempty" jsonschema:"RRULE with date-level parts only"`
 	ValidUntil  string    `json:"valid_until,omitempty" jsonschema:"an EDTF expression or RFC 3339 datetime"`
@@ -44,12 +42,6 @@ func (s *Server) applyAvailability(in availabilityIn, o *model.Availability, g *
 	}
 	if in.Description != "" {
 		o.Description = in.Description
-	}
-	if in.Capacity == nil {
-		in.Capacity = in.Duration
-	}
-	if in.Activities == nil {
-		in.Activities = in.Conditional
 	}
 	if in.Capacity != nil {
 		d, err := durationIn(in.Capacity)
@@ -136,7 +128,7 @@ func (s *Server) availabilityAdd(ctx context.Context, req *sdk.CallToolRequest, 
 	if Clean(in.Subject) == "" {
 		return errResult(apperr.Usage("subject is required: availability names its particular explicitly")), nil, nil
 	}
-	if in.Capacity == nil && in.Duration == nil {
+	if in.Capacity == nil {
 		return errResult(apperr.Usage("capacity is required: the capacity offered per occasion")), nil, nil
 	}
 	if in.Window == nil {
@@ -215,6 +207,11 @@ func (s *Server) availabilityRenew(ctx context.Context, req *sdk.CallToolRequest
 	o := *before
 	o.ValidUntil = v
 	prev, _ := projection.Version(before)
+	if ts, err := writeTime(""); err != nil {
+		return errResult(err), nil, nil
+	} else {
+		o.Timestamp = ts
+	}
 	if err := s.write(&o); err != nil {
 		return errResult(err), nil, nil
 	}
@@ -284,6 +281,7 @@ func (s *Server) availabilitySupersede(ctx context.Context, req *sdk.CallToolReq
 	}
 	retired := *old
 	retired.Retired = &r
+	retired.Timestamp = ts
 	if err := s.write(&retired); err != nil {
 		return errResult(err), nil, nil
 	}
@@ -302,12 +300,11 @@ func (s *Server) availabilityRetire(ctx context.Context, req *sdk.CallToolReques
 }
 
 type availabilityListIn struct {
-	Subject     string `json:"subject,omitempty"`
-	Activities  string `json:"activities,omitempty" jsonschema:"filter by an activities term"`
-	Conditional string `json:"conditional,omitempty" jsonschema:"deprecated alias of activities"`
-	Scope       string `json:"scope,omitempty"`
-	Retired     bool   `json:"retired,omitempty"`
-	Now         string `json:"now,omitempty"`
+	Subject    string `json:"subject,omitempty"`
+	Activities string `json:"activities,omitempty" jsonschema:"filter by an activities term"`
+	Scope      string `json:"scope,omitempty"`
+	Retired    bool   `json:"retired,omitempty"`
+	Now        string `json:"now,omitempty"`
 }
 
 func (s *Server) availabilityList(ctx context.Context, req *sdk.CallToolRequest, in availabilityListIn) (*sdk.CallToolResult, any, error) {
@@ -322,7 +319,7 @@ func (s *Server) availabilityList(ctx context.Context, req *sdk.CallToolRequest,
 	e := resolve.NewEnv(s.ws, g, at)
 	list := []map[string]any{}
 	for _, o := range g.Availabilities() {
-		if (o.Retired != nil) != in.Retired || (in.Subject != "" && o.Subject != in.Subject) || (in.Scope != "" && o.Scope != in.Scope) || ((in.Activities != "" && !has(o.Activities, in.Activities)) || (in.Conditional != "" && !has(o.Activities, in.Conditional))) {
+		if (o.Retired != nil) != in.Retired || (in.Subject != "" && o.Subject != in.Subject) || (in.Scope != "" && o.Scope != in.Scope) || (in.Activities != "" && !has(o.Activities, in.Activities)) {
 			continue
 		}
 		m, err := model.ToMap(o)

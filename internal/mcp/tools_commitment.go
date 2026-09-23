@@ -71,6 +71,11 @@ func (s *Server) answer(req *sdk.CallToolRequest, in answerIn, status string) (*
 	o := *c
 	o.Parties = append([]model.Party(nil), c.Parties...)
 	o.Parties[i].Status = status
+	if ts, err := writeTime(""); err != nil {
+		return errResult(err), nil, nil
+	} else {
+		o.Timestamp = ts
+	}
 	if err := s.write(&o); err != nil {
 		return errResult(err), nil, nil
 	}
@@ -119,6 +124,7 @@ func (s *Server) commitmentCancel(ctx context.Context, req *sdk.CallToolRequest,
 	prev, _ := projection.Version(c)
 	o := *c
 	o.Retired = &r
+	o.Timestamp = ts
 	if err := s.write(&o); err != nil {
 		return errResult(err), nil, nil
 	}
@@ -135,6 +141,7 @@ func (s *Server) commitmentCancel(ctx context.Context, req *sdk.CallToolRequest,
 			if in, ok := obj.(*model.Intention); ok && in.Retired == nil && in.Placement != nil {
 				freed := *in
 				freed.Placement = nil
+				freed.Timestamp = ts
 				if err := s.write(&freed); err != nil {
 					return errResult(err), nil, nil
 				}

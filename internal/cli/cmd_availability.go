@@ -267,6 +267,11 @@ func (a *app) availabilityEditCmd() *cobra.Command {
 				return err
 			}
 			prev, _ := projection.Version(before)
+			if ts, err := actTime(act); err != nil {
+				return err
+			} else {
+				o.Timestamp = ts
+			}
 			if err := writeObject(ws, &o); err != nil {
 				return err
 			}
@@ -352,6 +357,11 @@ func (a *app) availabilityRenewCmd() *cobra.Command {
 			o := *before
 			o.ValidUntil = v
 			prev, _ := projection.Version(before)
+			if ts, err := actTime(act); err != nil {
+				return err
+			} else {
+				o.Timestamp = ts
+			}
 			if err := writeObject(ws, &o); err != nil {
 				return err
 			}
@@ -440,6 +450,7 @@ func (a *app) availabilitySupersedeCmd() *cobra.Command {
 			}
 			retired := *old
 			retired.Retired = &r
+			retired.Timestamp = ts
 			if err := writeObject(ws, &retired); err != nil {
 				return err
 			}
@@ -500,6 +511,7 @@ func (a *app) availabilityRetireCmd() *cobra.Command {
 			o := *before
 			o.Retired = &r
 			prev, _ := projection.Version(before)
+			o.Timestamp = ts
 			if err := writeObject(ws, &o); err != nil {
 				return err
 			}
