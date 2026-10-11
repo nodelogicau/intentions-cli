@@ -82,7 +82,7 @@ func (s *Server) registerTools() {
 		Description: "Move the workspace from intentions/0.1 to intentions/0.2, the person's act: rewrites each commitment's origin shape and the availability field names, recomputes every version, carries every acknowledgement across so nothing lapses, rebuilds the index and rewrites format last. Refused while any intention reaches no firm terminus, naming them. Call with check to report what would change and write nothing; report that to the person and let them run the migration, on a clean checkout, reviewing the diff. Results equal `intentions migrate --json`."},
 		s.migrateTool)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "workspace_status", Annotations: readOnly,
-		Description: "The bound workspace: root, default subject, object counts, validate summary, flag count, and, inside a git checkout, workspace files not yet committed (read-only; never runs a git command that writes)."},
+		Description: "The bound workspace: root, default subject, object counts, validate summary, flag count, and, inside a git checkout, workspace files not yet committed (read-only; never runs a git command that writes). It counts but does not list: call check to see the flags and validate to see the problems."},
 		s.workspaceStatus)
 }
 

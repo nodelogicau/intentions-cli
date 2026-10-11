@@ -14,6 +14,9 @@ All notable changes to `intentions` are recorded here. The format follows
 - **`make bundle` no longer ships a stale macOS binary.** The local universal
   binary is built in the bundle's staging directory instead of `dist/`, where
   later runs picked up whatever was left there.
+- **`workspace_status` says where the details are.** Its description now tells
+  the model to call `check` for the flags and `validate` for the problems it
+  only counts. Claude Desktop had reported "2 flags" and stopped there.
 
 ## [0.15.0] - 2026-09-23
 
