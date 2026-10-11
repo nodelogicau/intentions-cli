@@ -180,6 +180,10 @@ take the same keys either way. Every optional field may be omitted;
 | `migrate` | `check?` | `{format_before, format_after, objects, acknowledgements, rewritten, applied}`; refused while any intention is unserved, naming them |
 | `workspace_status` | | root, subject, author, timezone, counts, `validate` summary, flag count, and inside a git checkout `git.uncommitted` (read-only) |
 
+A successful result carries that output as structured content and again as a
+JSON text block after a one-line summary, since some clients (Claude Desktop
+among them) show the model only the text.
+
 Errors are tool results with `isError: true`, a text line `<code>: <message>`,
 and `{"error": {"code", "message"}}` using the CLI's codes (`usage`,
 `refused`, `invalid`, `not_found`, `runtime`). Every refusal the verbs make,

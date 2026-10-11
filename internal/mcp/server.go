@@ -5,7 +5,9 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -73,6 +75,7 @@ func New(o Options) *Server {
 	o.Author, o.Harness, o.Model = Clean(o.Author), Clean(o.Harness), Clean(o.Model)
 	s := &Server{ws: o.Workspace, opts: o}
 	s.srv = sdk.NewServer(&sdk.Implementation{Name: "intentions", Version: skill.NormaliseVersion(o.Version)}, &sdk.ServerOptions{Instructions: s.instructions()})
+	s.srv.AddReceivingMiddleware(withDataText)
 	s.registerTools()
 	s.registerConventionsResource()
 	s.srv.AddPrompt(&sdk.Prompt{Name: PromptName, Description: "The intentions discipline: list before you add, a duration and a window never a slot, draft tentative, resolve then ask, a policy is the only way a harness firms or selects alone."}, func(ctx context.Context, req *sdk.GetPromptRequest) (*sdk.GetPromptResult, error) {
@@ -324,6 +327,24 @@ func asRefusal(err error, target **model.Refusal) bool {
 }
 
 // okResult pairs a one-line text summary with the structured value.
+// withDataText appends a successful tool result's structured content to its
+// text as JSON. Clients such as Claude Desktop hand the model only the text,
+// so without it the model sees the summary ("6 intentions") and none of the data.
+func withDataText(next sdk.MethodHandler) sdk.MethodHandler {
+	return func(ctx context.Context, method string, req sdk.Request) (sdk.Result, error) {
+		res, err := next(ctx, method, req)
+		if r, ok := res.(*sdk.CallToolResult); ok && err == nil && !r.IsError && r.StructuredContent != nil {
+			var b bytes.Buffer
+			enc := json.NewEncoder(&b)
+			enc.SetEscapeHTML(false)
+			if enc.Encode(r.StructuredContent) == nil {
+				r.Content = append(r.Content, &sdk.TextContent{Text: strings.TrimSpace(b.String())})
+			}
+		}
+		return res, err
+	}
+}
+
 func okResult(summary string) *sdk.CallToolResult {
 	return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: summary}}}
 }

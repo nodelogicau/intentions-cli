@@ -100,6 +100,13 @@ For each session the server SHALL default `source.harness` to the client's `clie
 - **WHEN** the server is started with `--author '${user_config.author}'`
 - **THEN** the author falls through to `intentions.yaml`
 
+### Requirement: Results carry their data as text
+A successful tool result SHALL carry, after its one-line summary text block, a second text block holding its structured content as JSON, so that a client which passes the model only text content still passes the data.
+
+#### Scenario: Listing in a text-only client
+- **WHEN** `intention_list` returns one intention
+- **THEN** the first text block is `1 intentions` and the second parses as JSON equal to the structured content, naming that intention's id
+
 ### Requirement: Errors are tool results with CLI codes
 A domain failure SHALL be returned as a tool result with `isError: true`, a text block `<code>: <message>`, and structured `{"error": {"code", "message"}}` using the CLI's error codes (`usage`, `refused`, `invalid`, `not_found`, `check_failed`, `runtime`). Protocol-level failures only SHALL be JSON-RPC errors.
 

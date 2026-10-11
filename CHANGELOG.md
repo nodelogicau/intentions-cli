@@ -3,6 +3,18 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **MCP results reach the model in clients that read only text.** Every
+  successful tool result now repeats its structured content as a JSON text
+  block after the summary. Claude Desktop passes the model only text, so it
+  saw "6 intentions" and none of the six.
+- **`make bundle` no longer ships a stale macOS binary.** The local universal
+  binary is built in the bundle's staging directory instead of `dist/`, where
+  later runs picked up whatever was left there.
+
 ## [0.15.0] - 2026-09-23
 
 Implements `intentions/0.2` (nodelogicau/intentions 60796e8, change

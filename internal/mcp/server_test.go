@@ -264,6 +264,15 @@ func TestIntentionLifecycle(t *testing.T) {
 	if int(l["count"].(float64)) != 1 {
 		t.Errorf("list: %v", l)
 	}
+	// The data rides in the text too, for clients that show the model only text.
+	res, err := h.cs.CallTool(context.Background(), &sdk.CallToolParams{Name: "intention_list", Arguments: map[string]any{"subject": ada}})
+	if err != nil || len(res.Content) != 2 {
+		t.Fatalf("list content: %v %v", err, res)
+	}
+	var fromText map[string]any
+	if err := json.Unmarshal([]byte(res.Content[1].(*sdk.TextContent).Text), &fromText); err != nil || res.Content[0].(*sdk.TextContent).Text != "1 intentions" || str(fromText["intentions"].([]any)[0].(map[string]any), "id") != id {
+		t.Errorf("list text: %v %v", err, res.Content)
+	}
 	// Harness firm without policy refused; with policy firms and records firmed_under.
 	h.fail("intention_firm", map[string]any{"id": id}, "refused")
 	term := h.ok("intention_add", map[string]any{"title": "Ship the budget", "auto_firm": "max_duration=PT2H"})
