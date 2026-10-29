@@ -41,8 +41,9 @@ harness driving this CLI against a real workspace
 format gave it nothing to stand on, 27 from implementing 26 and finding
 the same object inert as a ground and live as an authorisation, 28 from
 reading the DESIRE text against the terminus definition before implementing
-it, and 29 from reading a field refinement against the text's own rule on
-projections.
+it, 29 from reading a field refinement against the text's own rule on
+projections, and 30 from reviewing the habit change against that rule as
+item 29 settled it.
 
 | # | Topic | Status |
 |---|---|---|
@@ -75,6 +76,7 @@ projections.
 | 27 | A policy authorises nothing until it is firm | adopted with refinements, implemented in v0.13.0, [#27](https://github.com/nodelogicau/intentions/issues/27) |
 | 28 | Adopting a bare desire creates a terminus | adopted with additions, [#28](https://github.com/nodelogicau/intentions/issues/28) |
 | 29 | The origin change alters the commitment projection under intentions/0.1 | adopted with refinements, implemented in v0.15.0, [#29](https://github.com/nodelogicau/intentions/issues/29) |
+| 30 | `habit` joins a 0.2 projection files already carry | open, [#32](https://github.com/nodelogicau/intentions/issues/32) |
 
 ---
 
@@ -825,3 +827,69 @@ naming both versions. The CLI work is
 [intentions-cli#9](https://github.com/nodelogicau/intentions-cli/issues/9),
 which supersedes #8. Implemented in v0.15.0: the binary writes 0.2, reads
 0.1 as it is, migrates as the person's act, and refuses anything newer.
+
+## 30. `habit` joins a 0.2 projection files already carry ([#32](https://github.com/nodelogicau/intentions/issues/32))
+
+**The draft says:** since `habit-needs-no-plan` (`894bb69`, archived in
+`0f23c1d`), a recurring intention may carry `habit`, boolean, omitted at
+its default, and `habit` is in the INTENTION scheduling projection between
+`cadence` and `occurrence`. Versioning records it: "`window.clock` and
+`transparent` joined the 0.1 projection before any file carried the string,
+and `habit` joined the 0.2 projection while 0.2 was unreleased." The same
+paragraph keeps the rule item 29 fixed: projection field sets are frozen
+"from the moment any implementation writes the version string into a file,
+not from any declaration."
+
+**The problem:** the precedent and the rule disagree. v0.15.0 of this CLI,
+released 2026-09-23, writes `intentions/0.2` into every new workspace and
+every migrated one, so the 0.2 projection froze then by the rule's own
+terms. "Unreleased" is the declaration ceremony item 29 removed as the key.
+The two precedents it cites are not like this one: no file carried 0.1 when
+they joined, and files carry 0.2 now.
+
+The harm is smaller than item 29's, and it is real. No existing hash moves,
+because `habit` at its default is omitted, so no workspace needs
+migrating. A reader from before the change, though, decodes `habit` as an
+unknown key it keeps but does not hash. Once someone sets `habit: true`,
+that object has two versions under one format string: a v0.15.0 reader
+warns `stale_version` on it, `index --check` exits non-zero until someone
+rebuilds the index with one binary or the other, and an acknowledgement on
+the recurring intention lapses or holds depending on which binary last
+wrote the file. The old reader also keeps generating instances for the
+habit and puts its dormant instances back in `unresolved`, which is the
+deliberation the change exists to remove. A stored `counterpart_version`
+"stays comparable for as long as its format version is known" stops being
+true for those objects, because knowing the format version no longer
+settles which fields were hashed.
+
+The text also says nothing about `habit` in a 0.1 workspace, which a 0.2
+reader reads under 0.1 rules until `migrate`. The 0.1 projection is frozen
+without `habit`, so a 0.1 object carrying it would either hash under a set
+that has no place for it or carry a field with no effect on the version
+while it changes what generation and resolution do.
+
+**We decided:** nothing yet, and nothing ships until this is settled.
+[intentions-cli#10](https://github.com/nodelogicau/intentions-cli/issues/10)
+is open. If it ships as written, the plan is to hash `habit` under 0.2 only,
+keep it out of the 0.1 projection, and refuse to write `habit` in a 0.1
+workspace with a pointer to `migrate`.
+
+**Proposed text:** one of:
+
+- **(a) Bend the rule and say so.** Keep `habit` in 0.2, and replace the
+  "while 0.2 was unreleased" clause with the actual ground: an optional
+  field omitted at its default joins a frozen projection without moving any
+  existing hash, and the cost falls on readers older than the field, which
+  compute a different version for any object that carries it. Then state
+  that the freeze rule has this exception, since a rule with a silent
+  exception stops being a rule. Say in Status that a reader too old to know
+  `habit` must be upgraded before anyone sets it, and that `habit` is
+  admitted only under 0.2: a write that sets it in a 0.1 workspace is
+  refused, naming `migrate`.
+- **(b) Hold `habit` for `intentions/0.3`.** The rule stands as written,
+  the 0.2 projection stays as v0.15.0 hashes it, and the habit semantics
+  wait for the next version string.
+
+We lean to (a). The field is additive, no file carries it yet, and the
+harm needs a workspace shared across binaries on either side of the change.
+But the text should name the trade rather than call 0.2 unreleased.
