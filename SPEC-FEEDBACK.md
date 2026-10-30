@@ -76,7 +76,7 @@ item 29 settled it.
 | 27 | A policy authorises nothing until it is firm | adopted with refinements, implemented in v0.13.0, [#27](https://github.com/nodelogicau/intentions/issues/27) |
 | 28 | Adopting a bare desire creates a terminus | adopted with additions, [#28](https://github.com/nodelogicau/intentions/issues/28) |
 | 29 | The origin change alters the commitment projection under intentions/0.1 | adopted with refinements, implemented in v0.15.0, [#29](https://github.com/nodelogicau/intentions/issues/29) |
-| 30 | `habit` joins a 0.2 projection files already carry | open, [#32](https://github.com/nodelogicau/intentions/issues/32) |
+| 30 | `habit` joins a 0.2 projection files already carry | adopted, option (a), [#32](https://github.com/nodelogicau/intentions/issues/32) |
 
 ---
 
@@ -893,3 +893,20 @@ workspace with a pointer to `migrate`.
 We lean to (a). The field is additive, no file carries it yet, and the
 harm needs a workspace shared across binaries on either side of the change.
 But the text should name the trade rather than call 0.2 unreleased.
+
+**Resolution (`968f9c5`, archived in `b914b56`, change
+`habit-joins-frozen-projection`):** Option (a), with the exception made a
+closed list rather than a general clause. Field sets stay frozen as
+written; the text names one exception, an optional field omitted at its
+documented default joining a frozen projection without moving any existing
+hash, and names `habit` under 0.2 as the only field admitted that way. Any
+further change, a field of the same kind included, needs a new format
+version. The cost is stated where the guarantee was: a stored
+`counterpart_version` stays comparable between readers that agree on the
+admitted fields. `habit` is admitted only under 0.2: in a 0.1 workspace a
+write that sets it is refused naming `migrate`, validation reports it as an
+error, and until migration the object is hashed under the 0.1 projection
+with the field given no effect. Status says a reader older than `habit`
+(v0.15.0 and earlier) must be upgraded before anyone sharing a workspace
+sets it. The CLI work is
+[intentions-cli#10](https://github.com/nodelogicau/intentions-cli/issues/10).
