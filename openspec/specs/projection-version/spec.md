@@ -3,11 +3,9 @@
 ## Purpose
 
 How an object's version is derived: the frozen scheduling projection per type, value normalisation, RFC 8785 canonical JSON, sha256, and the cached `version` field.
-
 ## Requirements
-
 ### Requirement: Projection field sets
-The scheduling projection SHALL be, per type and per format version. Under `intentions/0.1`: intention `subject, duration, window, stability, activity, location, parties, serves, cadence, occurrence, placement, retired.kind`; availability `subject, duration, window, conditional, location, cadence, valid_until, retired.kind`; commitment `parties, placement, intention, origin, transparent, external, retired.kind` with `origin` as `import` or `{resolution}`; desire `subject, serves, retired.kind`; resolution `intention, placement, selector, displaced`. Under `intentions/0.2` the same, except availability `subject, capacity, window, activities, location, cadence, valid_until, retired.kind` and commitment `parties, placement, intention, origin, resolution, transparent, external, retired.kind` with `origin` a string. `version`, `firmed_under`, and the resolution record's `supply` and `presumed` SHALL NOT enter any projection. Each set SHALL be frozen from the moment any implementation writes its format version string into a file; an object's version SHALL be computed under the format of the workspace it is read from or written to.
+The scheduling projection SHALL be, per type and per format version. Under `intentions/0.1`: intention `subject, duration, window, stability, activity, location, parties, serves, cadence, occurrence, placement, retired.kind`; availability `subject, duration, window, conditional, location, cadence, valid_until, retired.kind`; commitment `parties, placement, intention, origin, transparent, external, retired.kind` with `origin` as `import` or `{resolution}`; desire `subject, serves, retired.kind`; resolution `intention, placement, selector, displaced`. Under `intentions/0.2` the same, except intention `subject, duration, window, stability, activity, location, parties, serves, cadence, habit, occurrence, placement, retired.kind`, availability `subject, capacity, window, activities, location, cadence, valid_until, retired.kind` and commitment `parties, placement, intention, origin, resolution, transparent, external, retired.kind` with `origin` a string. `version`, `firmed_under`, and the resolution record's `supply` and `presumed` SHALL NOT enter any projection. Each set SHALL be frozen from the moment any implementation writes its format version string into a file, with one named exception: `habit` joined the 0.2 intention set after files carried `intentions/0.2`, admitted because it is optional and omitted at its default, so no existing hash moved; no other field SHALL be admitted this way. `habit` SHALL enter the projection only when true and only under 0.2, so a 0.1 object carrying it hashes as if it were absent; an object's version SHALL be computed under the format of the workspace it is read from or written to.
 
 #### Scenario: Prose edit does not change version
 - **WHEN** only an intention's `description` is edited
@@ -44,6 +42,18 @@ The scheduling projection SHALL be, per type and per format version. Under `inte
 #### Scenario: The same commitment under 0.2
 - **WHEN** that workspace is migrated
 - **THEN** the commitment's version is recomputed under 0.2 and differs
+
+#### Scenario: Habit at its default
+- **WHEN** a 0.2 recurring intention omits `habit`
+- **THEN** its version equals the one v0.15.0 computes for the same file
+
+#### Scenario: Habit set under 0.2
+- **WHEN** `habit: true` is set on a 0.2 recurring intention
+- **THEN** its version changes
+
+#### Scenario: Habit in a 0.1 file
+- **WHEN** a 0.1 recurring intention carries `habit: true` by merge
+- **THEN** its version equals the version of the same object without `habit`
 
 ### Requirement: Value normalisation before hashing
 Before serialisation the projection SHALL be normalised: EDTF expressions in shortest admitted form; durations with zero components dropped, weeks converted to days, and the time part re-expressed from total seconds as hours, minutes, seconds without converting date components; datetimes as RFC 3339 UTC with seconds; all-day `start` kept as a calendar day; clock anchors as `HH:MM/HH:MM` with zero seconds dropped; set-valued lists sorted (references by id then role, parties by uri, strings lexically); `transparent: false` omitted; absent optionals omitted.
@@ -96,3 +106,4 @@ Every write SHALL store the computed version in the file under `version`, immedi
 #### Scenario: Projection shown
 - **WHEN** `intentions version-of int_A --projection` is run
 - **THEN** stdout is the canonical JSON string followed by the version
+

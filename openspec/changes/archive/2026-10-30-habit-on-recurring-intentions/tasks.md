@@ -44,4 +44,4 @@
 
 - [x] 5.1 Skill: a habit bullet and the verbs rows for `--habit` and `--clear-habit`. Regenerate the installed copy.
 - [x] 5.2 README: the fields table, the projection, a habit paragraph after recurrence, validation, and the Status upgrade note. `docs/mcp.md`: `intention_add` and `intention_edit` with `habit`.
-- [ ] 5.3 CHANGELOG under Unreleased, with the upgrade note for readers at v0.15.0 and earlier, then reply on intentions-cli#10.
+- [x] 5.3 CHANGELOG under Unreleased, with the upgrade note for readers at v0.15.0 and earlier, then reply on intentions-cli#10.

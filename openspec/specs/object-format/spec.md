@@ -3,9 +3,7 @@
 ## Purpose
 
 How objects are identified and written to disk: prefixed UUIDv7 ids, file naming, canonical field order, deterministic serialisation, order-tolerant reading, atomic in-place edits and frozen retired objects.
-
 ## Requirements
-
 ### Requirement: Identifier format
 Object and resolution identifiers SHALL have the form `<prefix>_<uuid>` where `prefix` is `des`, `int`, `avl`, `cmt`, or `res`, and `uuid` is a lowercase canonical hyphenated UUID version 7 (RFC 9562). Minting SHALL use a monotonic counter so identifiers minted by one process sort in creation order. On read the CLI SHALL accept any identifier matching `^(des|int|avl|cmt|res)_[A-Za-z0-9-]+$`.
 
@@ -33,7 +31,7 @@ Each object SHALL be stored as `<id>.yaml` in `desires/`, `intentions/`, `availa
 - **THEN** `validate` reports an error for that file
 
 ### Requirement: Canonical field order on write
-Writers SHALL emit top-level fields in the spec's canonical order per type, with `version` immediately after `id` on every type. Desire: `id, version, subject, title, description, activity, location, parties, serves, reference, source, timestamp, retired`. Intention: `id, version, subject, title, description, duration, window, stability, firmed_under, activity, location, parties, serves, cadence, occurrence, placement, preference, auto_select, auto_firm, reference, source, timestamp, acknowledgements, retired`. Availability: `id, version, subject, title, description, capacity, window, activities, location, cadence, valid_until, scope, source, timestamp, retired`, spelled `duration` and `conditional` in a `intentions/0.1` workspace. Commitment: `id, version, parties, placement, intention, origin, resolution, transparent, external, title, description, source, timestamp, acknowledgements, retired`, with `origin` as `import` or `{resolution: res_…}` and no `resolution` field in a `intentions/0.1` workspace. Resolution: `id, version, intention, placement, selector, candidates_considered, displaced, source, timestamp`. Embedded blocks SHALL be ordered: `source` as `author, harness, model`; `window` as `calendar, relative, clock`; `relative` as `target, relation, gap`; ranged durations and `gap` as `nominal, min, max`; `placement` as `start, duration, location`; `serves` entries as `id, role`; `parties` entries as `uri, status`; `retired` as `kind, reason, superseded_by, adopted_as, source, timestamp`; acknowledgements as `kind, counterpart, counterpart_version, reason, source, timestamp`. Fields not in the specification SHALL be written after every specified field.
+Writers SHALL emit top-level fields in the spec's canonical order per type, with `version` immediately after `id` on every type. Desire: `id, version, subject, title, description, activity, location, parties, serves, reference, source, timestamp, retired`. Intention: `id, version, subject, title, description, duration, window, stability, firmed_under, activity, location, parties, serves, cadence, habit, occurrence, placement, preference, auto_select, auto_firm, reference, source, timestamp, acknowledgements, retired`, with `habit` written only when true. Availability: `id, version, subject, title, description, capacity, window, activities, location, cadence, valid_until, scope, source, timestamp, retired`, spelled `duration` and `conditional` in a `intentions/0.1` workspace. Commitment: `id, version, parties, placement, intention, origin, resolution, transparent, external, title, description, source, timestamp, acknowledgements, retired`, with `origin` as `import` or `{resolution: res_…}` and no `resolution` field in a `intentions/0.1` workspace. Resolution: `id, version, intention, placement, selector, candidates_considered, displaced, source, timestamp`. Embedded blocks SHALL be ordered: `source` as `author, harness, model`; `window` as `calendar, relative, clock`; `relative` as `target, relation, gap`; ranged durations and `gap` as `nominal, min, max`; `placement` as `start, duration, location`; `serves` entries as `id, role`; `parties` entries as `uri, status`; `retired` as `kind, reason, superseded_by, adopted_as, source, timestamp`; acknowledgements as `kind, counterpart, counterpart_version, reason, source, timestamp`. Fields not in the specification SHALL be written after every specified field.
 
 #### Scenario: Full intention order
 - **WHEN** an intention with every field set is written
@@ -54,6 +52,10 @@ Writers SHALL emit top-level fields in the spec's canonical order per type, with
 #### Scenario: Old file re-emitted canonically
 - **WHEN** a file written by v0.1.0, with `version` as its last key, is edited by the CLI
 - **THEN** the rewritten file carries `version` second
+
+#### Scenario: Habit after cadence
+- **WHEN** a recurring intention carrying `habit: true` is written
+- **THEN** `habit: true` is the key immediately after `cadence`, and an intention whose `habit` is false carries no `habit` key
 
 ### Requirement: Any field order accepted on read
 Readers SHALL accept fields in any order and SHALL NOT report the arrangement.
@@ -154,3 +156,4 @@ This binary SHALL write `intentions/0.2` and SHALL read `intentions/0.1` and `in
 #### Scenario: Check writes nothing
 - **WHEN** `migrate --check` is run
 - **THEN** the report lists the ids that would change and no file is modified
+

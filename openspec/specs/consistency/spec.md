@@ -3,9 +3,7 @@
 ## Purpose
 
 `check`: the seven flag kinds, flag shape, transparent commitments, suppression by acknowledgement and lapse, when writes run the check, and the rule that it changes nothing.
-
 ## Requirements
-
 ### Requirement: Check on demand
 `intentions check [<id>]... [--now <RFC 3339>] [--fail-on-flags]` SHALL compute every flag over the workspace, or over the named objects and their counterparts, and report them without writing any file. With `--fail-on-flags` it SHALL exit 4 when any flag is reported. A second run on an unchanged workspace SHALL report the same flags.
 
@@ -120,3 +118,15 @@ A flag SHALL be suppressed when its subject carries an acknowledgement with the 
 #### Scenario: Selection reports its clash
 - **WHEN** `select` places an intention over a tentative one
 - **THEN** the result's `flags` carries the `window-clash` on both and both files are otherwise unchanged
+
+### Requirement: Dormant instances are not counted
+`intention-inconsistency` SHALL NOT count a dormant instance of a habit (see Habit in Intentions): such an instance is neither flagged nor paired with another intention. A placed instance of a habit SHALL be checked for every flag kind as before.
+
+#### Scenario: Dormant instance not counted
+- **WHEN** in a 0.2 workspace an unplaced intention and a dormant instance of a habit each fit the subject's single occasion alone but not together
+- **THEN** `check` reports no `intention-inconsistency` on either
+
+#### Scenario: Placed instance still clashes
+- **WHEN** a placed instance of a habit overlaps another placement of the subject
+- **THEN** `check` reports a `window-clash` on both
+
