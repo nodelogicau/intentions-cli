@@ -29,4 +29,4 @@
 
 - [x] 5.1 Skill: a terminus bullet (supersede rather than reword, set it tentative to withdraw, never retire it out from under dependents, a harness retires only its own draft) and the retire row's terminus kinds. Regenerate the installed copy.
 - [x] 5.2 README: grounding through retired links, the terminus retirement rules, and the `abandoned_end` warning. `docs/mcp.md`: `intention_retire` and the harness boundary.
-- [ ] 5.3 CHANGELOG under Unreleased, then reply on intentions-cli#11.
+- [x] 5.3 CHANGELOG under Unreleased, then reply on intentions-cli#11.

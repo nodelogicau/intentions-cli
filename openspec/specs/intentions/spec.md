@@ -3,9 +3,7 @@
 ## Purpose
 
 The intention verbs and every write rule that applies to an intention: stability and the harness boundary, the serves graph, activity terms, policies, editing, retirement, show and list.
-
 ## Requirements
-
 ### Requirement: Add an intention
 `intentions intention add` SHALL create one intention file. It SHALL require `--title` and accept `--subject`, `--description`, `--description-file`, `--duration`, `--calendar`, `--clock`, `--relative`, `--stability` (default `tentative`), `--activity`, `--location` (repeatable), `--party` (repeatable), `--serves id:role` (repeatable), `--cadence`, `--preference`, `--auto-select`, `--auto-firm`, `--reference`, `--timestamp`, and the attribution flags. `subject` SHALL default to `defaults.subject`; with no default and no flag the write SHALL be refused. `acknowledgements` SHALL be written as an empty list. The result SHALL be the full object and its version.
 
@@ -147,6 +145,14 @@ Each `serves` entry SHALL be `{id, role}` with role `in-order-to`, `for-the-sake
 ### Requirement: Retire an intention
 `intentions intention retire <id> --kind fulfilled|abandoned|superseded [--superseded-by id] [--reason text]` SHALL append a `retired` record with `source` and `timestamp`. `superseded_by` SHALL be required when and only when the kind is `superseded`, and its target SHALL exist.
 
+When the intention is a terminus the command SHALL also refuse with exit code 2, and nothing SHALL be written:
+- the kind `fulfilled` (rule `terminus_fulfilled`), since a self-understanding is never discharged; the message SHALL name `abandoned` and `superseded`;
+- a `superseded_by` that is not a terminus of the same subject (rule `terminus_successor`);
+- an act whose source carries a harness (rule `harness_retire`), unless the terminus is `tentative` and its own `source` carries a harness; the message SHALL name the act as the person's;
+- any retirement after which some unretired intention that reaches a firm terminus before the act would reach none (rule `ungrounds`), computed by the walk in Every intention reaches a terminus. The message SHALL name those intentions and the alternatives: set the terminus tentative with `intention edit <id> --stability tentative`, or retire it as `superseded` with `--superseded-by` naming a firm terminus of the subject.
+
+An intention with another firm ground, the dependents of a tentative terminus, desires serving the terminus, and intentions whose `firmed_under` names it SHALL NOT block the act. These refusals SHALL apply under `intentions/0.1` and `intentions/0.2` alike.
+
 #### Scenario: Superseded
 - **WHEN** `intention retire int_A --kind superseded --superseded-by int_C` is run and int_C exists
 - **THEN** the file carries `retired: {kind: superseded, superseded_by: int_C, source: …, timestamp: …}` and its version changes
@@ -162,6 +168,50 @@ Each `serves` entry SHALL be `{id, role}` with role `in-order-to`, `for-the-sake
 #### Scenario: Unknown kind refused
 - **WHEN** `intention retire int_A --kind cancelled` is run
 - **THEN** the command exits with code 2 naming the three intention kinds
+
+#### Scenario: Fulfilled terminus refused
+- **WHEN** `intention retire int_T --kind fulfilled` is run on a terminus
+- **THEN** the command exits with code 2 naming `abandoned` and `superseded`, and the file is unchanged
+
+#### Scenario: Terminus superseded by a scheduled intention
+- **WHEN** `intention retire int_T --kind superseded --superseded-by int_B` is run on a terminus and int_B has a window
+- **THEN** the command exits with code 2 with rule `terminus_successor`
+
+#### Scenario: Sole ground refused
+- **WHEN** the person runs `intention retire int_T --kind abandoned` on the only firm terminus that unretired int_A and int_B reach
+- **THEN** the command exits with code 2 naming int_A, int_B, `--stability tentative` and supersession, and the file is unchanged
+
+#### Scenario: Another ground remains
+- **WHEN** int_A serves firm termini int_T and int_U `for-the-sake-of` and the person retires int_T as `abandoned`
+- **THEN** the command exits 0 and `validate` reports nothing for int_A
+
+#### Scenario: Nothing rests on it
+- **WHEN** the person retires as `abandoned` a firm terminus that no unretired intention reaches
+- **THEN** the command exits 0
+
+#### Scenario: Superseded by a firm terminus
+- **WHEN** the person retires the sole ground of int_A as `superseded` with `--superseded-by` naming a firm terminus int_U of the subject
+- **THEN** the command exits 0 and int_A is served through int_U
+
+#### Scenario: Superseded by a draft
+- **WHEN** the person retires the sole ground of int_A as `superseded` with `--superseded-by` naming a tentative terminus of the subject
+- **THEN** the command exits with code 2 naming int_A
+
+#### Scenario: Harness withdraws its own draft
+- **WHEN** `intention retire int_T --kind abandoned --harness claude` is run on a tentative terminus whose `source` carries a harness and on which nothing rests
+- **THEN** the command exits 0
+
+#### Scenario: Harness retires a firm terminus
+- **WHEN** `intention retire int_T --kind abandoned --harness claude` is run on a firm terminus
+- **THEN** the command exits with code 2 with rule `harness_retire`, naming the act as the person's
+
+#### Scenario: Harness retires the person's draft
+- **WHEN** `intention retire int_T --kind abandoned --harness claude` is run on a tentative terminus whose `source` carries no harness
+- **THEN** the command exits with code 2 with rule `harness_retire`
+
+#### Scenario: Refused under 0.1 too
+- **WHEN** the person retires as `abandoned` the sole firm terminus of int_A in a workspace whose `format` is `intentions/0.1`
+- **THEN** the command exits with code 2 naming int_A
 
 ### Requirement: Show and list intentions
 `intentions intention show <id>` SHALL print the object with its computed version, and in JSON the full object plus `version`, `path`, `serves_resolved` (each target's title), and `flags` from the consistency check for that object. `intentions intention list` SHALL print every intention, filtered by `--subject`, `--activity`, `--stability`, `--recurring`, `--placed`, `--unplaced`, `--instances-of <id>`, `--retired` (default excludes retired), sorted by id. There SHALL be no `--standing`.
@@ -187,7 +237,7 @@ Each `serves` entry SHALL be `{id, role}` with role `in-order-to`, `for-the-sake
 - **THEN** the result carries `serves_resolved: [{id: int_B, role: …, title: …}]` and a `window-clash` in `flags`
 
 ### Requirement: Every intention reaches a terminus
-An intention that is not a terminus SHALL reach a firm, active terminus of its own `subject` through its `serves` graph, by any path of `in-order-to`, `for-the-sake-of` and `instance-of` references. In a `intentions/0.1` workspace `intention add`, `intention edit` and `intention firm` SHALL accept a write whose result leaves the written intention unserved and SHALL carry the finding in the JSON result under `findings`, a list of `{severity, code, id, message}` in the same shape `validate` reports, with code `unserved` at severity `warning`; the message SHALL name the fix. A write that leaves a terminus `tentative` SHALL carry a `draft_terminus` finding at severity `info`. `findings` SHALL be absent when the written object warrants none. Text output SHALL print each finding on its own line after the confirmation. In a `intentions/0.2` workspace the same write SHALL be refused with exit code 2 and the finding's message, and nothing SHALL be written; adoption inherits the rule.
+An intention that is not a terminus SHALL reach a firm, active terminus of its own `subject` through its `serves` graph, by any path of `in-order-to`, `for-the-sake-of` and `instance-of` references, walked through retired intentions as Validation's Every intention reaches a terminus describes. In a `intentions/0.1` workspace `intention add`, `intention edit` and `intention firm` SHALL accept a write whose result leaves the written intention unserved and SHALL carry the finding in the JSON result under `findings`, a list of `{severity, code, id, message}` in the same shape `validate` reports, with code `unserved` at severity `warning`; the message SHALL name the fix. A write that leaves a terminus `tentative` SHALL carry a `draft_terminus` finding at severity `info`. `findings` SHALL be absent when the written object warrants none. Text output SHALL print each finding on its own line after the confirmation. In a `intentions/0.2` workspace the same write SHALL be refused with exit code 2 and the finding's message, and nothing SHALL be written; adoption inherits the rule. This refusal SHALL cover only the intention being written: a write to a terminus that leaves its dependents unserved, such as setting it tentative, SHALL be accepted, and retiring a terminus is governed by Retire an intention.
 
 #### Scenario: Unserved add is accepted and reported
 - **WHEN** `intention add --title X --duration PT1H --calendar 2026-W40 --json` is run in a workspace holding no terminus
@@ -217,6 +267,14 @@ An intention that is not a terminus SHALL reach a firm, active terminus of its o
 - **WHEN** `intention add --title X --duration PT1H --calendar 2026-W40` is run in a 0.2 workspace holding no firm terminus of the subject
 - **THEN** the command exits with code 2 saying the workspace needs a terminus first, and no file is written
 
+#### Scenario: Withdrawal is accepted under 0.2
+- **WHEN** in a 0.2 workspace the person runs `intention edit int_T --stability tentative` on the only firm terminus that int_A reaches
+- **THEN** the command exits 0, and `validate` reports int_A as `unserved` at error level and exits 4
+
+#### Scenario: Served through a superseded reason
+- **WHEN** int_A is added with `--serves int_T:for-the-sake-of` where int_T is retired as `superseded` by a firm terminus int_U of the subject
+- **THEN** the write is accepted with no `findings`
+
 ### Requirement: Timestamp is the time of the last write
 Every verb that rewrites an object file SHALL set the object's `timestamp` to the time of the act, `--timestamp` where offered or now: `intention edit` and `firm`, `availability edit`, `renew` and `supersede`, `desire edit`, every retirement, `select`'s placement write and the freeing write of `commitment cancel`, the commitment answers, and `acknowledge`. A record's `timestamp` SHALL stay the time of the act that wrote it. The version SHALL be unaffected.
 
@@ -227,3 +285,4 @@ Every verb that rewrites an object file SHALL set the object's `timestamp` to th
 #### Scenario: Record keeps its time
 - **WHEN** a resolution record written at T1 exists and its intention is edited at T2
 - **THEN** the record's `timestamp` is still T1
+

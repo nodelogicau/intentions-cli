@@ -3,9 +3,7 @@
 ## Purpose
 
 The agent-facing skill embedded in the binary: `skill show` and `skill install` with per-harness presets (Claude Code, GitHub Copilot, the neutral `.agents/skills` location, Cursor rules, and an `AGENTS.md` section), version stamping and ownership markers, the never-overwrite-a-foreign-file rule, and the `--check` drift mode for CI.
-
 ## Requirements
-
 ### Requirement: The skill is embedded in the binary
 The binary SHALL embed `skills/intentions/SKILL.md` at build time. The embedded text, rendered for output, SHALL have its frontmatter `metadata.version` set to the binary version (without a leading `v`) and SHALL carry, immediately after the frontmatter's closing `---`, a marker line of the form `<!-- installed by intentions <version>; regenerate with: intentions skill install -->`. The rendered body SHALL otherwise be byte-identical to the repository file.
 
@@ -172,3 +170,11 @@ The embedded skill SHALL use the 0.2 names (`--capacity`, `--activities`), SHALL
 #### Scenario: Skill states migration
 - **WHEN** the embedded skill is read
 - **THEN** it names `migrate --check`, says the person runs the migration, and uses `--capacity` and `--activities`
+
+### Requirement: The skill says how a terminus changes
+The embedded skill SHALL state that when a reason has changed the harness prefers superseding the terminus with a new one over rewording it in place, because the change stays visible and its dependents stay grounded; that a reason is withdrawn by setting its terminus tentative; that a terminus admits `abandoned` and `superseded` only; that retiring a terminus anything still rests on is refused; and that a harness retires only a tentative terminus it drafted itself. The verbs table's retire row SHALL note the terminus kinds.
+
+#### Scenario: Skill states how a terminus changes
+- **WHEN** the embedded skill is read
+- **THEN** it says to supersede a changed reason, to set a terminus tentative to withdraw it, and never to retire one out from under what rests on it
+
