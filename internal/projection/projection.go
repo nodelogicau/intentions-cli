@@ -29,8 +29,12 @@ var Fields = map[string]map[model.Type][]string{
 		model.TypeResolution:   {"intention", "placement", "selector", "displaced"},
 	},
 	model.Format02: {
-		model.TypeDesire:       {"subject", "serves", "retired.kind"},
-		model.TypeIntention:    {"subject", "duration", "window", "stability", "activity", "location", "parties", "serves", "cadence", "occurrence", "placement", "retired.kind"},
+		model.TypeDesire: {"subject", "serves", "retired.kind"},
+		// habit is the freeze rule's one named exception (upstream #32): it
+		// joined after files carried intentions/0.2, admitted because it is
+		// optional and omitted at its default, so no existing hash moved. No
+		// other field may join a frozen set this way.
+		model.TypeIntention:    {"subject", "duration", "window", "stability", "activity", "location", "parties", "serves", "cadence", "habit", "occurrence", "placement", "retired.kind"},
 		model.TypeAvailability: {"subject", "capacity", "window", "activities", "location", "cadence", "valid_until", "retired.kind"},
 		model.TypeCommitment:   {"parties", "placement", "intention", "origin", "resolution", "transparent", "external", "retired.kind"},
 		model.TypeResolution:   {"intention", "placement", "selector", "displaced"},
@@ -82,6 +86,9 @@ func Project(obj model.Object) map[string]any {
 		put("parties", model.SortStrings(o.Parties))
 		put("serves", refs(o.Serves))
 		put("cadence", cadence(o.Cadence))
+		if o.HeldAsHabit() {
+			put("habit", true)
+		}
 		put("occurrence", granule(o.Occurrence))
 		put("placement", placement(o.Placement))
 		put("retired", retired(o.Retired))

@@ -43,6 +43,13 @@ func Generate(e Env, opts GenerateOptions) ([]*model.Intention, []Skip, error) {
 		if len(only) > 0 && !only[rec.ID] {
 			continue
 		}
+		if rec.HeldAsHabit() {
+			// A habit has no plan. Say so only when the run named it.
+			if only[rec.ID] {
+				skipped = append(skipped, Skip{Recurring: rec.ID, Reason: "held as habit, so it needs no plan; clear habit to plan it again"})
+			}
+			continue
+		}
 		if rec.Window == nil || rec.Window.Calendar == nil {
 			skipped = append(skipped, Skip{Recurring: rec.ID, Reason: "no calendar anchor to expand within"})
 			continue

@@ -16,8 +16,8 @@
 - **THEN** the command exits with code 2 naming the recurring intention as held as habit, and nothing is written
 
 #### Scenario: Placed instance of a habit
-- **WHEN** `resolve --replace` runs on a placed instance of a habit
-- **THEN** it resolves as before
+- **WHEN** `select --replace` runs on a placed instance of a habit
+- **THEN** it re-resolves as before
 
 ### Requirement: List unresolved intentions
 `intentions unresolved [--subject <uri>] [--scope <s>] [--step <d>] [--now <RFC 3339>]` SHALL list every unretired intention with no placement that is neither a terminus, nor recurring, nor a dormant instance of a habit, each with a `status` of `ready`, `blocked`, `no_candidates`, `incomplete`, or `unresolvable` derived from a dry resolution that writes nothing. A `ready` entry SHALL carry `candidates` (the full count) and `best_rank`; a `blocked` entry `blocked_on`; every non-ready entry a `reason`. Entries SHALL be ordered by the end of their resolution range, soonest first, then those without a range by `timestamp`, then id. The result SHALL carry `entries`, `count`, and `counts` by status.

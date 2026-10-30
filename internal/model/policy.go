@@ -225,6 +225,25 @@ func CheckScope(old, edited string) error {
 	return nil
 }
 
+// CheckHabit refuses a write that sets habit on an intention that did not
+// carry it (before is nil on add): under intentions/0.1, where habit has no
+// place in the projection, naming migrate; and from any source carrying a
+// harness, whatever policy it names, since no policy reaches habituation.
+// Keeping an existing habit or clearing it passes from any source. Whether
+// the person set habit is checked here only: source records the last write.
+func CheckHabit(before, after *Intention, act Source, format string) error {
+	if !after.Habit || (before != nil && before.Habit) {
+		return nil
+	}
+	if format == Format01 {
+		return refuse("habit_format", "habit is admitted only under %s, and this workspace is %s; the person moves it with `intentions migrate` first", Format02, Format01)
+	}
+	if act.Harness != "" {
+		return refuse("harness_habit", "holding %s as habit is the person's act (an author, no harness), and no policy authorises it; suggest it to the person, who runs `intentions intention edit %s --habit`", after.ID, after.ID)
+	}
+	return nil
+}
+
 // CheckSubjectUnchanged refuses a subject change on edit.
 func CheckSubjectUnchanged(old, edited string) error {
 	if old != edited {

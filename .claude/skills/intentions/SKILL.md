@@ -112,6 +112,7 @@ modifiers inside double quotes, so `"$id:in-order-to"` silently corrupts the id.
 | Record an intention | `intentions intention add --title "<what>" [--duration PT90M] [--calendar <edtf\|deictic>] [--clock HH:MM/HH:MM] [--relative <id>:<RELATION>[:min[:max]]] [--activity <term>] [--location <uri>]... [--party <uri>]... [--serves <id>:in-order-to\|for-the-sake-of]... [--description "<prose>"] --json` |
 | Multi-line prose | add `--description-file -` and pipe the text on stdin |
 | Make it recurring | add `--cadence "FREQ=WEEKLY;BYDAY=TU"` with a `--calendar` anchor for it to expand within |
+| Hold it as habit | `intentions intention edit <id> --habit` — the person's act, refused for you; suggest it. `--clear-habit` brings the plan back, and is yours to run when they ask |
 | Fill the plan in | `intentions intention edit <id> [same flags] [--clear-<field>] --json` → `{previous_version, version, projection_changed}` |
 | Firm (person's act) | `intentions intention firm <id> --json` — only when the person says so |
 | Firm (under a policy) | `intentions intention firm <id> --policy <terminus id> --json` — the only way a harness may firm; refused otherwise |
@@ -286,6 +287,17 @@ finding under `findings` in its result. The next revision refuses both.
   to plan a named period, and pass `--horizon` and `--recurring` so you
   materialise that period and nothing more. A workspace full of instances
   nobody asked for is a worse review for the person.
+- **A habit needs no plan, and it is the person's to declare.** When a
+  recurring intention has been fulfilled week after week and the person no
+  longer decides when to do it, suggest holding it as habit; never set it,
+  since `--habit` from a harness is refused under any policy. A habit
+  generates no instances, and its unplaced instances are dormant: `resolve`
+  refuses them and `unresolved` leaves them out, so do not try to place one.
+  Placed instances stand until the person retires them. A habit still serves
+  its terminus, and when that reason is withdrawn it is reported unserved:
+  that is the moment to ask whether the habit still holds. When it has
+  lapsed and the person wants the plan back, run `--clear-habit`. Habit needs
+  an `intentions/0.2` workspace; under 0.1 it is refused, naming `migrate`.
 - **No supply is an answer, not an obstacle.** When `resolve` reports no
   candidates, read the reason and tell the person: the window has passed, it
   lies beyond the horizon, a target it waits on is unplaced, or they have

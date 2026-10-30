@@ -255,3 +255,49 @@ func TestInconsistencyAndCycle(t *testing.T) {
 		t.Error("check not stable")
 	}
 }
+
+// A dormant instance of a habit is not paired; a placed one is checked as before.
+func TestHabitInstances(t *testing.T) {
+	cfg := store.NewConfig()
+	cfg.Format = model.Format02
+	cfg.Resolver.Timezone = "Australia/Melbourne"
+	cfg.Defaults.Subject, cfg.Defaults.Source.Author = ada, ada
+	ws, _, err := store.Init(t.TempDir(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, ws, availability("PT4H", "2026-09-15/2026-09-16", "09:00/11:00"))
+	rec := intention("Morning pages", "PT2H", "2026-09/2026-12", "")
+	c, _ := temporal.ParseCadence("FREQ=DAILY")
+	rec.Cadence, rec.Habit = &c, true
+	instance := func(day, at string) *model.Intention {
+		o := intention("Morning pages", "PT2H", day, at)
+		o.Occurrence = day
+		o.Serves = []model.Ref{{ID: rec.ID, Role: model.RoleInstanceOf}}
+		return o
+	}
+	dormant := instance("2026-09-15", "")
+	placed := instance("2026-09-16", "2026-09-16T09:00:00+10:00")
+	x := intention("X", "PT2H", "2026-09-15", "")
+	meeting := commitment("2026-09-16T09:30:00+10:00", "PT1H", false)
+	write(t, ws, rec, dormant, placed, x, meeting)
+	flags, err := Check(env(t, ws), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := kinds(flags, x.ID)[IntentionInconsistency]; ok {
+		t.Errorf("a dormant instance was paired: %+v", flags)
+	}
+	if _, ok := kinds(flags, dormant.ID)[IntentionInconsistency]; ok {
+		t.Errorf("a dormant instance was flagged: %+v", flags)
+	}
+	if kinds(flags, placed.ID)[WindowClash].Counterpart != meeting.ID {
+		t.Errorf("a placed instance of a habit no longer clashes: %+v", flags)
+	}
+	// Reverting brings the pairing back.
+	rec.Habit = false
+	write(t, ws, rec)
+	if flags, _ = Check(env(t, ws), nil); kinds(flags, x.ID)[IntentionInconsistency].Counterpart != dormant.ID {
+		t.Errorf("after revert: %+v", flags)
+	}
+}

@@ -190,7 +190,7 @@ type Extra struct {
 
 // Intention is what a person means to do. Canonical order: id, version,
 // subject, title, description, duration, window, stability, firmed_under,
-// activity, location, parties, serves, cadence, occurrence, placement,
+// activity, location, parties, serves, cadence, habit, occurrence, placement,
 // preference, auto_select, auto_firm, reference, source, timestamp,
 // acknowledgements, retired.
 type Intention struct {
@@ -208,6 +208,7 @@ type Intention struct {
 	Parties          []string
 	Serves           []Ref
 	Cadence          *temporal.Cadence
+	Habit            bool // held as habit: no plan; written only when true
 	Occurrence       string
 	Placement        *temporal.Placement
 	Preference       string
@@ -336,6 +337,31 @@ func (o *Intention) Refs() []string {
 
 // IsRecurring reports whether the intention carries a cadence.
 func (o *Intention) IsRecurring() bool { return o.Cadence != nil }
+
+// HeldAsHabit reports whether habit takes effect on the intention: it carries
+// habit and was read under intentions/0.2. Under 0.1 the field has no place in
+// the projection, so it is given no effect until migrate. Every behaviour
+// reads this, never the raw field.
+func (o *Intention) HeldAsHabit() bool { return o.Habit && o.Format() != Format01 }
+
+// Dormant reports whether o is a dormant instance of a habit, and of which
+// recurring intention: unretired, unplaced, and instance-of a recurring
+// intention held as habit. A placed instance is never dormant.
+func Dormant(g Graph, o *Intention) (string, bool) {
+	if o.Retired != nil || o.Placement != nil {
+		return "", false
+	}
+	id := o.InstanceOf()
+	if id == "" {
+		return "", false
+	}
+	obj, ok := g.Get(id)
+	rec, isIntention := obj.(*Intention)
+	if !ok || !isIntention || !rec.HeldAsHabit() {
+		return "", false
+	}
+	return id, true
+}
 
 // IsTerminus reports whether the intention is a terminus: no window, no
 // duration, no outbound serves references. Only a terminus may carry a policy

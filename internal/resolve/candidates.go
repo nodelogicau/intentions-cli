@@ -59,6 +59,9 @@ func Resolve(e Env, in *model.Intention, opts Options) (Result, error) {
 	if in.Retired != nil {
 		return res, refuse("%s is retired (%s) and cannot be resolved", in.ID, in.Retired.Kind)
 	}
+	if rec, ok := model.Dormant(e.G, in); ok {
+		return res, refuse("%s is an instance of %s, which is held as habit and needs no plan; the person clears it with `intentions intention edit %s --clear-habit` to plan it again", in.ID, rec, rec)
+	}
 	if in.Duration == nil {
 		return res, refuse("%s has no duration; a duration is required before resolution", in.ID)
 	}

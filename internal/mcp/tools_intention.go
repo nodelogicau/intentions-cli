@@ -23,7 +23,7 @@ func (s *Server) registerTools() {
 		Description: "Record what a person means to do: a duration and a window, never a slot. Always tentative; a harness may draft but may not make it firm here (see intention_firm). List first (intention_list) so you edit an existing intention rather than write a second one for the same thing. An intention that is not a terminus should serve one (serves [{id, role: for-the-sake-of}] naming a firm terminus of the subject, or an intention that reaches one); an unserved write is accepted and its result carries a warning under findings. Writes one YAML file for a person to review; results equal `intentions intention add --json`."},
 		s.intentionAdd)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_edit", Annotations: additive,
-		Description: "Edit an intention in place: fill the plan in as it becomes definite. Each field given replaces its own; each window anchor given replaces its own; `clear` removes optional fields. Prose edits leave the version unchanged. Refuses a retired intention, a subject change, a cycle in serves, and firm by a harness without policy. Results equal `intentions intention edit --json`."},
+		Description: "Edit an intention in place: fill the plan in as it becomes definite. Each field given replaces its own; each window anchor given replaces its own; `clear` removes optional fields. Prose edits leave the version unchanged. Refuses a retired intention, a subject change, a cycle in serves, firm by a harness without policy, and habit: true from you, since holding a recurring intention as habit is the person's act: suggest it after a run of fulfilled instances and give them `intentions intention edit <id> --habit`; habit: false (or clear: [habit]) brings the plan back and is yours to do when they ask. Results equal `intentions intention edit --json`."},
 		s.intentionEdit)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_firm", Annotations: additive,
 		Description: "Set stability to firm. A person's act needs nothing; a harness (you, when this session identifies one) must pass `policy`, a terminus of the subject carrying auto_firm whose terms the intention satisfies, and the file then records firmed_under. Refused otherwise: never firm because the person sounds sure. On a terminus it refuses any policy and any harness: a terminus is the person's word, firmed only by a call naming an author and no harness, and it grounds nothing until then."},
@@ -105,6 +105,7 @@ type intentionIn struct {
 	Parties     []string   `json:"parties,omitempty" jsonschema:"URIs of other particulars whose availability must be satisfied"`
 	Serves      []servesIn `json:"serves,omitempty" jsonschema:"outbound references: in-order-to a means to an end, for-the-sake-of a terminus"`
 	Cadence     string     `json:"cadence,omitempty" jsonschema:"RRULE with date-level parts only; makes this recurring and needs a calendar anchor"`
+	Habit       *bool      `json:"habit,omitempty" jsonschema:"true holds a recurring intention as habit, the person's act, refused for you: suggest it instead; false clears it, which you may do when the person wants the plan back"`
 	Preference  string     `json:"preference,omitempty" jsonschema:"earliest | latest | adjacent | spread"`
 	AutoSelect  string     `json:"auto_select,omitempty" jsonschema:"policy condition on a terminus: max_duration=PT30M,stability=tentative"`
 	AutoFirm    string     `json:"auto_firm,omitempty" jsonschema:"policy condition on a terminus: max_duration=PT30M"`
@@ -117,7 +118,7 @@ type intentionIn struct {
 type intentionEditIn struct {
 	ID string `json:"id" jsonschema:"the intention to edit"`
 	intentionIn
-	Clear []string `json:"clear,omitempty" jsonschema:"optional fields to remove: description, duration, window, calendar, clock, relative, activity, location, parties, serves, cadence, preference, auto_select, auto_firm, reference"`
+	Clear []string `json:"clear,omitempty" jsonschema:"optional fields to remove: description, duration, window, calendar, clock, relative, activity, location, parties, serves, cadence, habit, preference, auto_select, auto_firm, reference"`
 }
 
 // apply merges an input into an intention. Fields present replace their own.
@@ -215,6 +216,12 @@ func (s *Server) apply(in intentionIn, clear []string, o *model.Intention, g *st
 	}
 	if cleared("cadence") {
 		o.Cadence = nil
+	}
+	if in.Habit != nil {
+		o.Habit = *in.Habit
+	}
+	if cleared("habit") {
+		o.Habit = false
 	}
 	if in.Preference != "" {
 		o.Preference = in.Preference
@@ -347,6 +354,9 @@ func (s *Server) intentionAdd(ctx context.Context, req *sdk.CallToolRequest, in 
 	if err := s.apply(in, nil, o, g, s.ws.Config.Context(at)); err != nil {
 		return errResult(err), nil, nil
 	}
+	if err := model.CheckHabit(nil, o, src, g.Format); err != nil {
+		return errResult(err), nil, nil
+	}
 	if ps := model.Check(o); len(ps) > 0 {
 		return errResult(apperr.Invalid("%s", ps.Error())), nil, nil
 	}
@@ -387,6 +397,9 @@ func (s *Server) intentionEdit(ctx context.Context, req *sdk.CallToolRequest, in
 	o := *before
 	o.Serves = append([]model.Ref(nil), before.Serves...)
 	if err := s.apply(in.intentionIn, in.Clear, &o, g, s.ws.Config.Context(at)); err != nil {
+		return errResult(err), nil, nil
+	}
+	if err := model.CheckHabit(before, &o, src, g.Format); err != nil {
 		return errResult(err), nil, nil
 	}
 	if ps := model.Check(&o); len(ps) > 0 {

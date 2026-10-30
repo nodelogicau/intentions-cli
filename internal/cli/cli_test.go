@@ -2449,3 +2449,133 @@ func TestMigrateCountsASupersededReasonAsGround(t *testing.T) {
 		t.Errorf("A is served through the successor, yet migrate refuses: %d %s (%s)", r.code, errMsg(r), a)
 	}
 }
+
+func TestHabit(t *testing.T) {
+	ws := initWS02(t)
+	tt := addIntention(t, ws, "--title", "being someone who writes").str("id")
+	mustOK(t, run(t, ws, "", "intention", "firm", tt), "firm terminus")
+	pol := addIntention(t, ws, "--title", "Small things may be firmed", "--auto-firm", "max_duration=PT30M").str("id")
+	mustOK(t, run(t, ws, "", "intention", "firm", pol), "firm policy")
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--capacity", "PT3H", "--calendar", "2026-09/2026-12", "--clock", "09:00/12:00", "--cadence", "FREQ=WEEKLY;BYDAY=TU"), "supply")
+	rec := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Pages", "--duration", "PT1H", "--calendar", "2026-09/2026-12", "--cadence", "FREQ=WEEKLY;BYDAY=TU", "--serves", tt+":for-the-sake-of"), "recurring").str("id")
+	g := mustOK(t, run(t, ws, "", "generate", "--horizon", "P2W", "--now", rnow), "generate")
+	created := g.json["created"].([]any)
+	if len(created) != 2 {
+		t.Fatalf("generate: %v", g.json)
+	}
+	first := created[0].(map[string]any)["id"].(string)
+	second := created[1].(map[string]any)["id"].(string)
+	mustOK(t, run(t, ws, "", "select", first, "--candidate", "1", "--now", rnow), "place the first instance")
+	files := map[string]string{first: readFile(t, ws, "intentions/"+first+".yaml"), second: readFile(t, ws, "intentions/"+second+".yaml")}
+
+	// A harness never sets habit, policy or not; a one-off never carries it.
+	for _, extra := range [][]string{nil, {"--policy", pol}} {
+		r := run(t, ws, "", append([]string{"intention", "edit", rec, "--habit", "--harness", "claude"}, extra...)...)
+		if r.code != 2 || !strings.Contains(errMsg(r), "person's act") {
+			t.Errorf("harness habituates %v: %d %s", extra, r.code, errMsg(r))
+		}
+	}
+	if r := run(t, ws, "", "intention", "add", "--title", "Once", "--duration", "PT1H", "--calendar", "2026-W40", "--serves", tt+":for-the-sake-of", "--habit"); r.code != 2 || !strings.Contains(errMsg(r), "cadence") {
+		t.Errorf("habit on a one-off: %d %s", r.code, errMsg(r))
+	}
+	// The person habituates: the version moves and no instance changes.
+	before := readFile(t, ws, "intentions/"+rec+".yaml")
+	h := mustOK(t, run(t, ws, "", "intention", "edit", rec, "--habit"), "person habituates")
+	body := readFile(t, ws, "intentions/"+rec+".yaml")
+	if !strings.Contains(body, "\ncadence: FREQ=WEEKLY;BYDAY=TU\nhabit: true\n") || h.str("previous_version") == h.str("version") || body == before {
+		t.Errorf("habituated file:\n%s", body)
+	}
+	for id, was := range files {
+		if readFile(t, ws, "intentions/"+id+".yaml") != was {
+			t.Errorf("habituation touched instance %s", id)
+		}
+	}
+	// No plan: generate skips it, silently unless named; the dormant instance asks nothing and is refused.
+	g = mustOK(t, run(t, ws, "", "generate", "--horizon", "P4W", "--now", rnow), "generate a habit")
+	if len(g.json["created"].([]any)) != 0 || len(g.json["skipped"].([]any)) != 0 {
+		t.Errorf("unnamed habit: %v", g.json)
+	}
+	g = mustOK(t, run(t, ws, "", "generate", "--horizon", "P4W", "--recurring", rec, "--now", rnow), "generate the named habit")
+	if sk := g.json["skipped"].([]any); len(sk) != 1 || !strings.Contains(sk[0].(map[string]any)["reason"].(string), "habit") {
+		t.Errorf("named habit: %v", g.json)
+	}
+	for _, verb := range [][]string{{"resolve", second}, {"select", second, "--candidate", "1"}} {
+		r := run(t, ws, "", append(verb, "--now", rnow)...)
+		if r.code != 2 || !strings.Contains(errMsg(r), "held as habit") || !strings.Contains(errMsg(r), "--clear-habit") {
+			t.Errorf("%s a dormant instance: %d %s", verb[0], r.code, errMsg(r))
+		}
+	}
+	u := mustOK(t, run(t, ws, "", "unresolved", "--now", rnow), "unresolved")
+	for _, e := range u.json["entries"].([]any) {
+		if id := e.(map[string]any)["id"]; id == second || id == first {
+			t.Errorf("unresolved lists a habit's instance: %v", e)
+		}
+	}
+	mustOK(t, run(t, ws, "", "select", first, "--replace", "--candidate", "1", "--now", rnow), "a placed instance re-resolves as before")
+	// A harness may edit a habit and may revert it; clearing cadence first is refused.
+	mustOK(t, run(t, ws, "", "intention", "edit", rec, "--description", "after coffee", "--harness", "claude"), "harness edits a habit")
+	if !strings.Contains(readFile(t, ws, "intentions/"+rec+".yaml"), "\nhabit: true\n") {
+		t.Error("a harness edit dropped habit")
+	}
+	if r := run(t, ws, "", "intention", "edit", rec, "--clear-cadence"); r.code != 2 || !strings.Contains(errMsg(r), "--clear-habit") {
+		t.Errorf("clear cadence on a habit: %d %s", r.code, errMsg(r))
+	}
+	mustOK(t, run(t, ws, "", "intention", "edit", rec, "--clear-habit", "--harness", "claude"), "harness reverts")
+	if strings.Contains(readFile(t, ws, "intentions/"+rec+".yaml"), "habit") {
+		t.Error("revert left habit")
+	}
+	if r := mustOK(t, run(t, ws, "", "resolve", second, "--now", rnow), "resolve after revert"); r.code != 0 {
+		t.Error("instance still dormant")
+	}
+	if g = mustOK(t, run(t, ws, "", "generate", "--horizon", "P4W", "--now", rnow), "generate resumes"); len(g.json["created"].([]any)) == 0 {
+		t.Errorf("generate did not resume: %v", g.json)
+	}
+}
+
+func TestHabitUnder01(t *testing.T) {
+	ws := initWS(t) // intentions/0.1
+	tt := addIntention(t, ws, "--title", "being someone who writes").str("id")
+	mustOK(t, run(t, ws, "", "intention", "firm", tt), "firm")
+	rec := addIntention(t, ws, "--title", "Pages", "--duration", "PT1H", "--calendar", "2026-09/2026-12", "--cadence", "FREQ=WEEKLY;BYDAY=TU", "--serves", tt+":for-the-sake-of").str("id")
+	if r := run(t, ws, "", "intention", "edit", rec, "--habit"); r.code != 2 || !strings.Contains(errMsg(r), "intentions migrate") {
+		t.Errorf("habit under 0.1: %d %s", r.code, errMsg(r))
+	}
+	// A habit merged into a 0.1 file has no effect until migrate.
+	path := filepath.Join(ws, "intentions", rec+".yaml")
+	b := readFileAt(t, path)
+	if err := os.WriteFile(path, []byte(strings.Replace(b, "\ncadence: FREQ=WEEKLY;BYDAY=TU\n", "\ncadence: FREQ=WEEKLY;BYDAY=TU\nhabit: true\n", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g := mustOK(t, run(t, ws, "", "generate", "--horizon", "P2W", "--now", rnow), "generate under 0.1")
+	if len(g.json["created"].([]any)) != 2 {
+		t.Errorf("a merged habit under 0.1 should still generate: %v", g.json)
+	}
+	u := mustOK(t, run(t, ws, "", "unresolved", "--now", rnow), "unresolved under 0.1")
+	if int(u.json["count"].(float64)) != 2 {
+		t.Errorf("instances under 0.1 should be listed: %v", u.json["counts"])
+	}
+}
+
+func TestMigrateBringsAMergedHabitIntoEffect(t *testing.T) {
+	ws := initWS(t) // intentions/0.1
+	tt := addIntention(t, ws, "--title", "being someone who writes").str("id")
+	mustOK(t, run(t, ws, "", "intention", "firm", tt), "firm")
+	rec := addIntention(t, ws, "--title", "Pages", "--duration", "PT1H", "--calendar", "2026-09/2026-12", "--cadence", "FREQ=WEEKLY;BYDAY=TU", "--serves", tt+":for-the-sake-of")
+	path := filepath.Join(ws, "intentions", rec.str("id")+".yaml")
+	b := readFileAt(t, path)
+	if err := os.WriteFile(path, []byte(strings.Replace(b, "\ncadence: FREQ=WEEKLY;BYDAY=TU\n", "\ncadence: FREQ=WEEKLY;BYDAY=TU\nhabit: true\n", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if v := run(t, ws, "", "validate"); v.code != 4 {
+		t.Errorf("habit under 0.1 should fail validate: %d", v.code)
+	}
+	mustOK(t, run(t, ws, "", "migrate"), "migrate")
+	after := readFileAt(t, path)
+	if !strings.Contains(after, "\nhabit: true\n") || strings.Contains(after, "version: "+rec.str("version")+"\n") {
+		t.Errorf("migrated habit should keep the field and move its version:\n%s", after)
+	}
+	mustOK(t, run(t, ws, "", "validate"), "validate after migrate")
+	if g := mustOK(t, run(t, ws, "", "generate", "--horizon", "P2W", "--now", rnow), "generate"); len(g.json["created"].([]any)) != 0 {
+		t.Errorf("a migrated habit generated: %v", g.json)
+	}
+}

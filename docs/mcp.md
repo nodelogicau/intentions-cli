@@ -154,8 +154,8 @@ take the same keys either way. Every optional field may be omitted;
 | `desire_retire` | `id`, `kind` (`abandoned` \| `superseded`), `superseded_by?`, `reason?` | `{…, previous_version, retired}`; `adopted` refused |
 | `desire_show` | `id` | `{…, serves_resolved}` |
 | `desire_list` | `subject?`, `activity?`, `retired?` | `{desires, count}` |
-| `intention_add` | `title`, `subject?`, `duration?`, `window?`, `activity?`, `location[]?`, `parties[]?`, `serves[{id, role}]?`, `cadence?`, `preference?`, `auto_select?`, `auto_firm?`, `stability?`, `policy?`, `reference?`, `description?`, `timestamp?`, `source?` | `{id, type, path, version, object, created, findings?}` |
-| `intention_edit` | `id`, any of the above, `clear[]?` | `{…, previous_version, projection_changed, flags}` |
+| `intention_add` | `title`, `subject?`, `duration?`, `window?`, `activity?`, `location[]?`, `parties[]?`, `serves[{id, role}]?`, `cadence?`, `habit?`, `preference?`, `auto_select?`, `auto_firm?`, `stability?`, `policy?`, `reference?`, `description?`, `timestamp?`, `source?` | `{id, type, path, version, object, created, findings?}`; `habit: true` is refused, since every call here carries a harness: holding an intention as habit is the person's act in the CLI |
+| `intention_edit` | `id`, any of the above, `clear[]?` | `{…, previous_version, projection_changed, flags}`; `habit: false` or `clear: [habit]` brings a habit's plan back |
 | `intention_firm` | `id`, `policy?`, `source?` | `{…, previous_version, policy?, findings?}` |
 | `intention_retire` | `id`, `kind`, `superseded_by?`, `reason?` | `{…, retired}`; on a terminus, `fulfilled` is refused, `superseded_by` must name a terminus of the subject, and only a tentative terminus you drafted may be retired |
 | `intention_show` | `id`, `now?` | `{…, serves_resolved, flags}` |

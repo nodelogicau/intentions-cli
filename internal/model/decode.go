@@ -603,6 +603,10 @@ func (d *decoder) intention(root *yaml.Node) *Intention {
 			o.Serves = d.refs(k, v)
 		case "cadence":
 			o.Cadence = d.cadence(k, v)
+		case "habit":
+			if b := d.boolean(k, v); b != nil {
+				o.Habit = *b
+			}
 		case "occurrence":
 			o.Occurrence = d.str(k, v)
 		case "placement":

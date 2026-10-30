@@ -21,11 +21,12 @@ type intentionFields struct {
 	preference, autoSelect, autoFirm, reference  string
 	location, parties, serves                    []string
 	policy                                       string
+	habit                                        bool
 	window                                       windowFlags
 	clear                                        map[string]*bool
 }
 
-var clearableIntentionFields = []string{"description", "duration", "activity", "location", "parties", "serves", "cadence", "preference", "auto-select", "auto-firm", "reference"}
+var clearableIntentionFields = []string{"description", "duration", "activity", "location", "parties", "serves", "cadence", "habit", "preference", "auto-select", "auto-firm", "reference"}
 
 func addIntentionFieldFlags(cmd *cobra.Command, f *intentionFields, edit bool) {
 	cmd.Flags().StringVar(&f.title, "title", "", "prose title (required on add)")
@@ -38,6 +39,7 @@ func addIntentionFieldFlags(cmd *cobra.Command, f *intentionFields, edit bool) {
 	cmd.Flags().StringArrayVar(&f.parties, "party", nil, "URI of another particular whose availability must be satisfied (repeatable)")
 	cmd.Flags().StringArrayVar(&f.serves, "serves", nil, "outbound reference id:role, role in-order-to, for-the-sake-of, instance-of (repeatable)")
 	cmd.Flags().StringVar(&f.cadence, "cadence", "", "RRULE with date-level parts only; makes this a recurring intention, whose window needs a calendar anchor")
+	cmd.Flags().BoolVar(&f.habit, "habit", false, "hold a recurring intention as habit: no instances, nothing to resolve; the person's act, never a harness's")
 	cmd.Flags().StringVar(&f.preference, "preference", "", "earliest, latest, adjacent, or spread")
 	cmd.Flags().StringVar(&f.autoSelect, "auto-select", "", "policy condition on a terminus, e.g. max_duration=PT30M,stability=tentative")
 	cmd.Flags().StringVar(&f.autoFirm, "auto-firm", "", "policy condition on a terminus, e.g. max_duration=PT30M")
@@ -152,6 +154,12 @@ func (a *app) applyIntentionFields(cmd *cobra.Command, f intentionFields, o *mod
 	}
 	if cleared("cadence") {
 		o.Cadence = nil
+	}
+	if changed("habit") {
+		o.Habit = f.habit
+	}
+	if cleared("habit") {
+		o.Habit = false
 	}
 	if changed("preference") {
 		o.Preference = f.preference
@@ -279,6 +287,9 @@ func (a *app) intentionAddCmd() *cobra.Command {
 			if err := a.applyIntentionFields(cmd, f, o, ws, g, ws.Config.Context(now)); err != nil {
 				return err
 			}
+			if err := model.CheckHabit(nil, o, src, g.Format); err != nil {
+				return err
+			}
 			if ps := model.Check(o); len(ps) > 0 {
 				return ps
 			}
@@ -336,6 +347,9 @@ func (a *app) intentionEditCmd() *cobra.Command {
 			o := *before
 			o.Serves = append([]model.Ref(nil), before.Serves...)
 			if err := a.applyIntentionFields(cmd, f, &o, ws, g, ws.Config.Context(now)); err != nil {
+				return err
+			}
+			if err := model.CheckHabit(before, &o, src, g.Format); err != nil {
 				return err
 			}
 			if ps := model.Check(&o); len(ps) > 0 {

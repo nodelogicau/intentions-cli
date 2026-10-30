@@ -274,6 +274,9 @@ func inconsistencies(e resolve.Env) ([]Flag, error) {
 		if in.Retired != nil || in.Placement != nil || in.Duration == nil || in.Window == nil || in.IsRecurring() {
 			continue
 		}
+		if _, dormant := model.Dormant(e.G, in); dormant {
+			continue
+		}
 		if e.InCycle(in.ID) != nil {
 			continue
 		}

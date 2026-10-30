@@ -608,6 +608,47 @@ func TestTerminusRetirementOverMCP(t *testing.T) {
 	}
 }
 
+func TestHabitOverMCP(t *testing.T) {
+	harnessFormat = model.Format02
+	h := newHarness(t, "claude-ai", Options{})
+	harnessFormat = model.Format01
+	term := str(h.ok("intention_add", map[string]any{"title": "being someone who writes"}), "id")
+	h.firm(term)
+	rec := str(h.ok("intention_add", map[string]any{"title": "Pages", "duration": "PT1H", "window": map[string]any{"calendar": "2026-09/2026-12"}, "cadence": "FREQ=WEEKLY;BYDAY=TU",
+		"serves": []map[string]any{{"id": term, "role": "for-the-sake-of"}}}), "id")
+	if msg := h.fail("intention_edit", map[string]any{"id": rec, "habit": true}, "refused"); !strings.Contains(msg, "person's act") {
+		t.Errorf("client habituates: %s", msg)
+	}
+	h.fail("intention_add", map[string]any{"title": "More pages", "duration": "PT1H", "window": map[string]any{"calendar": "2026-09/2026-12"}, "cadence": "FREQ=WEEKLY;BYDAY=WE", "habit": true,
+		"serves": []map[string]any{{"id": term, "role": "for-the-sake-of"}}}, "refused")
+	if strings.Contains(h.file("intentions/"+rec+".yaml"), "habit") {
+		t.Fatal("habit set through the server")
+	}
+	h.ok("generate", map[string]any{"horizon": "P2W"})
+	// The person habituates in the CLI; here, on disk.
+	g, err := h.ws.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	o, _ := g.Get(rec)
+	hab := *o.(*model.Intention)
+	hab.Habit, hab.Source = true, model.Source{Author: ada}
+	if err := h.ws.WriteObject(&hab); err != nil {
+		t.Fatal(err)
+	}
+	if u := h.ok("unresolved", map[string]any{}); len(list(u, "entries")) != 0 {
+		t.Errorf("unresolved lists a habit's instances: %v", u)
+	}
+	// The client may bring the plan back.
+	r := h.ok("intention_edit", map[string]any{"id": rec, "habit": false})
+	if _, has := obj(r)["habit"]; has || strings.Contains(h.file("intentions/"+rec+".yaml"), "habit") || str(r, "previous_version") == str(r, "version") {
+		t.Errorf("client reverts: %v", r)
+	}
+	if u := h.ok("unresolved", map[string]any{}); len(list(u, "entries")) == 0 {
+		t.Errorf("instances should be back after revert: %v", u)
+	}
+}
+
 func TestDesiresOverMCP(t *testing.T) {
 	h := newHarness(t, "claude-ai", Options{})
 	d := h.ok("desire_add", map[string]any{"title": "call the accountant", "activity": "admin"})

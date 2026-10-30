@@ -172,6 +172,16 @@ A window is stored as the person expressed it and never as computed bounds:
 `--duration` is an ISO 8601 duration (`PT90M`) or a range `nominal:min:max`
 (`PT1H:PT30M:PT2H`). `--cadence` is an RRULE using date-level parts only; it
 makes the intention recurring and needs a `--calendar` anchor to expand within.
+`--habit` holds a recurring intention as **habit**: its context cues it and it
+needs no plan. A habit generates no instances; its unplaced, unretired
+instances are dormant, refused by `resolve` and `select`, left out of
+`unresolved` and of `intention-inconsistency`, and nothing is written to them,
+so `--clear-habit` brings them straight back. Placed instances behave as
+before. A habit stays active and must still reach a firm terminus, so a
+withdrawn reason reports it unserved. Setting `habit` is the person's act:
+a source carrying a harness is refused whatever `--policy` it names, while
+clearing it is anyone's. `habit` is in the 0.2 projection only and is refused
+in a 0.1 workspace, naming `migrate`.
 
 A **desire** is a want the person has expressed and not yet committed to,
 stored in `desires/` with a `des_` id: title, optional description, activity
@@ -349,6 +359,15 @@ Under 0.2 those fields are `capacity` and `activities`, `origin` is
 `resolution` or `import` with a sibling `resolution` field, and an intention
 that reaches no firm terminus is refused on write and an error on `validate`.
 A workspace naming a format this binary does not read is refused, naming both.
+
+`habit` joined the 0.2 intention projection after files carried
+`intentions/0.2`: the format's one named exception to the freeze rule,
+admitted because it is omitted at its default, so no existing version moved.
+A binary older than `habit` (v0.15.0 and earlier) keeps the field but neither
+hashes nor applies it, so it reports a habit as `stale_version`, fails
+`index --check`, and keeps generating its instances. Upgrade every binary
+that shares a workspace before anyone sets `habit`. Under 0.1 it is a
+validation error naming `migrate`, hashed as if absent and given no effect.
 
 `intentions migrate` moves a workspace from 0.1 to 0.2. It refuses while any
 intention is unserved, naming them; otherwise it rewrites the shapes and

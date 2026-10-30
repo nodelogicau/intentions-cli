@@ -5,6 +5,24 @@ All notable changes to `intentions` are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A recurring intention may be held as habit** (#10, format changes
+  `habit-needs-no-plan` and `habit-joins-frozen-projection`).
+  `intention edit --habit` sets it, as the person's act; a harness is refused
+  whatever `--policy` it names, and `--clear-habit` (or `habit: false` over
+  MCP) brings the plan back from any source. A habit generates no instances,
+  and its unplaced instances are dormant: `resolve` and `select` refuse them,
+  `unresolved` omits them, and `intention-inconsistency` does not count them.
+  A habit still has to reach a firm terminus. `habit_not_recurring` and
+  `habit_format` are new validation errors.
+- **Upgrade before you set it.** `habit` joins the `intentions/0.2`
+  projection as the format's one named exception to the freeze rule: no
+  existing version moves, but a binary from v0.15.0 or earlier reports a
+  habit as `stale_version`, fails `index --check`, and keeps generating its
+  instances. Upgrade every binary that shares a workspace before anyone sets
+  `habit`. In a 0.1 workspace setting it is refused, naming `migrate`.
+
 ### Changed
 
 - **Grounding passes through retired intentions** (#11, format change

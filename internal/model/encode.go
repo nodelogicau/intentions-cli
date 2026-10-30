@@ -292,6 +292,9 @@ func intentionNode(o *Intention) *yaml.Node {
 	addStrList(m, "parties", o.Parties, false)
 	addKV(m, "serves", refsNode(o.Serves))
 	addKV(m, "cadence", cadenceNode(o.Cadence))
+	if o.Habit {
+		addKV(m, "habit", plain("!!bool", "true"))
+	}
 	addStr(m, "occurrence", o.Occurrence)
 	addKV(m, "placement", placementNode(o.Placement))
 	addStr(m, "preference", o.Preference)

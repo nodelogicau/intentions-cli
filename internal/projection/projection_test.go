@@ -185,3 +185,55 @@ func TestProjectionScenarios(t *testing.T) {
 }
 
 var d, _ = temporal.ParseDurationSpec("PT1H")
+
+// habit enters the 0.2 projection only when true, and never the 0.1 one: no
+// existing hash moves, and a 0.1 file carrying it by merge hashes as if it
+// were absent. The 0.2 vector pins the bytes with habit set.
+func TestHabitProjection(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "model", "testdata", "habit.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	decode := func(format string, habit bool) *model.Intention {
+		obj, probs, err := model.Decode(b, model.TypeIntention)
+		if err != nil || len(probs) > 0 {
+			t.Fatalf("habit.yaml: %v %v", err, probs)
+		}
+		o := obj.(*model.Intention)
+		o.SetFormat(format)
+		o.Habit = habit
+		return o
+	}
+	on02, off02 := decode(model.Format02, true), decode(model.Format02, false)
+	if !on02.Habit || Project(on02)["habit"] != true || Project(off02)["habit"] != nil {
+		t.Errorf("0.2 projection: %v / %v", Project(on02), Project(off02))
+	}
+	if MustVersion(on02) == MustVersion(off02) {
+		t.Error("setting habit under 0.2 did not move the version")
+	}
+	if on01, off01 := decode(model.Format01, true), decode(model.Format01, false); MustVersion(on01) != MustVersion(off01) || Project(on01)["habit"] != nil {
+		t.Error("habit entered the 0.1 projection")
+	}
+	if len(Fields[model.Format01][model.TypeIntention]) != 12 || len(Fields[model.Format02][model.TypeIntention]) != 13 {
+		t.Error("intention field sets: 0.1 is frozen at 12, 0.2 admits habit alone")
+	}
+	canon, err := Canonical(on02)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := MustVersion(on02)
+	jsonPath, verPath := filepath.Join("testdata", "habit.canonical.json"), filepath.Join("testdata", "habit.version")
+	if *update {
+		_ = os.WriteFile(jsonPath, canon, 0o644)
+		_ = os.WriteFile(verPath, []byte(v+"\n"), 0o644)
+		return
+	}
+	wantJSON, err := os.ReadFile(jsonPath)
+	if err != nil {
+		t.Fatal("missing golden vector; run with -update")
+	}
+	wantV, _ := os.ReadFile(verPath)
+	if string(wantJSON) != string(canon) || strings.TrimSpace(string(wantV)) != v {
+		t.Errorf("habit vector\n got %s %s\nwant %s %s", canon, v, wantJSON, wantV)
+	}
+}

@@ -1,11 +1,14 @@
 package query
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/nodelogicau/intentions-cli/internal/model"
+	"github.com/nodelogicau/intentions-cli/internal/store"
 	"github.com/nodelogicau/intentions-cli/internal/temporal"
 )
 
@@ -339,5 +342,87 @@ func TestRefuseRetirement(t *testing.T) {
 	// Not a terminus: nothing to guard here.
 	if err := RefuseRetirement(g, a, at("abandoned", "", harness), "EDIT"); err != nil {
 		t.Errorf("means: %v", err)
+	}
+}
+
+func newWS02(t *testing.T) *store.Workspace {
+	t.Helper()
+	cfg := store.NewConfig()
+	cfg.Format = model.Format02
+	cfg.Resolver.Timezone = "Australia/Melbourne"
+	cfg.Defaults.Subject = "https://example.com/people/ada"
+	cfg.Defaults.Source.Author = "https://example.com/people/ada"
+	ws, _, err := store.Init(t.TempDir(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ws
+}
+
+func recurring(id string) *model.Intention {
+	o := withDuration(intention(id))
+	c, _ := temporal.ParseCadence("FREQ=DAILY")
+	cal, _ := temporal.ParseCalendar("2026-09/2026-12")
+	o.Cadence, o.Window = &c, &temporal.Window{Calendar: &cal}
+	return o
+}
+
+func TestHabitValidation(t *testing.T) {
+	ws := newWS02(t)
+	tt := firmTerminus("int_t")
+	h := recurring("int_h")
+	h.Habit = true
+	h.Serves = []model.Ref{{ID: "int_t", Role: model.RoleForTheSakeOf}}
+	inst := withDuration(intention("int_i"))
+	inst.Habit = true
+	inst.Occurrence = "2026-09-15"
+	inst.Serves = []model.Ref{{ID: "int_h", Role: model.RoleInstanceOf}}
+	term := intention("int_x")
+	term.Habit = true
+	write(t, ws, tt, h, inst, term)
+	r := run(t, ws)
+	if len(findingsFor(r, "int_h")) != 0 {
+		t.Errorf("a served habit: %v", findingsFor(r, "int_h"))
+	}
+	for _, id := range []string{"int_i", "int_x"} {
+		if f := findingsFor(r, id); !strings.HasPrefix(f["habit_not_recurring"], "error:") {
+			t.Errorf("%s: %v", id, f)
+		}
+	}
+	// The person withdraws the reason: the habit is unserved, at error level under 0.2.
+	tt.Stability = "tentative"
+	inst.Habit, term.Habit = false, false
+	write(t, ws, tt, inst, term)
+	if f := findingsFor(run(t, ws), "int_h"); !strings.HasPrefix(f["unserved"], "error:") {
+		t.Errorf("a habit outlives its reason: %v", f)
+	}
+}
+
+func TestHabitUnder01(t *testing.T) {
+	ws := newWS(t) // intentions/0.1
+	tt := firmTerminus("int_t")
+	h := recurring("int_h")
+	h.Serves = []model.Ref{{ID: "int_t", Role: model.RoleForTheSakeOf}}
+	write(t, ws, tt, h)
+	// A merge adds habit to the file without touching its cached version.
+	path := filepath.Join(ws.Root, "intentions", "int_h.yaml")
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	merged := strings.Replace(string(b), "\ncadence: FREQ=DAILY\n", "\ncadence: FREQ=DAILY\nhabit: true\n", 1)
+	if merged == string(b) {
+		t.Fatalf("no cadence line:\n%s", b)
+	}
+	if err := os.WriteFile(path, []byte(merged), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := run(t, ws)
+	f := findingsFor(r, "int_h")
+	if !strings.HasPrefix(f["habit_format"], "error:") || !strings.Contains(f["habit_format"], "intentions migrate") {
+		t.Errorf("habit under 0.1: %v", f)
+	}
+	if _, stale := f["stale_version"]; stale {
+		t.Errorf("habit moved the 0.1 version: %v", f)
 	}
 }

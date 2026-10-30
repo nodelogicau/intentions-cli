@@ -203,6 +203,12 @@ func (c *checker) intention(o *Intention) {
 	if o.Stability == "firm" && o.Source.Harness != "" && o.FirmedUnder == "" {
 		c.add("harness_firm", "firmed_under", "stability is firm and the source carries harness %q but no firmed_under names the policy; a harness may not firm without one", o.Source.Harness)
 	}
+	if o.Habit && o.Cadence == nil {
+		c.add("habit_not_recurring", "habit", "habit is admitted only on a recurring intention, one carrying a cadence; clear it with --clear-habit")
+	}
+	if o.Habit && o.Format() == Format01 {
+		c.add("habit_format", "habit", "habit is admitted only under %s, and this workspace is %s; the person moves it with `intentions migrate`, and until then habit has no effect; or clear it with --clear-habit", Format02, Format01)
+	}
 	if o.Cadence != nil && (o.Window == nil || o.Window.Calendar == nil) {
 		c.add("cadence_anchor", "cadence", "a cadence needs a window with a calendar anchor to expand within")
 	}

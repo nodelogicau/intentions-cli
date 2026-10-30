@@ -1,0 +1,1 @@
+{"cadence":"FREQ=DAILY","duration":"PT20M","habit":true,"serves":[{"id":"int_01a05a00-1111-7000-8000-000000000001","role":"for-the-sake-of"}],"stability":"firm","subject":"https://example.com/people/ada","window":{"calendar":"2026-09/2026-12","clock":"06:30/07:30"}}

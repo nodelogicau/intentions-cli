@@ -4,6 +4,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/nodelogicau/intentions-cli/internal/model"
 	"github.com/nodelogicau/intentions-cli/internal/temporal"
 )
 
@@ -49,6 +50,9 @@ func Unresolved(e Env, opts UnresolvedOptions) ([]UnresolvedEntry, error) {
 	for _, in := range e.G.Intentions() {
 		if in.Retired != nil || in.Placement != nil || in.IsRecurring() {
 			continue
+		}
+		if _, dormant := model.Dormant(e.G, in); dormant {
+			continue // a habit's instance asks nothing
 		}
 		if in.Duration == nil && in.Window == nil && len(in.Serves) == 0 {
 			continue // a terminus is a sink, never placed

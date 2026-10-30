@@ -400,3 +400,39 @@ func TestMintIDs(t *testing.T) {
 		t.Error("unknown prefix accepted")
 	}
 }
+
+func TestHabitRoundTrip(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("testdata", "habit.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj, probs, err := Decode(b, TypeIntention)
+	if err != nil || len(probs) > 0 {
+		t.Fatalf("decode: %v %v", err, probs)
+	}
+	o := obj.(*Intention)
+	if !o.Habit || len(o.Extras) > 0 {
+		t.Fatalf("habit not decoded as a field: %+v", o)
+	}
+	out, err := Encode(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), "\ncadence: FREQ=DAILY\nhabit: true\nsource:") {
+		t.Errorf("habit not after cadence:\n%s", out)
+	}
+	o.Habit = false
+	if out, _ = Encode(o); strings.Contains(string(out), "habit") {
+		t.Errorf("habit written at its default:\n%s", out)
+	}
+	// Held as habit only under 0.2.
+	o.Habit = true
+	o.SetFormat(Format01)
+	if o.HeldAsHabit() {
+		t.Error("habit takes effect under 0.1")
+	}
+	o.SetFormat(Format02)
+	if !o.HeldAsHabit() {
+		t.Error("habit has no effect under 0.2")
+	}
+}
