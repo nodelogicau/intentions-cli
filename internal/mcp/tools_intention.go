@@ -29,7 +29,7 @@ func (s *Server) registerTools() {
 		Description: "Set stability to firm. A person's act needs nothing; a harness (you, when this session identifies one) must pass `policy`, a terminus of the subject carrying auto_firm whose terms the intention satisfies, and the file then records firmed_under. Refused otherwise: never firm because the person sounds sure. On a terminus it refuses any policy and any harness: a terminus is the person's word, firmed only by a call naming an author and no harness, and it grounds nothing until then."},
 		s.intentionFirm)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_retire", Annotations: additive,
-		Description: "Append a retirement record: fulfilled, abandoned, or superseded (with superseded_by). Nothing is deleted; the file stays and every reference to it still resolves. A retired intention refuses further edits."},
+		Description: "Append a retirement record: fulfilled, abandoned, or superseded (with superseded_by). Nothing is deleted; the file stays and every reference to it still resolves. A retired intention refuses further edits. A terminus admits abandoned and superseded only, superseded by a terminus of its subject; a firm terminus, or a draft the person wrote, is the person's to retire in the CLI, and you may retire only a tentative terminus you drafted. Retiring a terminus that something still rests on is refused: suggest the person supersede it with a firm terminus when the reason has changed, or set it tentative to withdraw it."},
 		s.intentionRetire)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_show", Annotations: readOnly,
 		Description: "One intention with its computed version, resolved serves targets, and current consistency flags. Results equal `intentions intention show --json`."},
@@ -508,6 +508,11 @@ func (s *Server) retire(req *sdk.CallToolRequest, in retireIn, want model.Type) 
 	r := model.Retired{Kind: in.Kind, Reason: in.Reason, SupersededBy: in.SupersededBy, Source: s.source(req, in.Source), Timestamp: ts}
 	if err := model.CheckRetirement(g, obj, r); err != nil {
 		return errResult(err), nil, nil
+	}
+	if o, ok := obj.(*model.Intention); ok {
+		if err := query.RefuseRetirement(g, o, r, "intention_edit with stability tentative"); err != nil {
+			return errResult(err), nil, nil
+		}
 	}
 	prev, _ := projection.Version(obj)
 	var updated model.Object

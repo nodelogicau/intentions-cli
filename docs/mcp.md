@@ -157,7 +157,7 @@ take the same keys either way. Every optional field may be omitted;
 | `intention_add` | `title`, `subject?`, `duration?`, `window?`, `activity?`, `location[]?`, `parties[]?`, `serves[{id, role}]?`, `cadence?`, `preference?`, `auto_select?`, `auto_firm?`, `stability?`, `policy?`, `reference?`, `description?`, `timestamp?`, `source?` | `{id, type, path, version, object, created, findings?}` |
 | `intention_edit` | `id`, any of the above, `clear[]?` | `{…, previous_version, projection_changed, flags}` |
 | `intention_firm` | `id`, `policy?`, `source?` | `{…, previous_version, policy?, findings?}` |
-| `intention_retire` | `id`, `kind`, `superseded_by?`, `reason?` | `{…, retired}` |
+| `intention_retire` | `id`, `kind`, `superseded_by?`, `reason?` | `{…, retired}`; on a terminus, `fulfilled` is refused, `superseded_by` must name a terminus of the subject, and only a tentative terminus you drafted may be retired |
 | `intention_show` | `id`, `now?` | `{…, serves_resolved, flags}` |
 | `intention_list` | `subject?`, `activity?`, `stability?`, `recurring?`, `placed?`, `unplaced?`, `instances_of?`, `retired?` | `{intentions, count}` |
 | `availability_add` | `subject`, `capacity`, `window`, `title?`, `activities[]?`, `location[]?`, `cadence?`, `valid_until?`, `scope?`, `description?`, `timestamp?`, `source?` | `{…, effective_valid_until, effective_valid_until_from, flags, created}` |
@@ -213,7 +213,11 @@ nothing, and the refusal names the command the person runs. A terminus is the
 one thing no policy covers, so it is never
 firmed through this server: draft it tentative and give the person the CLI
 command, `intentions intention firm <id>`, run with their author and no
-harness. Until they do, it grounds nothing. `source.author` comes from the call, `--author`,
+harness. Until they do, it grounds nothing. Retiring a terminus is the
+person's act in the same way: `intention_retire` refuses a firm terminus and
+a draft the person wrote, and accepts only a tentative terminus you drafted.
+When a reason has changed, suggest the person supersede it with a firm
+terminus; to withdraw one, they set it tentative. `source.author` comes from the call, `--author`,
 `INTENTIONS_AUTHOR`, or `defaults.source.author` in `intentions.yaml`; an
 intention or availability with no author is refused.
 

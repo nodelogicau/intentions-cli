@@ -124,7 +124,7 @@ intentions intention add --title "Read the board pack" --json
 | `intention add` | Create an intention. `--title` is required; `subject` defaults from `intentions.yaml`. An intention that is not a terminus should reach one through `--serves`; an unserved write is accepted and its result carries a warning under `findings` |
 | `intention edit <id>` | Edit fields in place. Prose edits leave the version unchanged; `--clear-<field>` removes one |
 | `intention firm <id>` | Set stability to firm. A harness must pass `--policy <int_id>` naming a firm terminus of the subject carrying `auto_firm`; the id is written to `firmed_under`, and a tentative policy is refused by name. On a terminus, refuses any policy and any harness: only the person firms one |
-| `intention retire <id>` | Append a retirement record: `--kind fulfilled\|abandoned\|superseded [--superseded-by id]` |
+| `intention retire <id>` | Append a retirement record: `--kind fulfilled\|abandoned\|superseded [--superseded-by id]`. A terminus admits `abandoned` and `superseded` (by a terminus of its subject) only; retiring one is refused when it would leave a served intention with no firm terminus, and refused for a harness unless the terminus is a tentative draft the harness wrote |
 | `intention show <id>`, `intention list` | Show one with its version and resolved serves targets; list active (or `--retired`, `--recurring`) with filters |
 | `availability add` | Create an availability. `--subject`, `--capacity` and a window are required; `--activities` names the terms it is good for (`--duration` and `--conditional` still work as aliases) |
 | `availability edit <id>` | Edit prose or widen `--scope`. A change of terms is refused: use `supersede` |
@@ -144,7 +144,7 @@ intentions intention add --title "Read the board pack" --json
 | `show <id>` | Show any object, including commitments and resolutions written by other tools |
 | `version-of <id> [--projection]` | The computed version, and the canonical JSON it hashes |
 | `bounds [<id>] [--calendar] [--clock]` | Clock-time bounds of a window in the resolver context, with overrides |
-| `validate` | Check the whole workspace; exits 4 on any error. An intention reaching no firm terminus of its subject is a warning (`unserved`) naming the fix; a record selected under a policy since withdrawn is a warning (`selector_withdrawn`); a tentative terminus is info (`draft_terminus`) |
+| `validate` | Check the whole workspace; exits 4 on any error. An intention reaching no firm terminus of its subject is a warning (`unserved`) naming the fix; a record selected under a policy since withdrawn is a warning (`selector_withdrawn`); a means whose end was abandoned is a warning (`abandoned_end`); a terminus retired as `fulfilled` (`terminus_fulfilled`) or superseded by anything but a terminus of its subject (`terminus_successor`) is an error; a tentative terminus is info (`draft_terminus`) |
 | `index [--check]` | Rebuild `index.yaml`, or verify it and exit 4 on drift |
 | `migrate [--check]` | Move a `intentions/0.1` workspace to `intentions/0.2`: the person's act, refused while any intention is unserved; `--check` reports and writes nothing |
 | `skill show\|install` | Print or install the embedded agent skill for a harness; `install --check` for CI |
@@ -197,6 +197,21 @@ retiring it ends it, and either withdraws what rested on it: every intention
 firmed under it is in error until the person re-firms it by their own act
 or sets it tentative, while a resolution record selected under it is
 history and only warns.
+
+The walk to a terminus passes through retired intentions. At one retired as
+`superseded` it continues at `superseded_by`; at one retired as anything else
+it continues through that intention's own `serves`. A retired terminus
+grounds nothing, but a superseded one grounds through its successor, so a
+reason replaced by a firm terminus keeps everything that rested on it
+grounded, with no edits to the dependents. A terminus admits `abandoned` and
+`superseded` only, superseded by a terminus of its subject; it is never
+`fulfilled`. Retiring one is refused when an intention served now would be
+left with no firm terminus, naming those intentions and the two ways out:
+set the terminus tentative to withdraw it, or supersede it with a firm one.
+A firm terminus is the person's to retire, and a harness may retire only a
+tentative terminus it drafted. An intention whose `in-order-to` or
+`instance-of` end was abandoned is warned (`abandoned_end`), so pending
+instances of an ended arrangement prompt the person to retire them.
 
 ### Resolution
 

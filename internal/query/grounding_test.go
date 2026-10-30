@@ -206,3 +206,138 @@ func TestSelectorWithdrawn(t *testing.T) {
 		t.Errorf("not a policy: %v", f)
 	}
 }
+
+func retire(o *model.Intention, kind, by string) *model.Intention {
+	o.Retired = &model.Retired{Kind: kind, SupersededBy: by, Source: o.Source, Timestamp: time.Now()}
+	return o
+}
+
+func TestGroundingThroughRetirement(t *testing.T) {
+	ws := newWS(t)
+	// A reason superseded by a firm one passes the ground on.
+	old := retire(firmTerminus("int_t"), "superseded", "int_u")
+	u := firmTerminus("int_u")
+	a := withDuration(intention("int_a"))
+	a.Serves = []model.Ref{{ID: "int_t", Role: model.RoleForTheSakeOf}}
+	// An abandoned reason grounds nothing, and the message says it is retired.
+	gone := retire(firmTerminus("int_g"), "abandoned", "")
+	b := withDuration(intention("int_b"))
+	b.Serves = []model.Ref{{ID: "int_g", Role: model.RoleForTheSakeOf}}
+	// An ended arrangement: its instances stay served and each warns.
+	rec := retire(withDuration(intention("int_rec")), "abandoned", "")
+	rec.Serves = []model.Ref{{ID: "int_u", Role: model.RoleForTheSakeOf}}
+	i1 := withDuration(intention("int_i1"))
+	i1.Serves = []model.Ref{{ID: "int_rec", Role: model.RoleInstanceOf}}
+	// A fulfilled end is walked through and silent.
+	done := retire(withDuration(intention("int_done")), "fulfilled", "")
+	done.Serves = []model.Ref{{ID: "int_u", Role: model.RoleForTheSakeOf}}
+	c := withDuration(intention("int_c"))
+	c.Serves = []model.Ref{{ID: "int_done", Role: model.RoleInOrderTo}}
+	write(t, ws, old, u, a, gone, b, rec, i1, done, c)
+	r := run(t, ws)
+	if f := findingsFor(r, "int_a"); len(f) != 0 {
+		t.Errorf("served through a superseded reason: %v", f)
+	}
+	if f := findingsFor(r, "int_b"); !strings.Contains(f["unserved"], "retired terminus int_g") {
+		t.Errorf("abandoned reason: %v", f)
+	}
+	if f := findingsFor(r, "int_i1"); len(f) != 1 || !strings.HasPrefix(f["abandoned_end"], "warning:") || !strings.Contains(f["abandoned_end"], "int_rec") {
+		t.Errorf("ended arrangement: %v", f)
+	}
+	if f := findingsFor(r, "int_c"); len(f) != 0 {
+		t.Errorf("fulfilled end: %v", f)
+	}
+}
+
+func TestTerminusRetirementErrors(t *testing.T) {
+	ws := newWS(t) // 0.1: these are errors under either version
+	done := retire(firmTerminus("int_t"), "fulfilled", "")
+	sched := withDuration(intention("int_b"))
+	sched.Serves = []model.Ref{{ID: "int_u", Role: model.RoleForTheSakeOf}}
+	u := firmTerminus("int_u")
+	bySched := retire(firmTerminus("int_s"), "superseded", "int_b")
+	other := firmTerminus("int_o")
+	other.Subject = "https://example.com/people/priya"
+	byOther := retire(firmTerminus("int_x"), "superseded", "int_o")
+	byTerminus := retire(firmTerminus("int_y"), "superseded", "int_u")
+	write(t, ws, done, sched, u, bySched, other, byOther, byTerminus)
+	r := run(t, ws)
+	if f := findingsFor(r, "int_t"); !strings.HasPrefix(f["terminus_fulfilled"], "error:") {
+		t.Errorf("fulfilled terminus: %v", f)
+	}
+	for _, id := range []string{"int_s", "int_x"} {
+		if f := findingsFor(r, id); !strings.HasPrefix(f["terminus_successor"], "error:") {
+			t.Errorf("%s: %v", id, f)
+		}
+	}
+	if f := findingsFor(r, "int_y"); len(f) != 0 {
+		t.Errorf("superseded by a terminus of its subject: %v", f)
+	}
+}
+
+func TestRefuseRetirement(t *testing.T) {
+	ws := newWS(t)
+	tt := firmTerminus("int_t")
+	u := firmTerminus("int_u")
+	draft := intention("int_d")
+	mine := intention("int_m")
+	mine.Source.Harness = "claude"
+	a := withDuration(intention("int_a"))
+	a.Serves = []model.Ref{{ID: "int_t", Role: model.RoleForTheSakeOf}}
+	b := withDuration(intention("int_b"))
+	b.Serves = []model.Ref{{ID: "int_a", Role: model.RoleInOrderTo}}
+	both := withDuration(intention("int_both"))
+	both.Serves = []model.Ref{{ID: "int_t", Role: model.RoleForTheSakeOf}, {ID: "int_u", Role: model.RoleForTheSakeOf}}
+	onDraft := withDuration(intention("int_od"))
+	onDraft.Serves = []model.Ref{{ID: "int_d", Role: model.RoleForTheSakeOf}}
+	des := &model.Desire{ID: "des_w", Subject: tt.Subject, Title: "w", Serves: []model.Ref{{ID: "int_u", Role: model.RoleForTheSakeOf}}, Source: tt.Source, Timestamp: time.Now()}
+	write(t, ws, tt, u, draft, mine, a, b, both, onDraft, des)
+	g, err := ws.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	person := model.Source{Author: tt.Source.Author}
+	harness := model.Source{Author: tt.Source.Author, Harness: "claude"}
+	at := func(kind, by string, src model.Source) model.Retired {
+		return model.Retired{Kind: kind, SupersededBy: by, Source: src, Timestamp: time.Now()}
+	}
+	rule := func(err error) string {
+		if r, ok := err.(*model.Refusal); ok {
+			return r.Rule
+		}
+		return ""
+	}
+	// Sole ground of int_a and, through it, int_b; int_both has int_u.
+	err = RefuseRetirement(g, tt, at("abandoned", "", person), "EDIT")
+	if rule(err) != "ungrounds" || !strings.Contains(err.Error(), "int_a, int_b") || strings.Contains(err.Error(), "int_both") || !strings.Contains(err.Error(), "EDIT") || !strings.Contains(err.Error(), "superseded by int_u") {
+		t.Errorf("sole ground: %v", err)
+	}
+	if err := RefuseRetirement(g, tt, at("superseded", "int_u", person), "EDIT"); err != nil {
+		t.Errorf("superseded by a firm terminus: %v", err)
+	}
+	if err := RefuseRetirement(g, tt, at("superseded", "int_d", person), "EDIT"); rule(err) != "ungrounds" {
+		t.Errorf("superseded by a draft: %v", err)
+	}
+	// int_u: int_both has another ground; a desire never blocks.
+	if err := RefuseRetirement(g, u, at("abandoned", "", person), "EDIT"); err != nil {
+		t.Errorf("another ground remains: %v", err)
+	}
+	// Dependents of a draft do not block.
+	if err := RefuseRetirement(g, draft, at("abandoned", "", person), "EDIT"); err != nil {
+		t.Errorf("draft with dependents: %v", err)
+	}
+	// The harness rule.
+	if err := RefuseRetirement(g, mine, at("abandoned", "", harness), "EDIT"); err != nil {
+		t.Errorf("harness withdraws its draft: %v", err)
+	}
+	if err := RefuseRetirement(g, u, at("abandoned", "", harness), "EDIT"); rule(err) != "harness_retire" || !strings.Contains(err.Error(), "person's act") {
+		t.Errorf("harness retires a firm terminus: %v", err)
+	}
+	if err := RefuseRetirement(g, draft, at("abandoned", "", harness), "EDIT"); rule(err) != "harness_retire" {
+		t.Errorf("harness retires the person's draft: %v", err)
+	}
+	// Not a terminus: nothing to guard here.
+	if err := RefuseRetirement(g, a, at("abandoned", "", harness), "EDIT"); err != nil {
+		t.Errorf("means: %v", err)
+	}
+}

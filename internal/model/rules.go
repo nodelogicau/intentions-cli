@@ -230,6 +230,9 @@ func (c *checker) intention(o *Intention) {
 		c.add("missing", "acknowledgements", "acknowledgements is required, possibly empty")
 	}
 	c.retired(TypeIntention, o.Retired)
+	if o.Retired != nil && o.Retired.Kind == "fulfilled" && o.IsTerminus() {
+		c.add("terminus_fulfilled", "retired.kind", "a terminus retired as fulfilled: a self-understanding is never discharged, so a terminus admits abandoned and superseded only")
+	}
 }
 
 func (c *checker) availability(o *Availability) {

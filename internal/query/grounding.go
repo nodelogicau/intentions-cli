@@ -2,6 +2,8 @@ package query
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/nodelogicau/intentions-cli/internal/model"
 	"github.com/nodelogicau/intentions-cli/internal/store"
@@ -75,4 +77,48 @@ func RefuseUnserved(g *store.Graph, o *model.Intention) error {
 
 func draftMessage(id string) string {
 	return fmt.Sprintf("a draft terminus: it grounds nothing until the person firms it with `intentions intention firm %s` (an author, no harness)", id)
+}
+
+// RefuseRetirement returns the refusal a retirement of terminus o by r must
+// make, or nil; anything but a terminus passes. A firm terminus is the
+// person's to retire, and a harness may withdraw only a draft it wrote
+// itself. Under either format version, no retirement may leave an intention
+// that is served now with no firm terminus: the message names those
+// intentions and the two ways out, withdrawing the terminus by setting it
+// tentative or superseding it with a firm one. edit is how the front end
+// spells setting it tentative.
+func RefuseRetirement(g *store.Graph, o *model.Intention, r model.Retired, edit string) error {
+	if !o.IsTerminus() {
+		return nil
+	}
+	if r.Source.Harness != "" && (o.Stability == "firm" || o.Source.Harness == "") {
+		why := "it is firm"
+		if o.Stability != "firm" {
+			why = "the person wrote it"
+		}
+		return &model.Refusal{Rule: "harness_retire", Message: fmt.Sprintf("%s is a terminus and %s, so retiring it is the person's act (an author, no harness); a harness may retire only a tentative terminus it drafted itself", o.ID, why)}
+	}
+	after := *o
+	after.Retired = &r
+	var lost []string
+	for _, in := range g.Intentions() {
+		if in.Retired != nil || in.IsTerminus() || in.Subject != o.Subject {
+			continue
+		}
+		if model.Grounding(g, in).Kind == model.Served && model.Grounding(overlay{g, &after}, in).Kind != model.Served {
+			lost = append(lost, in.ID)
+		}
+	}
+	if len(lost) == 0 {
+		return nil
+	}
+	sort.Strings(lost)
+	successor := "a firm terminus of the subject"
+	for _, id := range model.FirmTermini(g.Intentions(), o.Subject) {
+		if id != o.ID {
+			successor = id
+			break
+		}
+	}
+	return &model.Refusal{Rule: "ungrounds", Message: fmt.Sprintf("retiring %s would leave %s with no firm terminus of %s; to withdraw the reason, set it tentative (%s), or to replace it, retire it as superseded by %s", o.ID, strings.Join(lost, ", "), o.Subject, edit, successor)}
 }

@@ -189,6 +189,11 @@ func (v *validator) referential() {
 			}
 			if o.Retired != nil {
 				check("retired.superseded_by", o.Retired.SupersededBy, model.TypeIntention)
+				if o.Retired.SupersededBy != "" && o.IsTerminus() {
+					if msg := model.TerminusSuccessor(v.g, o, o.Retired.SupersededBy); msg != "" {
+						v.add(SeverityError, "terminus_successor", id, "%s", msg)
+					}
+				}
 			}
 		case *model.Availability:
 			if o.Window != nil && o.Window.Relative != nil {
@@ -209,6 +214,22 @@ func (v *validator) referential() {
 	}
 }
 
+// abandonedEnds warns once for each in-order-to or instance-of link from in
+// to an intention retired as abandoned: a means outliving an end the person
+// dropped. A fulfilled end is completion out of order and raises nothing, and
+// a for-the-sake-of link to an abandoned terminus surfaces as unserved.
+func (v *validator) abandonedEnds(in *model.Intention) {
+	for _, r := range in.Serves {
+		if r.Role != model.RoleInOrderTo && r.Role != model.RoleInstanceOf {
+			continue
+		}
+		obj, _ := v.g.Get(r.ID)
+		if t, ok := obj.(*model.Intention); ok && t.Retired != nil && t.Retired.Kind == "abandoned" {
+			v.add(SeverityWarning, "abandoned_end", in.ID, "serves %s %s, which was abandoned; retire %s too, or re-point it at an end the person still holds", r.ID, r.Role, in.ID)
+		}
+	}
+}
+
 // graph reports serves cycles (one error per strongly connected component),
 // the terminus rule, every intention that reaches no firm terminus of its own
 // subject, and every terminus still held as a draft.
@@ -223,6 +244,9 @@ func (v *validator) graph() {
 	}
 	termini := map[string][]string{}
 	for _, in := range v.g.Intentions() {
+		if in.Retired == nil {
+			v.abandonedEnds(in)
+		}
 		if in.Retired != nil || inCycle[in.ID] {
 			continue
 		}

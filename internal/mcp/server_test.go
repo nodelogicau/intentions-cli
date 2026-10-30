@@ -574,6 +574,40 @@ func TestEveryIntentionReachesATerminus(t *testing.T) {
 	}
 }
 
+func TestTerminusRetirementOverMCP(t *testing.T) {
+	h := newHarness(t, "claude-ai", Options{})
+	own := str(h.ok("intention_add", map[string]any{"title": "being someone who reads"}), "id")
+	h.fail("intention_retire", map[string]any{"id": own, "kind": "fulfilled"}, "refused")
+	firm := str(h.ok("intention_add", map[string]any{"title": "being someone who follows through"}), "id")
+	h.firm(firm)
+	if msg := h.fail("intention_retire", map[string]any{"id": firm, "kind": "abandoned"}, "refused"); !strings.Contains(msg, "person's act") {
+		t.Errorf("firm terminus: %s", msg)
+	}
+	// A draft the person wrote is theirs, even while tentative.
+	persons := str(h.ok("intention_add", map[string]any{"title": "being someone who rests"}), "id")
+	g, err := h.ws.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	o, _ := g.Get(persons)
+	p := *o.(*model.Intention)
+	p.Source = model.Source{Author: ada}
+	if err := h.ws.WriteObject(&p); err != nil {
+		t.Fatal(err)
+	}
+	h.fail("intention_retire", map[string]any{"id": persons, "kind": "abandoned"}, "refused")
+	for _, id := range []string{firm, persons} {
+		if strings.Contains(h.file("intentions/"+id+".yaml"), "retired:") {
+			t.Errorf("%s retired through the server", id)
+		}
+	}
+	// Its own draft it may withdraw.
+	r := h.ok("intention_retire", map[string]any{"id": own, "kind": "abandoned"})
+	if obj(r)["retired"].(map[string]any)["kind"] != "abandoned" {
+		t.Errorf("own draft: %v", r)
+	}
+}
+
 func TestDesiresOverMCP(t *testing.T) {
 	h := newHarness(t, "claude-ai", Options{})
 	d := h.ok("desire_add", map[string]any{"title": "call the accountant", "activity": "admin"})

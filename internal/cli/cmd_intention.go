@@ -482,6 +482,9 @@ func (a *app) intentionRetireCmd() *cobra.Command {
 			if err := model.CheckRetirement(g, before, r); err != nil {
 				return err
 			}
+			if err := query.RefuseRetirement(g, before, r, fmt.Sprintf("`intentions intention edit %s --stability tentative`", before.ID)); err != nil {
+				return err
+			}
 			o := *before
 			o.Retired = &r
 			prev, _ := projection.Version(before)
@@ -500,7 +503,7 @@ func (a *app) intentionRetireCmd() *cobra.Command {
 			})
 		}),
 	}
-	cmd.Flags().StringVar(&kind, "kind", "", "fulfilled, abandoned, or superseded")
+	cmd.Flags().StringVar(&kind, "kind", "", "fulfilled, abandoned, or superseded (a terminus: abandoned or superseded only)")
 	cmd.Flags().StringVar(&supersededBy, "superseded-by", "", "the replacing intention (required with kind superseded)")
 	cmd.Flags().StringVar(&reason, "reason", "", "prose reason")
 	addActFlags(cmd, &act)

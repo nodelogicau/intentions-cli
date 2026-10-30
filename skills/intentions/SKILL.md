@@ -117,7 +117,7 @@ modifiers inside double quotes, so `"$id:in-order-to"` silently corrupts the id.
 | Record capacity | `intentions availability add --subject <uri> --capacity PT3H --calendar <edtf> [--clock HH:MM/HH:MM] [--activities <term>]... [--location <uri>]... [--cadence <rrule>] [--valid-until <edtf>] [--scope personal\|organisation\|public] --json` |
 | Extend capacity | `intentions availability renew <id> --valid-until <edtf> --json` |
 | Change capacity terms | `intentions availability supersede <id> [changed flags] --json` — never `edit` for window, capacity, activities or location |
-| Withdraw | `intentions intention retire <id> --kind fulfilled\|abandoned\|superseded [--superseded-by <id>] --reason "<why>" --json`; `intentions availability retire <id> --kind retracted\|superseded …` |
+| Withdraw | `intentions intention retire <id> --kind fulfilled\|abandoned\|superseded [--superseded-by <id>] --reason "<why>" --json` (a terminus: `abandoned` or `superseded` by a terminus only); `intentions availability retire <id> --kind retracted\|superseded …` |
 | What a window means | `intentions bounds <id> --json` or `intentions bounds --calendar this-week --clock 09:00/12:00 --json`; writes nothing |
 | Generate instances | `intentions generate --horizon <P…> [--recurring <id>] --json` → `{created, skipped}`; idempotent. Only when the person asks to plan a named period, and narrow it to that period |
 | Rank placements | `intentions resolve <id> [--limit N] --json` → `{candidates: [{rank, start, end, displaces, supply}], candidates_considered, reason}`; writes nothing but instances |
@@ -155,6 +155,17 @@ On failure stderr carries `{"error": {"code", "message"}}`; a refused write says
   person or a task. The workspace's `intentions.md` carries this convention
   under **Termini**. The graph is a DAG; a write that would close a cycle is
   refused. A terminus is a sink and cannot gain serves.
+- **A reason changes by supersession.** When what a terminus says no longer
+  fits, write the new terminus and retire the old one `--kind superseded
+  --superseded-by <new>` rather than rewording it in place: the change stays
+  visible and everything that rested on it stays grounded once the person
+  firms the new one. To withdraw a reason, the person sets it tentative
+  (`intention edit <id> --stability tentative`); what rested on it is then
+  reported unserved until it is re-grounded. A terminus is never `fulfilled`,
+  and retiring one that something still rests on is refused, naming what
+  would lose its ground. A firm terminus is the person's to retire; you may
+  retire only a tentative terminus you drafted yourself. A means whose end
+  was abandoned is warned (`abandoned_end`): ask whether to retire it too.
 - **Draft tentative. Firm is the person's.** Every intention you add is
   `tentative`. Setting `firm` with a harness in the source is refused unless
   `--policy` names a terminus of the subject carrying `auto_firm` whose terms

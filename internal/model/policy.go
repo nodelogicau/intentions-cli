@@ -77,7 +77,35 @@ func CheckRetirement(g Graph, obj Object, r Retired) error {
 			return refuse("superseded_by", "an object cannot supersede itself")
 		}
 	}
+	if t, ok := obj.(*Intention); ok && t.IsTerminus() {
+		if r.Kind == "fulfilled" {
+			return refuse("terminus_fulfilled", "%s is a terminus, and a self-understanding is never discharged; retire it as abandoned, or as superseded by the terminus that replaces it", t.ID)
+		}
+		if r.SupersededBy != "" {
+			if msg := TerminusSuccessor(g, t, r.SupersededBy); msg != "" {
+				return refuse("terminus_successor", "%s", msg)
+			}
+		}
+	}
 	return nil
+}
+
+// TerminusSuccessor says why id cannot succeed terminus t, or "" when it is a
+// terminus of t's subject. A retired successor is admitted: the grounding walk
+// follows it in turn.
+func TerminusSuccessor(g Graph, t *Intention, id string) string {
+	obj, ok := g.Get(id)
+	if !ok {
+		return ""
+	}
+	s, ok := obj.(*Intention)
+	switch {
+	case !ok || !s.IsTerminus():
+		return fmt.Sprintf("superseded_by %s is not a terminus; a terminus is superseded only by a terminus of its subject", id)
+	case s.Subject != t.Subject:
+		return fmt.Sprintf("superseded_by %s is a terminus of %s, not of %s; a terminus is superseded only by a terminus of its subject", id, s.Subject, t.Subject)
+	}
+	return ""
 }
 
 // CheckServes refuses serves entries that dangle, close a cycle, or break the

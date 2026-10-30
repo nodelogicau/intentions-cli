@@ -2358,3 +2358,94 @@ func TestTimestampIsLastWrite(t *testing.T) {
 		t.Errorf("validate: %v", v.json["findings"])
 	}
 }
+
+func TestTerminusRetirement(t *testing.T) {
+	retire := func(ws, id string, args ...string) result {
+		return run(t, ws, "", append([]string{"intention", "retire", id}, args...)...)
+	}
+	firmTerminus := func(ws, title string) string {
+		id := addIntention(t, ws, "--title", title).str("id")
+		mustOK(t, run(t, ws, "", "intention", "firm", id), "firm "+title)
+		return id
+	}
+	ws := initWS(t)
+	tt := firmTerminus(ws, "being someone who follows through")
+	u := firmTerminus(ws, "being someone who keeps their word")
+	sched := addIntention(t, ws, "--title", "Plan", "--duration", "PT1H", "--serves", u+":for-the-sake-of").str("id")
+	a := addIntention(t, ws, "--title", "A", "--duration", "PT1H", "--serves", tt+":for-the-sake-of").str("id")
+	b := addIntention(t, ws, "--title", "B", "--duration", "PT1H", "--serves", a+":in-order-to").str("id")
+
+	if r := retire(ws, tt, "--kind", "fulfilled"); r.code != 2 || !strings.Contains(errMsg(r), "abandoned") {
+		t.Errorf("fulfilled terminus: %d %s", r.code, errMsg(r))
+	}
+	if r := retire(ws, tt, "--kind", "superseded", "--superseded-by", sched); r.code != 2 || !strings.Contains(errMsg(r), "not a terminus") {
+		t.Errorf("scheduled successor: %d %s", r.code, errMsg(r))
+	}
+	// Sole ground of A, and through it B: refused, naming both and the ways out.
+	// This workspace is 0.1; the refusal holds under either version.
+	r := retire(ws, tt, "--kind", "abandoned")
+	if r.code != 2 || !strings.Contains(errMsg(r), a+", "+b) || !strings.Contains(errMsg(r), "intentions intention edit "+tt+" --stability tentative") || !strings.Contains(errMsg(r), "superseded by "+u) {
+		t.Errorf("sole ground: %d %s %v", r.code, errMsg(r), r.json)
+	}
+	if strings.Contains(readFile(t, ws, "intentions/"+tt+".yaml"), "retired:") {
+		t.Error("file changed after refusal")
+	}
+	// A harness never retires a firm terminus, nor the person's draft; it may withdraw its own.
+	if r := retire(ws, u, "--kind", "abandoned", "--harness", "claude"); r.code != 2 || !strings.Contains(errMsg(r), "person's act") {
+		t.Errorf("harness firm: %d %s", r.code, errMsg(r))
+	}
+	draft := addIntention(t, ws, "--title", "being someone who rests").str("id")
+	if r := retire(ws, draft, "--kind", "abandoned", "--harness", "claude"); r.code != 2 {
+		t.Errorf("harness retires the person's draft: %d %s", r.code, errMsg(r))
+	}
+	own := addIntention(t, ws, "--title", "being someone who reads", "--harness", "claude").str("id")
+	mustOK(t, retire(ws, own, "--kind", "abandoned", "--harness", "claude"), "harness withdraws its own draft")
+	// Superseded by a draft leaves A unserved; by a firm terminus passes the ground on.
+	if r := retire(ws, tt, "--kind", "superseded", "--superseded-by", draft); r.code != 2 || !strings.Contains(errMsg(r), a) {
+		t.Errorf("superseded by a draft: %d %s", r.code, errMsg(r))
+	}
+	mustOK(t, retire(ws, tt, "--kind", "superseded", "--superseded-by", u), "superseded by a firm terminus")
+	v := run(t, ws, "", "validate")
+	if v.code != 0 || strings.Contains(v.stdout, a) {
+		t.Errorf("A served through the successor: %d %s", v.code, v.stdout)
+	}
+	// An add serving the superseded reason carries no findings.
+	if r := addIntention(t, ws, "--title", "C", "--duration", "PT1H", "--serves", tt+":for-the-sake-of"); r.json["findings"] != nil {
+		t.Errorf("add through a superseded reason: %v", r.json["findings"])
+	}
+	// u now grounds the plan, A, B and C; with another firm ground beside it, nothing blocks.
+	w := firmTerminus(ws, "being someone who shows up")
+	mustOK(t, run(t, ws, "", "intention", "edit", a, "--serves", w+":for-the-sake-of", "--serves", tt+":for-the-sake-of"), "second ground")
+	if r := retire(ws, u, "--kind", "abandoned"); r.code != 2 || strings.Contains(errMsg(r), a) || !strings.Contains(errMsg(r), sched) {
+		t.Errorf("another ground spares A only: %d %s", r.code, errMsg(r))
+	}
+	// Nothing rests on it.
+	lone := firmTerminus(ws, "being someone who sings")
+	mustOK(t, retire(ws, lone, "--kind", "abandoned"), "nothing rests on it")
+}
+
+func TestTerminusWithdrawalUnder02(t *testing.T) {
+	ws := initWS02(t)
+	tt := addIntention(t, ws, "--title", "being someone who follows through").str("id")
+	mustOK(t, run(t, ws, "", "intention", "firm", tt), "firm")
+	a := addIntention(t, ws, "--title", "A", "--duration", "PT1H", "--serves", tt+":for-the-sake-of").str("id")
+	// Withdrawal is accepted; validate then reports A unserved at error level.
+	mustOK(t, run(t, ws, "", "intention", "edit", tt, "--stability", "tentative"), "withdraw")
+	v := run(t, ws, "", "validate")
+	if v.code != 4 || !strings.Contains(v.stdout, a) || !strings.Contains(v.stdout, "unserved") {
+		t.Errorf("withdrawal: %d %s", v.code, v.stdout)
+	}
+}
+
+func TestMigrateCountsASupersededReasonAsGround(t *testing.T) {
+	ws := initWS(t) // intentions/0.1
+	tt := addIntention(t, ws, "--title", "being someone who follows through").str("id")
+	u := addIntention(t, ws, "--title", "being someone who keeps their word").str("id")
+	mustOK(t, run(t, ws, "", "intention", "firm", tt), "firm t")
+	mustOK(t, run(t, ws, "", "intention", "firm", u), "firm u")
+	a := addIntention(t, ws, "--title", "A", "--duration", "PT1H", "--serves", tt+":for-the-sake-of").str("id")
+	mustOK(t, run(t, ws, "", "intention", "retire", tt, "--kind", "superseded", "--superseded-by", u), "supersede")
+	if r := run(t, ws, "", "migrate", "--check"); r.code != 0 {
+		t.Errorf("A is served through the successor, yet migrate refuses: %d %s (%s)", r.code, errMsg(r), a)
+	}
+}

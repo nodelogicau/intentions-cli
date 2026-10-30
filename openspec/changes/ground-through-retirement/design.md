@@ -37,9 +37,9 @@ Alternative considered: a separate visited set for supersession chains. Rejected
 
 ### D2. `Ground.Retired` and the message
 
-A terminus retired as `abandoned` (or, illegally, as `fulfilled`) goes into a new `Retired` list. The `Ends` comment stops listing "a retired terminus". When nothing grounds and `Retired` is non-empty, `Unserved` says "it reaches only the retired terminus X, which grounds nothing", ahead of the drafts/foreign/ends cases. The offered fix is still a firm terminus of the subject when one exists.
+A terminus retired as `abandoned` (or, illegally, as `fulfilled`) goes into a new `Retired` list. The `Ends` comment stops listing "a retired terminus". When nothing grounds and `Retired` is non-empty, `Unserved` says "it reaches only the retired terminus X, which grounds nothing". The offered fix is still a firm terminus of the subject when one exists.
 
-`Kind` gains no new value. The precedence is: a retired terminus reached is reported before a draft, a foreign terminus or an end, because it's the most specific cause.
+`Kind` gains no new value. A draft reached still leads the message, because firming it is the quickest fix. Otherwise a retired terminus is named ahead of a plain end, and alongside a foreign terminus when both are reached.
 
 ### D3. The kind and successor rules go in `CheckRetirement` and in the per-object rules
 
@@ -59,6 +59,8 @@ New `query.RefuseRetirement(g *store.Graph, o *model.Intention, r model.Retired)
 2. **Ungrounding:** collect candidate dependents, meaning every unretired, non-terminus intention of `o.Subject`. Intentions of another subject never ground on `o`. For each candidate that is `Served` against `g` now, recompute against `overlay{g, retired o}`. If any are now not served, refuse (rule `ungrounds`), naming them sorted and the two alternatives: `intentions intention edit <id> --stability tentative` (`intention_edit` over MCP) and `--kind superseded --superseded-by <firm terminus>`. When the subject holds another firm terminus, name it as the supersession target.
 
 Desires aren't intentions and `firmed_under` isn't a serves link, so neither is a candidate and neither blocks.
+
+Over MCP every call carries the client as harness, so the harness rule refuses a firm terminus or a person's draft before the ungrounding check runs. A harness's own tentative draft grounds nothing, so `ungrounds` is in practice a CLI refusal. The MCP spelling of the edit alternative is kept for parity.
 
 The check runs under 0.1 and 0.2 alike. It returns a `*model.Refusal`, so both front ends map it to exit 2 or `refused` exactly as `RefuseUnserved` does.
 

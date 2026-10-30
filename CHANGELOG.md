@@ -5,6 +5,28 @@ All notable changes to `intentions` are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Grounding passes through retired intentions** (#11, format change
+  `ground-through-retirement`). The walk to a terminus follows
+  `superseded_by` at a superseded intention and walks any other retired
+  intention through its own `serves`. A superseded terminus grounds through
+  its successor, so replacing a reason with a firm terminus keeps what rested
+  on it served. A retired terminus grounds nothing, and the `unserved`
+  message now names it as retired.
+- **Retiring a terminus is guarded**, under 0.1 and 0.2 alike, in
+  `intention retire` and `intention_retire`. `fulfilled` is refused;
+  `superseded_by` must name a terminus of the subject; a retirement that
+  would leave a served intention with no firm terminus is refused, naming
+  them and the two ways out (set it tentative, or supersede it with a firm
+  terminus); and a harness may retire only a tentative terminus it drafted.
+- **New findings.** `abandoned_end` warns on an unretired intention whose
+  `in-order-to` or `instance-of` end was abandoned. `terminus_fulfilled` and
+  `terminus_successor` are errors. A workspace holding a terminus retired as
+  `fulfilled` now fails `validate`.
+- The skill says to supersede a changed reason rather than reword it, and to
+  set a terminus tentative to withdraw it.
+
 ### Fixed
 
 - **MCP results reach the model in clients that read only text.** Every
