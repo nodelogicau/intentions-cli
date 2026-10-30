@@ -76,7 +76,7 @@ item 29 settled it.
 | 27 | A policy authorises nothing until it is firm | adopted with refinements, implemented in v0.13.0, [#27](https://github.com/nodelogicau/intentions/issues/27) |
 | 28 | Adopting a bare desire creates a terminus | adopted with additions, [#28](https://github.com/nodelogicau/intentions/issues/28) |
 | 29 | The origin change alters the commitment projection under intentions/0.1 | adopted with refinements, implemented in v0.15.0, [#29](https://github.com/nodelogicau/intentions/issues/29) |
-| 30 | `habit` joins a 0.2 projection files already carry | adopted, option (a), [#32](https://github.com/nodelogicau/intentions/issues/32) |
+| 30 | `habit` joins a 0.2 projection files already carry | adopted, option (a), implemented in v0.16.0, [#32](https://github.com/nodelogicau/intentions/issues/32) |
 
 ---
 
@@ -910,3 +910,4 @@ with the field given no effect. Status says a reader older than `habit`
 (v0.15.0 and earlier) must be upgraded before anyone sharing a workspace
 sets it. The CLI work is
 [intentions-cli#10](https://github.com/nodelogicau/intentions-cli/issues/10).
+Implemented in v0.16.0.

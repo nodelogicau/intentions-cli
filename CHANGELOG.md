@@ -3,7 +3,15 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.16.0] - 2026-10-31
+
+Implements two settlements within `intentions/0.2`: grounding through retired
+intentions and the guards on retiring a terminus (nodelogicau/intentions#31,
+[#11](https://github.com/nodelogicau/intentions-cli/issues/11)), and habit on
+recurring intentions (nodelogicau/intentions#30 and #32, SPEC-FEEDBACK item
+30, [#10](https://github.com/nodelogicau/intentions-cli/issues/10)). No
+existing version moves and no workspace needs migrating. **Upgrade every
+binary that shares a workspace before anyone sets `habit`.**
 
 ### Added
 
@@ -556,6 +564,7 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
+[0.16.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.12.0...v0.13.0
