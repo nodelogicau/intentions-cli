@@ -73,12 +73,15 @@ homebrew_casks:
       verified: github.com/nodelogicau/intentions-cli/
     binaries:
       - intentions
-    hooks:
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/intentions"]
-          end
+    # Homebrew deprecated `postflight`, which hooks.post.install generates,
+    # for the declarative `postflight_steps`. The block is a Go template, so
+    # Homebrew's own {{staged_path}} placeholder is escaped to pass through.
+    custom_block: |
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{staged_path}}" }}/intentions"]
+        end
+      end
 
 changelog:
   use: github
