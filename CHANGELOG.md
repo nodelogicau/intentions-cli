@@ -5,6 +5,15 @@ All notable changes to `intentions` are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-03
+
+Implements the calendar hold link within `intentions/0.2`, also admitted
+under 0.1 (nodelogicau/intentions#34,
+[#12](https://github.com/nodelogicau/intentions-cli/issues/12)). The field is
+outside every projection: no version moves and no workspace needs migrating.
+**Upgrade every binary that shares a workspace before a harness records
+holds.**
+
 ### Added
 
 - **A calendar hold link on a placed solo intention** (#12, format change
@@ -597,7 +606,8 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
-[Unreleased]: https://github.com/nodelogicau/intentions-cli/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/nodelogicau/intentions-cli/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.13.0...v0.14.0
