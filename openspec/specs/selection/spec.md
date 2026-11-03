@@ -3,9 +3,7 @@
 ## Purpose
 
 `select`: the recorded act that writes the RESOLUTION record, the placement, and a commitment when there are parties; policy-authorised selection; displacement surfaced and never changed; replacement.
-
 ## Requirements
-
 ### Requirement: Selection is a recorded act
 `intentions select <id> (--candidate N | --policy <int_id>) [--replace] [--scope <s>] [--now <RFC 3339>]` SHALL recompute the candidates as `resolve` does, take the chosen one, and write in one act: a RESOLUTION record with `id`, `version`, `intention`, `placement`, `selector` (`person` or the policy id), `candidates_considered`, `displaced` (sorted), `source`, `timestamp`, an implementation-added `supply` list naming the availabilities the placement rests on, and, when the intention names parties the workspace does not track, `presumed` listing their URIs sorted, so a reader sees whose time the placement assumes without evidence; neither `supply` nor `presumed` enters the projection; the `placement` onto the intention, with `location` from the intersection of the intention's and the supply's location lists when either constrained it; and, when the intention has `parties`, a COMMITMENT with the subject and every party at `tentative`, `origin: resolution` and `resolution: <res id>` under 0.2, or `origin: {resolution: <res id>}` under 0.1, `intention`, `title` copied, and the act's `source`. The result SHALL carry the record, the intention, the commitment when created, and `flags` from the check that follows.
 
@@ -81,4 +79,11 @@ Objects a selected placement overlaps SHALL be listed in `displaced` and SHALL N
 #### Scenario: Nothing to carry
 - **WHEN** the replaced intention has no commitment, or its commitment is already retired
 - **THEN** the replacement writes no commitment and cancels nothing
+
+### Requirement: Replacement keeps the hold link
+A replacing selection SHALL keep the intention's `external`, so that the harness moves the same calendar event to the new placement instead of writing a second one.
+
+#### Scenario: Re-selection moves the hold
+- **WHEN** `select int_A --candidate 2 --replace` runs on a placed intention carrying `external`
+- **THEN** int_A carries the new placement and the same `external`
 

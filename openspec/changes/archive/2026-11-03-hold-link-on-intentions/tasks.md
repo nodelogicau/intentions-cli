@@ -62,4 +62,4 @@
 - [x] 6.2 README: the intention fields table, the projection exclusion, a calendar-hold paragraph, validation, and the Status upgrade note. `docs/mcp.md`: `intention_edit` and `intention_list`.
 - [x] 6.3 SPEC-FEEDBACK: a new item for the case where an intention's hold `uid` equals a commitment's `external`, proposing a warning upstream.
 - [x] 6.4 CHANGELOG under Unreleased, with the upgrade note for readers at v0.16.0 and earlier, and the cask `postflight_steps` fix.
-- [ ] 6.5 Reply on intentions-cli#12.
+- [x] 6.5 Reply on intentions-cli#12.
