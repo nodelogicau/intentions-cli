@@ -77,7 +77,7 @@ item 29 settled it, and 31 from implementing the calendar hold link.
 | 28 | Adopting a bare desire creates a terminus | adopted with additions, [#28](https://github.com/nodelogicau/intentions/issues/28) |
 | 29 | The origin change alters the commitment projection under intentions/0.1 | adopted with refinements, implemented in v0.15.0, [#29](https://github.com/nodelogicau/intentions/issues/29) |
 | 30 | `habit` joins a 0.2 projection files already carry | adopted, option (a), implemented in v0.16.0, [#32](https://github.com/nodelogicau/intentions/issues/32) |
-| 31 | A hold imported before it was recognised | open, not yet filed upstream |
+| 31 | A hold imported before it was recognised | open, [#36](https://github.com/nodelogicau/intentions/issues/36) |
 
 ---
 
@@ -913,7 +913,7 @@ sets it. The CLI work is
 [intentions-cli#10](https://github.com/nodelogicau/intentions-cli/issues/10).
 Implemented in v0.16.0.
 
-## 31. A hold imported before it was recognised
+## 31. A hold imported before it was recognised ([#36](https://github.com/nodelogicau/intentions/issues/36))
 
 **The draft says:** since `hold-placed-intentions` (nodelogicau/intentions#34),
 a placed intention with no `parties` may carry `external`, the link to the
@@ -936,7 +936,7 @@ cause. The error list covers two intentions sharing a link and is silent on
 an intention and a commitment sharing one. The same can arise by merge,
 without either write passing the import check.
 
-**We decided:** nothing beyond the text. This implementation reports the three errors
+**We decided:** nothing beyond the text. v0.17.0 of this CLI reports the three errors
 as written and reports nothing for an intention and a commitment sharing a
 link.
 
