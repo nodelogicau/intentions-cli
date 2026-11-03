@@ -709,3 +709,46 @@ func TestMigrateAndZeroTwoOverMCP(t *testing.T) {
 		t.Errorf("list by activities: %v", l)
 	}
 }
+
+func TestCalendarHoldOverMCP(t *testing.T) {
+	h := newHarness(t, "claude-ai", Options{})
+	h.ok("availability_add", map[string]any{"subject": ada, "capacity": "PT3H", "window": map[string]any{"calendar": "2026-09/2026-12", "clock": "09:00/12:00"}, "cadence": "FREQ=WEEKLY;BYDAY=TU"})
+	a := str(h.ok("intention_add", map[string]any{"title": "Draft chapter", "duration": "PT1H", "window": map[string]any{"calendar": "2026-W38"}}), "id")
+	h.ok("select", map[string]any{"id": a, "candidate": 1})
+	h.firm(a)
+	before := h.file("intentions/" + a + ".yaml")
+
+	// The client records the hold it wrote: no policy, version and source unchanged.
+	link := map[string]any{"system": "icalendar", "uid": "abc-123@cal.example"}
+	r := h.ok("intention_edit", map[string]any{"id": a, "external": link})
+	body := h.file("intentions/" + a + ".yaml")
+	if str(r, "previous_version") != str(r, "version") || !strings.Contains(body, "uid: abc-123@cal.example") || strings.Contains(body, "harness:") || strings.Contains(before, "harness:") {
+		t.Errorf("client records a hold: %v\n%s", r, body)
+	}
+	if msg := h.fail("intention_edit", map[string]any{"id": a, "parties": []string{room}}, "refused"); !strings.Contains(msg, "clear it in the same write") {
+		t.Errorf("gaining parties: %s", msg)
+	}
+
+	// The lookup finds the holder after it is retired; clear removes the link.
+	h.ok("intention_retire", map[string]any{"id": a, "kind": "fulfilled"})
+	if l := h.ok("intention_list", map[string]any{"external": "abc-123@cal.example"}); int(l["count"].(float64)) != 1 {
+		t.Errorf("lookup of a retired holder: %v", l)
+	}
+	if l := h.ok("intention_list", map[string]any{"external": "not-a-hold"}); int(l["count"].(float64)) != 0 {
+		t.Errorf("unknown uid: %v", l)
+	}
+	h.fail("intention_list", map[string]any{"external_system": "icalendar"}, "usage")
+	b := str(h.ok("intention_add", map[string]any{"title": "Revise chapter", "duration": "PT1H", "window": map[string]any{"calendar": "2026-W38"}}), "id")
+	h.ok("select", map[string]any{"id": b, "candidate": 1})
+	if msg := h.fail("intention_edit", map[string]any{"id": b, "parties": []string{room}, "external": map[string]any{"system": "icalendar", "uid": "p"}}, "invalid"); !strings.Contains(msg, "belongs on that commitment") {
+		t.Errorf("with parties: %s", msg)
+	}
+	if msg := h.fail("intention_edit", map[string]any{"id": b, "external": link}, "refused"); !strings.Contains(msg, "already the hold of "+a) {
+		t.Errorf("duplicate: %s", msg)
+	}
+	h.ok("intention_edit", map[string]any{"id": b, "external": map[string]any{"system": "icalendar", "uid": "b"}})
+	h.ok("intention_edit", map[string]any{"id": b, "clear": []string{"external"}})
+	if strings.Contains(h.file("intentions/"+b+".yaml"), "external") {
+		t.Error("clear: [external] left the link")
+	}
+}

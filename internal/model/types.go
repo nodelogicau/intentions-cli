@@ -191,7 +191,7 @@ type Extra struct {
 // Intention is what a person means to do. Canonical order: id, version,
 // subject, title, description, duration, window, stability, firmed_under,
 // activity, location, parties, serves, cadence, habit, occurrence, placement,
-// preference, auto_select, auto_firm, reference, source, timestamp,
+// external, preference, auto_select, auto_firm, reference, source, timestamp,
 // acknowledgements, retired.
 type Intention struct {
 	format           string
@@ -211,6 +211,7 @@ type Intention struct {
 	Habit            bool // held as habit: no plan; written only when true
 	Occurrence       string
 	Placement        *temporal.Placement
+	External         *External // the calendar hold written for the placement; outside the projection
 	Preference       string
 	AutoSelect       *Policy
 	AutoFirm         *Policy
@@ -343,6 +344,12 @@ func (o *Intention) IsRecurring() bool { return o.Cadence != nil }
 // the projection, so it is given no effect until migrate. Every behaviour
 // reads this, never the raw field.
 func (o *Intention) HeldAsHabit() bool { return o.Habit && o.Format() != Format01 }
+
+// HoldsUID reports whether o carries the calendar hold link uid, under
+// system when one is given.
+func (o *Intention) HoldsUID(uid, system string) bool {
+	return o.External != nil && o.External.UID == uid && (system == "" || o.External.System == system)
+}
 
 // Dormant reports whether o is a dormant instance of a habit, and of which
 // recurring intention: unretired, unplaced, and instance-of a recurring

@@ -237,3 +237,43 @@ func TestHabitProjection(t *testing.T) {
 		t.Errorf("habit vector\n got %s %s\nwant %s %s", canon, v, wantJSON, wantV)
 	}
 }
+
+func TestHoldLinkOutsideProjection(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "model", "testdata", "intention.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, format := range []string{model.Format01, model.Format02} {
+		obj, _, _ := model.Decode(b, model.TypeIntention)
+		o := obj.(*model.Intention)
+		o.SetFormat(format)
+		bare := MustVersion(o)
+		o.External = &model.External{System: "icalendar", UID: "abc-123@cal.example"}
+		if MustVersion(o) != bare || Project(o)["external"] != nil {
+			t.Errorf("%s: setting external moved the version", format)
+		}
+		o.External.UID = "def-456@cal.example"
+		if MustVersion(o) != bare {
+			t.Errorf("%s: replacing external moved the version", format)
+		}
+	}
+	c, _, err := model.Decode(mustRead(t, filepath.Join("..", "model", "testdata", "commitment.yaml")), model.TypeCommitment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cm := c.(*model.Commitment)
+	before := MustVersion(cm)
+	cm.External = &model.External{System: "icalendar", UID: "changed"}
+	if MustVersion(cm) == before {
+		t.Error("a commitment's external left its projection")
+	}
+}
+
+func mustRead(t *testing.T, path string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}

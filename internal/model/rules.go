@@ -72,6 +72,11 @@ func (c *checker) enum(field, v string, vs []string, required bool) {
 	}
 }
 
+func (c *checker) external(e *External) {
+	c.enum("external.system", e.System, ExternalSystems, true)
+	c.require("external.uid", e.UID)
+}
+
 func (c *checker) uri(field, v string) {
 	if v != "" && !ValidURI(v) {
 		c.add("invalid", field, "%q is not an absolute URI", v)
@@ -209,6 +214,15 @@ func (c *checker) intention(o *Intention) {
 	if o.Habit && o.Format() == Format01 {
 		c.add("habit_format", "habit", "habit is admitted only under %s, and this workspace is %s; the person moves it with `intentions migrate`, and until then habit has no effect; or clear it with --clear-habit", Format02, Format01)
 	}
+	if o.External != nil {
+		c.external(o.External)
+		if o.Placement == nil {
+			c.add("hold_unplaced", "external", "external links the calendar hold written for a placement, and this intention has none; clear it with --clear-external")
+		}
+		if len(o.Parties) > 0 {
+			c.add("hold_with_parties", "external", "an intention with parties gets a commitment on selection, and its hold belongs on that commitment; clear it with --clear-external")
+		}
+	}
 	if o.Cadence != nil && (o.Window == nil || o.Window.Calendar == nil) {
 		c.add("cadence_anchor", "cadence", "a cadence needs a window with a calendar anchor to expand within")
 	}
@@ -306,8 +320,7 @@ func (c *checker) commitment(o *Commitment) {
 		c.add("transparent_origin", "transparent", "a commitment born of a resolution consumed supply to exist and cannot be transparent")
 	}
 	if o.External != nil {
-		c.enum("external.system", o.External.System, ExternalSystems, true)
-		c.require("external.uid", o.External.UID)
+		c.external(o.External)
 	}
 	c.source("source", o.Source, false)
 	if o.Timestamp.IsZero() {

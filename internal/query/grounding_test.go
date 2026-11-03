@@ -426,3 +426,42 @@ func TestHabitUnder01(t *testing.T) {
 		t.Errorf("habit moved the 0.1 version: %v", f)
 	}
 }
+
+func TestHoldValidation(t *testing.T) {
+	for _, ws := range []*store.Workspace{newWS(t), newWS02(t)} {
+		tt := firmTerminus("int_t")
+		s, _ := temporal.ParsePlacementStart("2026-09-21T09:00:00+10:00")
+		placed := func(id string, e *model.External) *model.Intention {
+			o := withDuration(intention(id))
+			o.Serves = []model.Ref{{ID: "int_t", Role: model.RoleForTheSakeOf}}
+			o.Placement = &temporal.Placement{Start: s, Duration: *o.Duration}
+			o.External = e
+			return o
+		}
+		a := placed("int_a", &model.External{System: "icalendar", UID: "u"})
+		b := placed("int_b", &model.External{System: "icalendar", UID: "u"})
+		b.Retired = &model.Retired{Kind: "fulfilled", Source: model.Source{Author: "https://example.com/people/ada"}, Timestamp: time.Now()}
+		c := placed("int_c", &model.External{System: "jscalendar", UID: "u"})
+		d := placed("int_d", &model.External{System: "icalendar", UID: "p"})
+		d.Parties = []string{"https://example.com/people/sam"}
+		e := placed("int_e", &model.External{System: "icalendar", UID: "e"})
+		e.Placement = nil
+		write(t, ws, tt, a, b, c, d, e)
+		r := run(t, ws)
+		if f := findingsFor(r, "int_a"); len(f) != 0 {
+			t.Errorf("%s: the first holder: %v", ws.Config.Format, f)
+		}
+		if f := findingsFor(r, "int_b"); !strings.HasPrefix(f["hold_duplicate"], "error:") || !strings.Contains(f["hold_duplicate"], "int_a") || len(f) != 1 {
+			t.Errorf("%s: a retired duplicate: %v", ws.Config.Format, f)
+		}
+		if f := findingsFor(r, "int_c"); len(f) != 0 {
+			t.Errorf("%s: same uid, other system: %v", ws.Config.Format, f)
+		}
+		if f := findingsFor(r, "int_d"); !strings.HasPrefix(f["hold_with_parties"], "error:") || !strings.Contains(f["hold_with_parties"], "commitment") {
+			t.Errorf("%s: parties: %v", ws.Config.Format, f)
+		}
+		if f := findingsFor(r, "int_e"); !strings.HasPrefix(f["hold_unplaced"], "error:") {
+			t.Errorf("%s: unplaced: %v", ws.Config.Format, f)
+		}
+	}
+}

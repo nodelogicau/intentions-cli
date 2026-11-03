@@ -337,6 +337,27 @@ func (d *decoder) cadence(field string, v *yaml.Node) *temporal.Cadence {
 	return &c
 }
 
+// external decodes the {system, uid} link to an external calendar object.
+func (d *decoder) external(field string, v *yaml.Node) *External {
+	m := d.mapping(field, v)
+	if m == nil {
+		return nil
+	}
+	e := &External{}
+	pairs(m, func(k string, ev *yaml.Node) bool {
+		switch k {
+		case "system":
+			e.System = d.str(field+".system", ev)
+		case "uid":
+			e.UID = d.str(field+".uid", ev)
+		default:
+			d.problem("invalid", field+"."+k, "unknown external field")
+		}
+		return true
+	})
+	return e
+}
+
 func (d *decoder) placement(field string, v *yaml.Node) *temporal.Placement {
 	m := d.mapping(field, v)
 	if m == nil {
@@ -611,6 +632,8 @@ func (d *decoder) intention(root *yaml.Node) *Intention {
 			o.Occurrence = d.str(k, v)
 		case "placement":
 			o.Placement = d.placement(k, v)
+		case "external":
+			o.External = d.external(k, v)
 		case "preference":
 			o.Preference = d.str(k, v)
 		case "auto_select":
@@ -730,21 +753,7 @@ func (d *decoder) commitment(root *yaml.Node) *Commitment {
 		case "transparent":
 			o.Transparent = d.boolean(k, v)
 		case "external":
-			m := d.mapping(k, v)
-			if m != nil {
-				o.External = &External{}
-				pairs(m, func(ek string, ev *yaml.Node) bool {
-					switch ek {
-					case "system":
-						o.External.System = d.str(k+".system", ev)
-					case "uid":
-						o.External.UID = d.str(k+".uid", ev)
-					default:
-						d.problem("invalid", k+"."+ek, "unknown external field")
-					}
-					return true
-				})
-			}
+			o.External = d.external(k, v)
 		case "title":
 			o.Title = d.str(k, v)
 		case "description":

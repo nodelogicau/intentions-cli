@@ -34,7 +34,7 @@ The CLI never talks to a calendar. It has no importer and no exporter, and commi
   - `hold_unplaced`: `external` without `placement`;
   - `hold_with_parties`: `external` with `parties`, naming the commitment as the place for the link;
   - plus the existing enum and required-`uid` checks, now run for intentions too.
-- `query/validate.go` checks the graph: `hold_duplicate` is reported once for each pair of intentions, retired or not, that carry the same `system` + `uid`, naming both.
+- `query/validate.go` checks the graph: `hold_duplicate` is reported on each intention, retired or not, whose `system` + `uid` an earlier intention in id order already carries, naming that first holder.
 
 Validation and write-time refusal share these rules. That is how `habit_not_recurring` already works.
 
@@ -70,7 +70,7 @@ Alternative considered: a dedicated `hold <uid>` verb. Rejected, because a list 
 
 Tests pin the first two.
 
-**D10. Show prints it.** The text output prints `external: <system>:<uid>` after the placement. The JSON `show` output already serialises the whole object, so it carries the field once the struct has it.
+**D10. Show prints it.** Both text and JSON `show` print the encoded object, so the link appears after `placement` once the struct carries it. No rendering code changes.
 
 ## Risks / Trade-offs
 

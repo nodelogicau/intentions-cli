@@ -244,6 +244,36 @@ func CheckHabit(before, after *Intention, act Source, format string) error {
 	return nil
 }
 
+// CheckHold refuses a write that leaves an intention's calendar hold link
+// where it cannot stand: carried into gaining parties, whose hold belongs on
+// the commitment selection creates, or shared with another intention, retired
+// or not, since each hold is its own event. The link's other rules (placed,
+// no parties, system and uid) are the object's own, checked by Check. Setting
+// or clearing the link needs no policy: it confers nothing.
+func CheckHold(all []*Intention, before, after *Intention) error {
+	if after.External == nil {
+		return nil
+	}
+	if before != nil && before.External != nil && len(before.Parties) == 0 && len(after.Parties) > 0 {
+		return refuse("hold_gains_parties", "%s carries a calendar hold, and an intention with parties keeps its hold on the commitment selection creates; clear it in the same write with --clear-external", after.ID)
+	}
+	if other := HoldOwner(all, *after.External, after.ID); other != "" {
+		return refuse("hold_duplicate", "%s:%s is already the hold of %s; each hold is its own event", after.External.System, after.External.UID, other)
+	}
+	return nil
+}
+
+// HoldOwner returns the id of an intention in all other than except, retired
+// or not, carrying the link e, or "".
+func HoldOwner(all []*Intention, e External, except string) string {
+	for _, in := range all {
+		if in.ID != except && in.External != nil && *in.External == e {
+			return in.ID
+		}
+	}
+	return ""
+}
+
 // CheckSubjectUnchanged refuses a subject change on edit.
 func CheckSubjectUnchanged(old, edited string) error {
 	if old != edited {

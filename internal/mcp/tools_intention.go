@@ -23,7 +23,7 @@ func (s *Server) registerTools() {
 		Description: "Record what a person means to do: a duration and a window, never a slot. Always tentative; a harness may draft but may not make it firm here (see intention_firm). List first (intention_list) so you edit an existing intention rather than write a second one for the same thing. An intention that is not a terminus should serve one (serves [{id, role: for-the-sake-of}] naming a firm terminus of the subject, or an intention that reaches one); an unserved write is accepted and its result carries a warning under findings. Writes one YAML file for a person to review; results equal `intentions intention add --json`."},
 		s.intentionAdd)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_edit", Annotations: additive,
-		Description: "Edit an intention in place: fill the plan in as it becomes definite. Each field given replaces its own; each window anchor given replaces its own; `clear` removes optional fields. Prose edits leave the version unchanged. Refuses a retired intention, a subject change, a cycle in serves, firm by a harness without policy, and habit: true from you, since holding a recurring intention as habit is the person's act: suggest it after a run of fulfilled instances and give them `intentions intention edit <id> --habit`; habit: false (or clear: [habit]) brings the plan back and is yours to do when they ask. Results equal `intentions intention edit --json`."},
+		Description: "Edit an intention in place: fill the plan in as it becomes definite. Each field given replaces its own; each window anchor given replaces its own; `clear` removes optional fields. Prose edits leave the version unchanged. Refuses a retired intention, a subject change, a cycle in serves, firm by a harness without policy, and habit: true from you, since holding a recurring intention as habit is the person's act: suggest it after a run of fulfilled instances and give them `intentions intention edit <id> --habit`; habit: false (or clear: [habit]) brings the plan back and is yours to do when they ask. After writing a busy hold to the person's calendar for a placed intention with no parties, record it as external {system, uid}: no policy, version unchanged; refused on an unplaced intention, on one with parties (its hold belongs on its commitment), and for a uid another intention holds. Results equal `intentions intention edit --json`."},
 		s.intentionEdit)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_firm", Annotations: additive,
 		Description: "Set stability to firm. A person's act needs nothing; a harness (you, when this session identifies one) must pass `policy`, a terminus of the subject carrying auto_firm whose terms the intention satisfies, and the file then records firmed_under. Refused otherwise: never firm because the person sounds sure. On a terminus it refuses any policy and any harness: a terminus is the person's word, firmed only by a call naming an author and no harness, and it grounds nothing until then."},
@@ -35,7 +35,7 @@ func (s *Server) registerTools() {
 		Description: "One intention with its computed version, resolved serves targets, and current consistency flags. Results equal `intentions intention show --json`."},
 		s.intentionShow)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_list", Annotations: readOnly,
-		Description: "Every intention (active by default), filtered by subject, activity, stability, recurring, placed, unplaced, instances_of, or retired. Call this before intention_add."},
+		Description: "Every intention (active by default), filtered by subject, activity, stability, recurring, placed, unplaced, instances_of, or retired. Call this before intention_add. With external (a uid), the intention holding that calendar event, retired or not: call it before importing an event, and import nothing that matches."},
 		s.intentionList)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "availability_add", Annotations: additive, InputSchema: requiring[availabilityIn]("subject", "capacity", "window"),
 		Description: "Record capacity: a standing statement that a particular (a person, a room, anything with a URI) has a duration of capacity within a window, optionally for certain activities (conditional), at certain places, recurring by cadence. Capacity is a fact about the person: record what they told you, never what an empty calendar suggests and never to make a resolution succeed. Only for the people this workspace tracks, not for external parties."},
@@ -118,7 +118,13 @@ type intentionIn struct {
 type intentionEditIn struct {
 	ID string `json:"id" jsonschema:"the intention to edit"`
 	intentionIn
-	Clear []string `json:"clear,omitempty" jsonschema:"optional fields to remove: description, duration, window, calendar, clock, relative, activity, location, parties, serves, cadence, habit, preference, auto_select, auto_firm, reference"`
+	External *externalIn `json:"external,omitempty" jsonschema:"the calendar hold you wrote for this placed intention with no parties: {system: icalendar|jscalendar, uid}; needs no policy and leaves the version unchanged"`
+	Clear    []string    `json:"clear,omitempty" jsonschema:"optional fields to remove: description, duration, window, calendar, clock, relative, activity, location, parties, serves, cadence, habit, external, preference, auto_select, auto_firm, reference"`
+}
+
+type externalIn struct {
+	System string `json:"system" jsonschema:"icalendar or jscalendar"`
+	UID    string `json:"uid" jsonschema:"the event's UID (iCalendar) or uid (JSCalendar)"`
 }
 
 // apply merges an input into an intention. Fields present replace their own.
@@ -399,7 +405,16 @@ func (s *Server) intentionEdit(ctx context.Context, req *sdk.CallToolRequest, in
 	if err := s.apply(in.intentionIn, in.Clear, &o, g, s.ws.Config.Context(at)); err != nil {
 		return errResult(err), nil, nil
 	}
+	if in.External != nil {
+		o.External = &model.External{System: in.External.System, UID: in.External.UID}
+	}
+	if has(in.Clear, "external") {
+		o.External = nil
+	}
 	if err := model.CheckHabit(before, &o, src, g.Format); err != nil {
+		return errResult(err), nil, nil
+	}
+	if err := model.CheckHold(g.Intentions(), before, &o); err != nil {
 		return errResult(err), nil, nil
 	}
 	if ps := model.Check(&o); len(ps) > 0 {
@@ -608,14 +623,16 @@ func (s *Server) intentionShow(ctx context.Context, req *sdk.CallToolRequest, in
 }
 
 type listIn struct {
-	Subject     string `json:"subject,omitempty"`
-	Activity    string `json:"activity,omitempty"`
-	Stability   string `json:"stability,omitempty"`
-	Recurring   bool   `json:"recurring,omitempty"`
-	Placed      bool   `json:"placed,omitempty"`
-	Unplaced    bool   `json:"unplaced,omitempty"`
-	InstancesOf string `json:"instances_of,omitempty"`
-	Retired     bool   `json:"retired,omitempty" jsonschema:"list retired intentions instead of active"`
+	Subject        string `json:"subject,omitempty"`
+	Activity       string `json:"activity,omitempty"`
+	Stability      string `json:"stability,omitempty"`
+	Recurring      bool   `json:"recurring,omitempty"`
+	Placed         bool   `json:"placed,omitempty"`
+	Unplaced       bool   `json:"unplaced,omitempty"`
+	InstancesOf    string `json:"instances_of,omitempty"`
+	Retired        bool   `json:"retired,omitempty" jsonschema:"list retired intentions instead of active"`
+	External       string `json:"external,omitempty" jsonschema:"the intention whose calendar hold has this uid, retired or not: ask before importing an event, and import nothing that matches"`
+	ExternalSystem string `json:"external_system,omitempty" jsonschema:"narrow external to icalendar or jscalendar"`
 }
 
 func (s *Server) intentionList(ctx context.Context, req *sdk.CallToolRequest, in listIn) (*sdk.CallToolResult, any, error) {
@@ -623,9 +640,20 @@ func (s *Server) intentionList(ctx context.Context, req *sdk.CallToolRequest, in
 	if err != nil {
 		return errResult(err), nil, nil
 	}
+	if in.ExternalSystem != "" && in.External == "" {
+		return errResult(apperr.Usage("external_system narrows external; give the uid in external")), nil, nil
+	}
 	var items []*model.Intention
 	for _, o := range g.Intentions() {
-		if (o.Retired != nil) != in.Retired || (in.Subject != "" && o.Subject != in.Subject) || (in.Activity != "" && o.Activity != in.Activity) || (in.Stability != "" && o.Stability != in.Stability) {
+		// A hold lookup finds the holder retired or not.
+		if in.External != "" {
+			if !o.HoldsUID(in.External, in.ExternalSystem) {
+				continue
+			}
+		} else if (o.Retired != nil) != in.Retired {
+			continue
+		}
+		if (in.Subject != "" && o.Subject != in.Subject) || (in.Activity != "" && o.Activity != in.Activity) || (in.Stability != "" && o.Stability != in.Stability) {
 			continue
 		}
 		if (in.Recurring && !o.IsRecurring()) || (in.Placed && o.Placement == nil) || (in.Unplaced && o.Placement != nil) || (in.InstancesOf != "" && o.InstanceOf() != in.InstancesOf) {

@@ -3,6 +3,39 @@
 All notable changes to `intentions` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **A calendar hold link on a placed solo intention** (#12, format change
+  `hold-placed-intentions`, nodelogicau/intentions#34). A placed intention
+  with no parties may carry `external: {system, uid}`, the busy event a
+  harness wrote to the person's calendar for its placement.
+  `intention edit --external <system>:<uid>` records it, and
+  `--clear-external` drops it. Over MCP, `intention_edit` takes
+  `external` and `clear: [external]`. The link is outside the projection
+  under both formats, so no version moves, no acknowledgement lapses, and no
+  policy is needed: a harness may record a hold on an intention the person
+  firmed. A replacing `select` and retirement keep it.
+- **Hold rules.** A write is refused, and `validate` reports an error
+  (`hold_unplaced`, `hold_with_parties`, `hold_duplicate`), when the link sits
+  on an intention with no placement, on one with parties (whose hold belongs
+  on its commitment), or on a second intention, retired or not. An edit that
+  adds parties to a held intention must clear the link in the same write.
+- **Finding a hold.** `intention list --external <uid>
+  [--external-system <s>]`, and `external` on `intention_list`, return the
+  holder, retired ones included, so an importer can recognise its own hold
+  and skip it. The skill gives the harness the whole workflow: the event's
+  fixed shape, the lookup before import, moving it on re-selection, and
+  releasing it after `abandoned` or `superseded`.
+- **Upgrade before a harness records holds.** v0.16.0 and earlier keep the
+  field verbatim but neither validate it nor know it marks a hold.
+
+### Fixed
+
+- **The Homebrew cask no longer warns that `postflight` is deprecated.** It
+  strips the quarantine attribute with `postflight_steps` instead.
+
 ## [0.16.0] - 2026-10-31
 
 Implements two settlements within `intentions/0.2`: grounding through retired
@@ -564,6 +597,7 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
+[Unreleased]: https://github.com/nodelogicau/intentions-cli/compare/v0.16.0...HEAD
 [0.16.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.13.0...v0.14.0

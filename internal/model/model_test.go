@@ -140,14 +140,6 @@ func TestCheckRules(t *testing.T) {
 	if ps := Check(base()); len(ps) > 0 {
 		t.Fatalf("base: %v", ps)
 	}
-	fieldOf := func(ps Problems) string {
-		var fs []string
-		for _, p := range ps {
-			fs = append(fs, p.Field+":"+p.Code)
-		}
-		sort.Strings(fs)
-		return strings.Join(fs, ",")
-	}
 	o := base()
 	o.Activity = "Deep Work"
 	if got := fieldOf(Check(o)); got != "activity:malformed_term" {
@@ -435,4 +427,89 @@ func TestHabitRoundTrip(t *testing.T) {
 	if !o.HeldAsHabit() {
 		t.Error("habit has no effect under 0.2")
 	}
+}
+
+func TestHoldLink(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("testdata", "intention.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A file written before the field was known: external trails as an extra.
+	held := strings.Replace(string(b), "acknowledgements: []\n", "acknowledgements: []\nexternal:\n  uid: abc-123@cal.example\n  system: icalendar\n", 1)
+	held = strings.Replace(held, "serves:\n", "placement:\n  start: 2026-09-08T09:00:00+10:00\n  duration: PT90M\nserves:\n", 1)
+	obj, probs, err := Decode([]byte(held), TypeIntention)
+	if err != nil || len(probs) > 0 {
+		t.Fatalf("decode: %v %v", err, probs)
+	}
+	o := obj.(*Intention)
+	if o.External == nil || *o.External != (External{System: "icalendar", UID: "abc-123@cal.example"}) || len(o.Extras) > 0 {
+		t.Fatalf("external not decoded as a field: %+v", o)
+	}
+	out, err := Encode(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), "  duration: PT90M\nexternal:\n  system: icalendar\n  uid: abc-123@cal.example\nsource:") {
+		t.Errorf("external not after placement:\n%s", out)
+	}
+	if !o.HoldsUID("abc-123@cal.example", "") || !o.HoldsUID("abc-123@cal.example", "icalendar") || o.HoldsUID("abc-123@cal.example", "jscalendar") {
+		t.Error("HoldsUID")
+	}
+	if ps := Check(o); len(ps) > 0 {
+		t.Errorf("a placed solo hold: %v", ps)
+	}
+	// The object's own rules.
+	o.Placement = nil
+	if got := fieldOf(Check(o)); got != "external:hold_unplaced" {
+		t.Errorf("unplaced: %s", got)
+	}
+	obj, _, _ = Decode([]byte(held), TypeIntention)
+	o = obj.(*Intention)
+	o.Parties = []string{"https://example.com/people/sam"}
+	if got := fieldOf(Check(o)); got != "external:hold_with_parties" {
+		t.Errorf("parties: %s", got)
+	}
+	o.Parties = nil
+	o.External.System = "outlook"
+	if got := fieldOf(Check(o)); got != "external.system:invalid" {
+		t.Errorf("system: %s", got)
+	}
+}
+
+func TestCheckHold(t *testing.T) {
+	link := External{System: "icalendar", UID: "u"}
+	solo := func(id string, e *External, parties ...string) *Intention {
+		return &Intention{ID: id, External: e, Parties: parties}
+	}
+	a, b := solo("int_a", &link), solo("int_b", nil)
+	retired := solo("int_r", &External{System: "icalendar", UID: "r"})
+	retired.Retired = &Retired{Kind: "fulfilled"}
+	all := []*Intention{a, b, retired}
+	if err := CheckHold(all, a, solo("int_a", &link)); err != nil {
+		t.Errorf("keeping its own link: %v", err)
+	}
+	if err := CheckHold(all, b, solo("int_b", &link)); err == nil || err.(*Refusal).Rule != "hold_duplicate" || !strings.Contains(err.Error(), "int_a") {
+		t.Errorf("duplicate: %v", err)
+	}
+	if err := CheckHold(all, b, solo("int_b", &External{System: "icalendar", UID: "r"})); err == nil || err.(*Refusal).Rule != "hold_duplicate" {
+		t.Errorf("duplicate of a retired holder: %v", err)
+	}
+	if err := CheckHold(all, b, solo("int_b", &External{System: "jscalendar", UID: "u"})); err != nil {
+		t.Errorf("same uid, other system: %v", err)
+	}
+	if err := CheckHold(all, a, solo("int_a", &link, "https://example.com/people/sam")); err == nil || err.(*Refusal).Rule != "hold_gains_parties" {
+		t.Errorf("gaining parties: %v", err)
+	}
+	if err := CheckHold(all, a, solo("int_a", nil, "https://example.com/people/sam")); err != nil {
+		t.Errorf("gaining parties and dropping the hold: %v", err)
+	}
+}
+
+func fieldOf(ps Problems) string {
+	var fs []string
+	for _, p := range ps {
+		fs = append(fs, p.Field+":"+p.Code)
+	}
+	sort.Strings(fs)
+	return strings.Join(fs, ",")
 }

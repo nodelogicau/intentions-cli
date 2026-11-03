@@ -4,7 +4,7 @@
 `validate` SHALL report as errors, under either format:
 - `hold_unplaced`: an intention carrying `external` with no `placement`;
 - `hold_with_parties`: an intention carrying `external` and `parties`, naming the commitment as the place for the link;
-- `hold_duplicate`: two intentions, retired or not, carrying the same `external` `system` and `uid`, reported once per pair and naming both.
+- `hold_duplicate`: an intention carrying the same `external` `system` and `uid` as another, retired or not, reported on each holder after the first in id order and naming the first.
 
 An unknown `external.system` or an empty `uid` on an intention SHALL be reported as on a commitment.
 
@@ -14,7 +14,7 @@ An unknown `external.system` or an empty `uid` on an intention SHALL be reported
 
 #### Scenario: Merged duplicate
 - **WHEN** two branches each record a hold with the same `system` and `uid` on different intentions
-- **THEN** `validate` reports one `hold_duplicate` naming both
+- **THEN** `validate` reports one `hold_duplicate` on the later id, naming the earlier
 
 #### Scenario: Same UID under different systems
 - **WHEN** one intention carries `{system: icalendar, uid: x}` and another `{system: jscalendar, uid: x}`

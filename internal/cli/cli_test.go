@@ -2579,3 +2579,98 @@ func TestMigrateBringsAMergedHabitIntoEffect(t *testing.T) {
 		t.Errorf("a migrated habit generated: %v", g.json)
 	}
 }
+
+func TestCalendarHold(t *testing.T) {
+	ws := initWS02(t)
+	tt := addIntention(t, ws, "--title", "being someone who writes").str("id")
+	mustOK(t, run(t, ws, "", "intention", "firm", tt), "firm terminus")
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--capacity", "PT3H", "--calendar", "2026-09/2026-12", "--clock", "09:00/12:00", "--cadence", "FREQ=WEEKLY;BYDAY=TU"), "supply")
+	place := func(title string) string {
+		id := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", title, "--duration", "PT1H", "--calendar", "2026-09/2026-12", "--serves", tt+":for-the-sake-of"), "add "+title).str("id")
+		mustOK(t, run(t, ws, "", "select", id, "--candidate", "1", "--now", rnow), "place "+title)
+		return id
+	}
+	a, b := place("Draft chapter"), place("Revise chapter")
+	mustOK(t, run(t, ws, "", "intention", "firm", a), "the person firms a")
+	unplaced := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Someday", "--duration", "PT1H", "--calendar", "2026-09/2026-12", "--serves", tt+":for-the-sake-of"), "unplaced").str("id")
+
+	// A harness records its hold on a firm intention: no policy, nothing else moves.
+	path := "intentions/" + a + ".yaml"
+	before := readFile(t, ws, path)
+	r := mustOK(t, run(t, ws, "", "intention", "edit", a, "--external", "icalendar:abc-123@cal.example", "--harness", "claude"), "harness records a hold")
+	body := readFile(t, ws, path)
+	if r.str("previous_version") != r.str("version") || !strings.Contains(body, "\nexternal:\n  system: icalendar\n  uid: abc-123@cal.example\n") {
+		t.Errorf("hold recorded:\n%s", body)
+	}
+	if strings.Index(body, "\nplacement:") > strings.Index(body, "\nexternal:") {
+		t.Errorf("external not after placement:\n%s", body)
+	}
+	if !strings.Contains(body, "stability: firm") || strings.Contains(body, "harness:") || strings.Contains(before, "harness:") {
+		t.Errorf("the hold write restamped the source or stability:\n%s", body)
+	}
+	if v := mustOK(t, run(t, ws, "", "validate"), "validate"); int(v.json["counts"].(map[string]any)["error"].(float64)) != 0 {
+		t.Errorf("validate after a hold: %v", v.json)
+	}
+	if show := text(t, ws, "intention", "show", a); !strings.Contains(show.stdout, "uid: abc-123@cal.example") {
+		t.Errorf("show:\n%s", show.stdout)
+	}
+
+	// The value's form, and the rules.
+	refused := func(what, says string, args ...string) {
+		t.Helper()
+		if r := run(t, ws, "", append([]string{"intention", "edit"}, args...)...); r.code != 2 || !strings.Contains(errMsg(r), says) {
+			t.Errorf("%s: %d %s", what, r.code, errMsg(r))
+		}
+	}
+	refused("with parties", "belongs on that commitment", b, "--external", "icalendar:p", "--party", room)
+	mustOK(t, run(t, ws, "", "intention", "edit", b, "--external", "jscalendar:urn:uuid:42"), "uid with colons")
+	if body := readFile(t, ws, "intentions/"+b+".yaml"); !strings.Contains(body, "system: jscalendar\n  uid: urn:uuid:42\n") {
+		t.Errorf("split on the first colon:\n%s", body)
+	}
+	for _, bad := range []string{"abc-123", ":abc", "icalendar:"} {
+		if r := run(t, ws, "", "intention", "edit", b, "--external", bad); r.code != 2 || !strings.Contains(errMsg(r), "<system>:<uid>") {
+			t.Errorf("--external %q: %d %s", bad, r.code, errMsg(r))
+		}
+	}
+	if r := run(t, ws, "", "intention", "edit", b, "--external", "outlook:x"); r.code != 2 || !strings.Contains(errMsg(r), "external.system") {
+		t.Errorf("unknown system: %d %s", r.code, errMsg(r))
+	}
+	refused("unplaced", "has none", unplaced, "--external", "icalendar:u")
+	refused("gaining parties", "clear it in the same write", a, "--party", room)
+	refused("duplicate", "already the hold of "+a, b, "--external", "icalendar:abc-123@cal.example")
+	if r := run(t, ws, "", "intention", "add", "--title", "x", "--external", "icalendar:y"); r.code != 2 {
+		t.Errorf("add takes --external: %d", r.code)
+	}
+
+	// Replacement keeps the link; retirement keeps it; the lookup finds a retired holder.
+	mustOK(t, run(t, ws, "", "select", a, "--candidate", "2", "--replace", "--now", rnow), "replace")
+	if !strings.Contains(readFile(t, ws, path), "uid: abc-123@cal.example") {
+		t.Error("replacement dropped the hold")
+	}
+	mustOK(t, run(t, ws, "", "intention", "retire", a, "--kind", "fulfilled"), "retire")
+	if !strings.Contains(readFile(t, ws, path), "uid: abc-123@cal.example") {
+		t.Error("retirement dropped the hold")
+	}
+	refused("duplicate of a retired holder", "already the hold of "+a, b, "--external", "icalendar:abc-123@cal.example")
+	l := mustOK(t, run(t, ws, "", "intention", "list", "--external", "abc-123@cal.example"), "lookup")
+	if l.json["count"].(float64) != 1 || l.json["intentions"].([]any)[0].(map[string]any)["id"] != a {
+		t.Errorf("lookup of a retired holder: %v", l.json)
+	}
+	if l := mustOK(t, run(t, ws, "", "intention", "list", "--external", "abc-123@cal.example", "--external-system", "jscalendar"), "lookup by system"); l.json["count"].(float64) != 0 {
+		t.Errorf("system narrows: %v", l.json)
+	}
+	if l := mustOK(t, run(t, ws, "", "intention", "list", "--external", "not-a-hold"), "no hold"); l.json["count"].(float64) != 0 {
+		t.Errorf("unknown uid: %v", l.json)
+	}
+	if r := run(t, ws, "", "intention", "list", "--external-system", "icalendar"); r.code != 2 {
+		t.Errorf("--external-system alone: %d", r.code)
+	}
+
+	// Clearing, by a harness, leaves the version; clearing lets parties in.
+	c := mustOK(t, run(t, ws, "", "intention", "edit", b, "--clear-external", "--harness", "claude"), "harness clears")
+	if c.str("previous_version") != c.str("version") || strings.Contains(readFile(t, ws, "intentions/"+b+".yaml"), "external") {
+		t.Errorf("clear: %v", c.json)
+	}
+	mustOK(t, run(t, ws, "", "intention", "edit", b, "--external", "icalendar:q"), "hold again")
+	mustOK(t, run(t, ws, "", "intention", "edit", b, "--party", room, "--clear-external"), "gain parties and drop the hold in one write")
+}

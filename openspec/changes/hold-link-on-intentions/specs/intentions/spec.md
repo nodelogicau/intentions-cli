@@ -5,7 +5,7 @@ The CLI SHALL admit `external` (`{system: icalendar|jscalendar, uid}`) on a plac
 
 `intentions intention edit <id> --external <system>:<uid>` SHALL set it, splitting the value on its first colon. A value with no colon or an empty part SHALL be a usage error (exit 2). `--clear-external` SHALL remove it. `intention add` SHALL NOT take `--external`.
 
-A write SHALL be refused (exit 2), naming the rule, when:
+A write SHALL be refused (exit 2), with a message stating the rule and the fix, when (in parentheses, the code `validate` reports for the same condition, or the refusal's rule):
 - the result carries `external` with no `placement` (`hold_unplaced`);
 - the result carries `external` with `parties` (`hold_with_parties`), naming the commitment created on selection as the place for the link;
 - the write adds `parties` to an intention carrying `external` without clearing `external` in the same write (`hold_gains_parties`);
@@ -13,7 +13,7 @@ A write SHALL be refused (exit 2), naming the rule, when:
 
 Setting or clearing `external` SHALL be accepted from a source carrying a harness without `--policy`, and SHALL NOT change the intention's `source`, `stability` or `firmed_under`. Retirement SHALL keep `external`.
 
-`intention show` SHALL print the link. `intention list --external <uid>` SHALL list every intention whose `external.uid` is that value, retired ones included without `--retired`. `--external-system <system>` SHALL narrow the match to that system.
+`intention show` SHALL print the link in the object it prints. `intention list --external <uid>` SHALL list every intention whose `external.uid` is that value, retired ones included without `--retired`. `--external-system <system>` SHALL narrow the match to that system.
 
 #### Scenario: Harness records a hold on a firm intention
 - **WHEN** `intention edit int_A --external icalendar:abc-123@cal.example --harness claude-code` runs on a placed, person-firmed intention with no `parties`

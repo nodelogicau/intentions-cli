@@ -154,6 +154,16 @@ func windowNode(w *temporal.Window) *yaml.Node {
 	return m
 }
 
+func externalNode(e *External) *yaml.Node {
+	if e == nil {
+		return nil
+	}
+	m := mapping()
+	addStrAlways(m, "system", e.System)
+	addStrAlways(m, "uid", e.UID)
+	return m
+}
+
 func placementNode(p *temporal.Placement) *yaml.Node {
 	if p == nil {
 		return nil
@@ -297,6 +307,7 @@ func intentionNode(o *Intention) *yaml.Node {
 	}
 	addStr(m, "occurrence", o.Occurrence)
 	addKV(m, "placement", placementNode(o.Placement))
+	addKV(m, "external", externalNode(o.External))
 	addStr(m, "preference", o.Preference)
 	addKV(m, "auto_select", policyNode(o.AutoSelect))
 	addKV(m, "auto_firm", policyNode(o.AutoFirm))
@@ -356,12 +367,7 @@ func commitmentNode(o *Commitment) *yaml.Node {
 	if o.Transparent != nil && *o.Transparent {
 		addKV(m, "transparent", plain("!!bool", strconv.FormatBool(*o.Transparent)))
 	}
-	if o.External != nil {
-		em := mapping()
-		addStrAlways(em, "system", o.External.System)
-		addStrAlways(em, "uid", o.External.UID)
-		addKV(m, "external", em)
-	}
+	addKV(m, "external", externalNode(o.External))
 	addStr(m, "title", o.Title)
 	addStr(m, "description", o.Description)
 	addKV(m, "source", sourceNode(o.Source))

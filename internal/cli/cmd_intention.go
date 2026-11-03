@@ -19,6 +19,7 @@ type intentionFields struct {
 	subject, title, description, descriptionFile string
 	duration, stability, activity, cadence       string
 	preference, autoSelect, autoFirm, reference  string
+	external                                     string
 	location, parties, serves                    []string
 	policy                                       string
 	habit                                        bool
@@ -26,7 +27,7 @@ type intentionFields struct {
 	clear                                        map[string]*bool
 }
 
-var clearableIntentionFields = []string{"description", "duration", "activity", "location", "parties", "serves", "cadence", "habit", "preference", "auto-select", "auto-firm", "reference"}
+var clearableIntentionFields = []string{"description", "duration", "activity", "location", "parties", "serves", "cadence", "habit", "external", "preference", "auto-select", "auto-firm", "reference"}
 
 func addIntentionFieldFlags(cmd *cobra.Command, f *intentionFields, edit bool) {
 	cmd.Flags().StringVar(&f.title, "title", "", "prose title (required on add)")
@@ -51,6 +52,7 @@ func addIntentionFieldFlags(cmd *cobra.Command, f *intentionFields, edit bool) {
 	}
 	f.clear = map[string]*bool{}
 	if edit {
+		cmd.Flags().StringVar(&f.external, "external", "", "<system>:<uid> of the calendar hold written for the placement (icalendar or jscalendar); no policy needed, version unchanged")
 		for _, name := range clearableIntentionFields {
 			b := new(bool)
 			f.clear[name] = b
@@ -160,6 +162,16 @@ func (a *app) applyIntentionFields(cmd *cobra.Command, f intentionFields, o *mod
 	}
 	if cleared("habit") {
 		o.Habit = false
+	}
+	if changed("external") {
+		e, err := parseExternalFlag(f.external)
+		if err != nil {
+			return err
+		}
+		o.External = e
+	}
+	if cleared("external") {
+		o.External = nil
 	}
 	if changed("preference") {
 		o.Preference = f.preference
@@ -350,6 +362,9 @@ func (a *app) intentionEditCmd() *cobra.Command {
 				return err
 			}
 			if err := model.CheckHabit(before, &o, src, g.Format); err != nil {
+				return err
+			}
+			if err := model.CheckHold(g.Intentions(), before, &o); err != nil {
 				return err
 			}
 			if ps := model.Check(&o); len(ps) > 0 {
@@ -589,7 +604,7 @@ func (a *app) intentionShowCmd() *cobra.Command {
 }
 
 func (a *app) intentionListCmd() *cobra.Command {
-	var subject, activity, stability, instancesOf string
+	var subject, activity, stability, instancesOf, external, externalSystem string
 	var recurring, retired, placed, unplaced bool
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -600,13 +615,22 @@ func (a *app) intentionListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if externalSystem != "" && external == "" {
+				return usageErr("--external-system narrows --external; give the uid with --external")
+			}
 			g, err := ws.Load()
 			if err != nil {
 				return err
 			}
 			var items []*model.Intention
 			for _, o := range g.Intentions() {
-				if (o.Retired != nil) != retired {
+				// A hold lookup finds the holder retired or not: an importer
+				// must recognise the hold of a fulfilled intention too.
+				if external != "" {
+					if !o.HoldsUID(external, externalSystem) {
+						continue
+					}
+				} else if (o.Retired != nil) != retired {
 					continue
 				}
 				if subject != "" && o.Subject != subject {
@@ -664,6 +688,8 @@ func (a *app) intentionListCmd() *cobra.Command {
 		}),
 	}
 	cmd.Flags().StringVar(&subject, "subject", "", "filter by subject URI")
+	cmd.Flags().StringVar(&external, "external", "", "the intention whose calendar hold has this uid, retired or not")
+	cmd.Flags().StringVar(&externalSystem, "external-system", "", "narrow --external to icalendar or jscalendar")
 	cmd.Flags().StringVar(&activity, "activity", "", "filter by activity term")
 	cmd.Flags().StringVar(&stability, "stability", "", "filter by stability")
 	cmd.Flags().BoolVar(&recurring, "recurring", false, "only recurring intentions (with a cadence)")

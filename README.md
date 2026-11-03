@@ -31,7 +31,7 @@ tool to decide, for raising upstream.
 
 | Implemented | Deferred to follow-on changes |
 |---|---|
-| Workspace: `init`, discovery, `intentions.yaml`, `workspace pointer` | iCalendar and JSCalendar import and export; iTIP |
+| Workspace: `init`, discovery, `intentions.yaml`, `workspace pointer` | iCalendar and JSCalendar import and export (the harness's, with the hold link and lookup below); iTIP |
 | Intentions: add, edit, firm, retire, show, list | Presence, federation |
 | Availability: add, edit, renew, supersede, retire, show, list | |
 | Commitments: accept, decline, cancel, show, list | |
@@ -122,10 +122,10 @@ intentions intention add --title "Read the board pack" --json
 | `desire retire <id>` | Append a retirement record: `--kind abandoned\|superseded [--superseded-by <des id>]`; `adopted` is written only by `adopt` |
 | `desire show <id>`, `desire list` | Show one with the terminus it serves; list active (or `--retired`) with filters |
 | `intention add` | Create an intention. `--title` is required; `subject` defaults from `intentions.yaml`. An intention that is not a terminus should reach one through `--serves`; an unserved write is accepted and its result carries a warning under `findings` |
-| `intention edit <id>` | Edit fields in place. Prose edits leave the version unchanged; `--clear-<field>` removes one |
+| `intention edit <id>` | Edit fields in place. Prose edits leave the version unchanged; `--clear-<field>` removes one; `--external <system>:<uid>` records a calendar hold |
 | `intention firm <id>` | Set stability to firm. A harness must pass `--policy <int_id>` naming a firm terminus of the subject carrying `auto_firm`; the id is written to `firmed_under`, and a tentative policy is refused by name. On a terminus, refuses any policy and any harness: only the person firms one |
 | `intention retire <id>` | Append a retirement record: `--kind fulfilled\|abandoned\|superseded [--superseded-by id]`. A terminus admits `abandoned` and `superseded` (by a terminus of its subject) only; retiring one is refused when it would leave a served intention with no firm terminus, and refused for a harness unless the terminus is a tentative draft the harness wrote |
-| `intention show <id>`, `intention list` | Show one with its version and resolved serves targets; list active (or `--retired`, `--recurring`) with filters |
+| `intention show <id>`, `intention list` | Show one with its version and resolved serves targets; list active (or `--retired`, `--recurring`) with filters; `--external <uid>` finds a calendar hold's intention, retired or not |
 | `availability add` | Create an availability. `--subject`, `--capacity` and a window are required; `--activities` names the terms it is good for (`--duration` and `--conditional` still work as aliases) |
 | `availability edit <id>` | Edit prose or widen `--scope`. A change of terms is refused: use `supersede` |
 | `availability renew <id>` | Advance `--valid-until` on the same object |
@@ -240,6 +240,26 @@ earlier of the window's end and `resolver.horizon`.
 Anything displaced is listed on the record and left
 alone; `check` shows it as a `window-clash` on both until the person
 acknowledges it or re-resolves.
+
+### Calendar holds
+
+A harness that writes to the person's calendar may write a busy **hold** for
+a placed intention with no parties, and records it with `intention edit <id>
+--external <system>:<uid>` (`icalendar` or `jscalendar`; the value splits on
+its first colon, so a UID may carry colons). `--clear-external` drops it. The
+link is outside the projection: setting, moving or clearing it leaves the
+version unchanged and lapses no acknowledgement, and it needs no policy, so a
+harness may record a hold on an intention the person firmed. It is refused,
+and an error on `validate`, on an intention with no placement and on one with
+parties, whose hold belongs on its commitment; an edit that adds parties to a
+held intention must clear the link in the same write; and no two intentions,
+retired or not, may carry the same `system` and `uid`. A replacing `select`
+and retirement both keep it. `intention list --external <uid>` finds the
+holder, retired ones included, which is how an importer recognises its own
+hold and skips it. The CLI writes no events: the hold's shape (start and
+duration, a URI location, the title, always opaque, `STATUS` from stability)
+and releasing it after `abandoned` or `superseded` are the harness's, set out
+in the skill.
 
 ## Agent skill
 
@@ -368,6 +388,12 @@ hashes nor applies it, so it reports a habit as `stale_version`, fails
 `index --check`, and keeps generating its instances. Upgrade every binary
 that shares a workspace before anyone sets `habit`. Under 0.1 it is a
 validation error naming `migrate`, hashed as if absent and given no effect.
+
+An intention's `external`, the calendar hold link, is admitted under 0.1 and
+0.2 and outside both projections, so no version moves. A binary older than it
+(v0.16.0 and earlier) keeps the field verbatim but neither validates it nor
+knows it marks a hold. Upgrade every binary that shares a workspace before a
+harness records holds.
 
 `intentions migrate` moves a workspace from 0.1 to 0.2. It refuses while any
 intention is unserved, naming them; otherwise it rewrites the shapes and

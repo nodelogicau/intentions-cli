@@ -192,6 +192,16 @@ func parseDurationFlag(s string) (*temporal.DurationSpec, error) {
 	return &d, nil
 }
 
+// parseExternalFlag splits <system>:<uid> on the first colon: a system never
+// carries one, a uid may.
+func parseExternalFlag(s string) (*model.External, error) {
+	system, uid, ok := strings.Cut(s, ":")
+	if !ok || system == "" || uid == "" {
+		return nil, usageErr("--external takes <system>:<uid>, e.g. icalendar:abc-123@cal.example; got %q", s)
+	}
+	return &model.External{System: system, UID: uid}, nil
+}
+
 func parseCadenceFlag(s string) (*temporal.Cadence, error) {
 	if s == "" {
 		return nil, nil

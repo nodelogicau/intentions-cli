@@ -123,6 +123,8 @@ modifiers inside double quotes, so `"$id:in-order-to"` silently corrupts the id.
 | Generate instances | `intentions generate --horizon <P…> [--recurring <id>] --json` → `{created, skipped}`; idempotent. Only when the person asks to plan a named period, and narrow it to that period |
 | Rank placements | `intentions resolve <id> [--limit N] --json` → `{candidates: [{rank, start, end, displaces, supply}], candidates_considered, reason}`; writes nothing but instances |
 | Record the choice | `intentions select <id> --candidate N --json` → `{resolution, intention, commitment?, flags}`; `--replace` to move a placed one |
+| Record a calendar hold | `intentions intention edit <id> --external <icalendar\|jscalendar>:<uid> --json` after writing the busy event; a placed intention with no parties only; no policy, version unchanged. `--clear-external` drops the link |
+| Is this event my hold? | `intentions intention list --external <uid> [--external-system <s>] --json`, retired holders included; import nothing that matches |
 | Select under a policy | `intentions select <id> --policy <terminus id> --json` — harness only, top rank-1 candidate only; refused otherwise |
 | What awaits placement | `intentions unresolved [--subject <uri>] --json` → `{entries: [{id, title, status, reason?, blocked_on?, candidates, best_rank?, deadline?}], count, counts}`; `ready` means candidates exist, `blocked` names the target to place first, `incomplete` needs an edit |
 | Answer a commitment | `intentions commitment accept\|decline <id> [--party <uri>] --json` — only when the person has said so; no policy authorises it |
@@ -297,6 +299,22 @@ finding under `findings` in its result. The next revision refuses both.
   that is the moment to ask whether the habit still holds. When it has
   lapsed and the person wants the plan back, run `--clear-habit`. Habit needs
   an `intentions/0.2` workspace; under 0.1 it is refused, naming `migrate`.
+- **A calendar hold is a mirror of a placement, and the link is how you find
+  it again.** When you can write to the person's calendar and a placed
+  intention has no parties, you may write one busy event for it, then record
+  it with `intention edit <id> --external <system>:<uid>`. With parties the
+  event belongs on the commitment, never the intention. The event carries
+  only the placement's start and duration (all-day form for an all-day
+  placement), `placement.location` when it is a URI, the title, `TRANSP:OPAQUE`
+  (`freeBusyStatus: busy`), and `STATUS:TENTATIVE` or `CONFIRMED` from
+  stability: no description, no serves, no parties. Before importing any
+  event, run `intention list --external <uid>`; a match is your own hold, so
+  import nothing for it. After `select --replace`, move the same event rather
+  than writing a second. After a retirement as `abandoned` or `superseded`,
+  delete the event from the calendar (the link stays, and the workspace needs
+  no write); after `fulfilled`, leave it. If the event is gone or moved in the
+  calendar, the placement is the truth: rewrite it from the placement, or
+  write a new one and replace the link.
 - **No supply is an answer, not an obstacle.** When `resolve` reports no
   candidates, read the reason and tell the person: the window has passed, it
   lies beyond the horizon, a target it waits on is unplaced, or they have

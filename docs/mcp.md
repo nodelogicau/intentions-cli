@@ -155,11 +155,11 @@ take the same keys either way. Every optional field may be omitted;
 | `desire_show` | `id` | `{…, serves_resolved}` |
 | `desire_list` | `subject?`, `activity?`, `retired?` | `{desires, count}` |
 | `intention_add` | `title`, `subject?`, `duration?`, `window?`, `activity?`, `location[]?`, `parties[]?`, `serves[{id, role}]?`, `cadence?`, `habit?`, `preference?`, `auto_select?`, `auto_firm?`, `stability?`, `policy?`, `reference?`, `description?`, `timestamp?`, `source?` | `{id, type, path, version, object, created, findings?}`; `habit: true` is refused, since every call here carries a harness: holding an intention as habit is the person's act in the CLI |
-| `intention_edit` | `id`, any of the above, `clear[]?` | `{…, previous_version, projection_changed, flags}`; `habit: false` or `clear: [habit]` brings a habit's plan back |
+| `intention_edit` | `id`, any of the above, `external{system, uid}?`, `clear[]?` | `{…, previous_version, projection_changed, flags}`; `habit: false` or `clear: [habit]` brings a habit's plan back; `external` records the calendar hold the client wrote for a placed intention with no parties, needing no policy and leaving the version unchanged, and `clear: [external]` drops it |
 | `intention_firm` | `id`, `policy?`, `source?` | `{…, previous_version, policy?, findings?}` |
 | `intention_retire` | `id`, `kind`, `superseded_by?`, `reason?` | `{…, retired}`; on a terminus, `fulfilled` is refused, `superseded_by` must name a terminus of the subject, and only a tentative terminus you drafted may be retired |
 | `intention_show` | `id`, `now?` | `{…, serves_resolved, flags}` |
-| `intention_list` | `subject?`, `activity?`, `stability?`, `recurring?`, `placed?`, `unplaced?`, `instances_of?`, `retired?` | `{intentions, count}` |
+| `intention_list` | `subject?`, `activity?`, `stability?`, `recurring?`, `placed?`, `unplaced?`, `instances_of?`, `retired?`, `external?`, `external_system?` | `{intentions, count}`; `external` (a UID) finds the holder of that calendar hold, retired or not, for an importer to skip |
 | `availability_add` | `subject`, `capacity`, `window`, `title?`, `activities[]?`, `location[]?`, `cadence?`, `valid_until?`, `scope?`, `description?`, `timestamp?`, `source?` | `{…, effective_valid_until, effective_valid_until_from, flags, created}` |
 | `availability_renew` | `id`, `valid_until` | `{…, previous_version}` |
 | `availability_supersede` | `id`, changed terms, `reason?` | `{…, created, superseded: {id, version}}` |

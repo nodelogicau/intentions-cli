@@ -42,8 +42,8 @@ format gave it nothing to stand on, 27 from implementing 26 and finding
 the same object inert as a ground and live as an authorisation, 28 from
 reading the DESIRE text against the terminus definition before implementing
 it, 29 from reading a field refinement against the text's own rule on
-projections, and 30 from reviewing the habit change against that rule as
-item 29 settled it.
+projections, 30 from reviewing the habit change against that rule as
+item 29 settled it, and 31 from implementing the calendar hold link.
 
 | # | Topic | Status |
 |---|---|---|
@@ -77,6 +77,7 @@ item 29 settled it.
 | 28 | Adopting a bare desire creates a terminus | adopted with additions, [#28](https://github.com/nodelogicau/intentions/issues/28) |
 | 29 | The origin change alters the commitment projection under intentions/0.1 | adopted with refinements, implemented in v0.15.0, [#29](https://github.com/nodelogicau/intentions/issues/29) |
 | 30 | `habit` joins a 0.2 projection files already carry | adopted, option (a), implemented in v0.16.0, [#32](https://github.com/nodelogicau/intentions/issues/32) |
+| 31 | A hold imported before it was recognised | open, not yet filed upstream |
 
 ---
 
@@ -911,3 +912,37 @@ with the field given no effect. Status says a reader older than `habit`
 sets it. The CLI work is
 [intentions-cli#10](https://github.com/nodelogicau/intentions-cli/issues/10).
 Implemented in v0.16.0.
+
+## 31. A hold imported before it was recognised
+
+**The draft says:** since `hold-placed-intentions` (nodelogicau/intentions#34),
+a placed intention with no `parties` may carry `external`, the link to the
+busy hold a harness wrote for its placement. On import, "an external event
+whose `system` and `uid` match any intention's `external`, retired or not,
+SHALL be recognised as that intention's hold and SHALL NOT create a
+commitment." Validation gains three errors: `external` without `placement`,
+`external` with `parties`, and two intentions carrying the same `system` and
+`uid`.
+
+**The problem:** the import check prevents the loop from now on. It does not
+find the loop already closed. A harness that wrote holds before the field
+existed, or an importer older than the check, has already imported its own
+hold as a commitment with `origin: import`, the subject as its only party,
+and the hold's `uid`. Once the harness records that same `uid` on the
+intention, the workspace holds an intention and a commitment linked to one
+event, and they overlap. `check` reports them as a `window-clash`, which is
+the self-inflicted clash the change exists to prevent, and nothing names the
+cause. The error list covers two intentions sharing a link and is silent on
+an intention and a commitment sharing one. The same can arise by merge,
+without either write passing the import check.
+
+**We decided:** nothing beyond the text. This implementation reports the three errors
+as written and reports nothing for an intention and a commitment sharing a
+link.
+
+**Proposed text:** add a warning to Validation: an intention whose `external`
+`system` and `uid` match an unretired commitment's `external`, naming both,
+with the fix that the commitment is the intention's own hold imported before
+it was recognised and is retired as `cancelled`. A warning rather than an
+error, because the workspace is still consistent as data, and the person may
+judge that the commitment is a real event that happens to share the UID.

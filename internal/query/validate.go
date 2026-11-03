@@ -68,6 +68,7 @@ func Validate(ws *store.Workspace, g *store.Graph) Report {
 	v.referential()
 	v.graph()
 	v.instances()
+	v.holds()
 	v.versions()
 	v.index()
 	v.terms()
@@ -211,6 +212,23 @@ func (v *validator) referential() {
 				check(fmt.Sprintf("displaced[%d]", i), d, model.TypeIntention, model.TypeCommitment)
 			}
 		}
+	}
+}
+
+// holds reports each pair of intentions, retired or not, carrying the same
+// calendar hold link, on the later id and naming the earlier: every hold is an
+// event of its own. The link's single-object rules come through structural.
+func (v *validator) holds() {
+	first := map[model.External]string{}
+	for _, in := range v.g.Intentions() {
+		if in.External == nil {
+			continue
+		}
+		if other, ok := first[*in.External]; ok {
+			v.add(SeverityError, "hold_duplicate", in.ID, "carries the hold %s:%s, which %s already carries; each hold is its own event, so clear the link on the one that did not write it", in.External.System, in.External.UID, other)
+			continue
+		}
+		first[*in.External] = in.ID
 	}
 }
 
