@@ -144,7 +144,7 @@ intentions intention add --title "Read the board pack" --json
 | `show <id>` | Show any object, including commitments and resolutions written by other tools |
 | `version-of <id> [--projection]` | The computed version, and the canonical JSON it hashes |
 | `bounds [<id>] [--calendar] [--clock]` | Clock-time bounds of a window in the resolver context, with overrides |
-| `validate` | Check the whole workspace; exits 4 on any error. An intention reaching no firm terminus of its subject is a warning (`unserved`) naming the fix; a record selected under a policy since withdrawn is a warning (`selector_withdrawn`); a means whose end was abandoned is a warning (`abandoned_end`); a terminus retired as `fulfilled` (`terminus_fulfilled`) or superseded by anything but a terminus of its subject (`terminus_successor`) is an error; a tentative terminus is info (`draft_terminus`) |
+| `validate` | Check the whole workspace; exits 4 on any error. An intention reaching no firm terminus of its subject is a warning (`unserved`) naming the fix; a record selected under a policy since withdrawn is a warning (`selector_withdrawn`); a means whose end was abandoned is a warning (`abandoned_end`); an intention whose hold link an unretired commitment also carries is a warning (`hold_imported`) naming both fixes; a terminus retired as `fulfilled` (`terminus_fulfilled`) or superseded by anything but a terminus of its subject (`terminus_successor`) is an error; a tentative terminus is info (`draft_terminus`) |
 | `index [--check]` | Rebuild `index.yaml`, or verify it and exit 4 on drift |
 | `migrate [--check]` | Move a `intentions/0.1` workspace to `intentions/0.2`: the person's act, refused while any intention is unserved; `--check` reports and writes nothing |
 | `skill show\|install` | Print or install the embedded agent skill for a harness; `install --check` for CI |
@@ -256,7 +256,13 @@ held intention must clear the link in the same write; and no two intentions,
 retired or not, may carry the same `system` and `uid`. A replacing `select`
 and retirement both keep it. `intention list --external <uid>` finds the
 holder, retired ones included, which is how an importer recognises its own
-hold and skips it. The CLI writes no events: the hold's shape (start and
+hold and skips it. A hold imported as a commitment before that check existed
+(or arriving by merge) leaves an intention and an unretired commitment
+sharing one link: `validate` warns (`hold_imported`) on the intention, once
+per commitment, with both fixes, cancelling the commitment if it is the
+intention's own hold or clearing the intention's link if it is a real event
+sharing the UID, and a write that sets such a link is accepted with the same
+warning under `findings`. The CLI writes no events: the hold's shape (start and
 duration, a URI location, the title, always opaque, `STATUS` from stability)
 and releasing it after `abandoned` or `superseded` are the harness's, set out
 in the skill.

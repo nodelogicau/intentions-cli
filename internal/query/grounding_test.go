@@ -465,3 +465,74 @@ func TestHoldValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestHoldImportedBeforeRecognised(t *testing.T) {
+	ws := newWS02(t)
+	tt := firmTerminus("int_t")
+	s, _ := temporal.ParsePlacementStart("2026-09-21T09:00:00+10:00")
+	placed := func(id, uid string) *model.Intention {
+		o := withDuration(intention(id))
+		o.Serves = []model.Ref{{ID: "int_t", Role: model.RoleForTheSakeOf}}
+		o.Placement = &temporal.Placement{Start: s, Duration: *o.Duration}
+		o.External = &model.External{System: "icalendar", UID: uid}
+		return o
+	}
+	ada := model.Source{Author: "https://example.com/people/ada"}
+	hour, _ := temporal.ParseDurationSpec("PT1H")
+	imported := func(id, system, uid string) *model.Commitment {
+		return &model.Commitment{ID: id, Parties: []model.Party{{URI: ada.Author, Status: "accepted"}},
+			Placement: &temporal.Placement{Start: s, Duration: hour}, Origin: model.OriginImport,
+			External: &model.External{System: system, UID: uid}, Source: ada, Timestamp: time.Now()}
+	}
+	a := placed("int_a", "u") // own hold imported once
+	b := placed("int_b", "r") // a recurring import: three matches
+	c := placed("int_c", "f") // retired: only the cancel is offered
+	c.Retired = &model.Retired{Kind: "fulfilled", Source: ada, Timestamp: time.Now()}
+	d := placed("int_d", "x") // the duplicate is cancelled
+	e := placed("int_e", "j") // same uid, other system
+	cx := imported("cmt_x", "icalendar", "x")
+	cx.Retired = &model.Retired{Kind: "cancelled", Source: ada, Timestamp: time.Now()}
+	write(t, ws, tt, a, b, c, d, e,
+		imported("cmt_a", "icalendar", "u"),
+		imported("cmt_r1", "icalendar", "r"), imported("cmt_r2", "icalendar", "r"), imported("cmt_r3", "icalendar", "r"),
+		imported("cmt_c", "icalendar", "f"), cx, imported("cmt_j", "jscalendar", "j"))
+	r := run(t, ws)
+	if r.HasErrors() {
+		t.Errorf("hold_imported is only a warning: %v", r.Findings)
+	}
+	on := func(id string) []Finding {
+		var out []Finding
+		for _, f := range r.Findings {
+			if f.ID == id && f.Code == "hold_imported" {
+				out = append(out, f)
+			}
+		}
+		return out
+	}
+	if fs := on("int_a"); len(fs) != 1 || fs[0].Severity != SeverityWarning ||
+		!strings.Contains(fs[0].Message, "cmt_a") || !strings.Contains(fs[0].Message, "icalendar:u") ||
+		!strings.Contains(fs[0].Message, "commitment cancel cmt_a") || !strings.Contains(fs[0].Message, "intention edit int_a --clear-external") {
+		t.Errorf("own hold imported: %v", fs)
+	}
+	if fs := on("int_b"); len(fs) != 3 || !strings.Contains(fs[0].Message, "cmt_r1") || !strings.Contains(fs[2].Message, "cmt_r3") {
+		t.Errorf("recurring import: %v", fs)
+	}
+	if fs := on("int_c"); len(fs) != 1 || !strings.Contains(fs[0].Message, "commitment cancel cmt_c") || strings.Contains(fs[0].Message, "--clear-external") {
+		t.Errorf("retired intention: %v", fs)
+	}
+	if fs := on("int_d"); len(fs) != 0 {
+		t.Errorf("cancelled duplicate: %v", fs)
+	}
+	if fs := on("int_e"); len(fs) != 0 {
+		t.Errorf("other system: %v", fs)
+	}
+
+	// The write path reports the same finding.
+	g, err := ws.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fs := WriteFindings(g, a); len(fs) != 1 || fs[0].Code != "hold_imported" {
+		t.Errorf("write findings: %v", fs)
+	}
+}

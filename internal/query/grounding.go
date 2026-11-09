@@ -26,13 +26,14 @@ func (o overlay) Get(id string) (model.Object, bool) {
 
 // WriteFindings reports what validate would say about o once it is written
 // into g: an unserved warning when it reaches no firm terminus of its own
-// subject, a draft info finding when it is a tentative terminus. Nil when
-// nothing warrants a finding, so a result can omit the key.
+// subject, a draft info finding when it is a tentative terminus, and a
+// hold_imported warning for each unretired commitment sharing its hold link.
+// Nil when nothing warrants a finding, so a result can omit the key.
 func WriteFindings(g *store.Graph, o *model.Intention) []Finding {
 	if o.Retired != nil {
 		return nil
 	}
-	var out []Finding
+	out := SharedHolds(g, o)
 	if o.IsTerminus() {
 		if o.Stability != "firm" {
 			out = append(out, Finding{Severity: SeverityInfo, Code: "draft_terminus", ID: o.ID, Message: draftMessage(o.ID)})
@@ -121,4 +122,27 @@ func RefuseRetirement(g *store.Graph, o *model.Intention, r model.Retired, edit 
 		}
 	}
 	return &model.Refusal{Rule: "ungrounds", Message: fmt.Sprintf("retiring %s would leave %s with no firm terminus of %s; to withdraw the reason, set it tentative (%s), or to replace it, retire it as superseded by %s", o.ID, strings.Join(lost, ", "), o.Subject, edit, successor)}
+}
+
+// SharedHolds reports one hold_imported warning for each unretired commitment
+// carrying the same calendar hold link as in, in commitment id order: most
+// often the intention's own hold, imported before import recognised it. Only
+// the person can tell, so the message offers both fixes; a retired intention
+// cannot be edited, so for one it offers only the cancel.
+func SharedHolds(g *store.Graph, in *model.Intention) []Finding {
+	if in.External == nil {
+		return nil
+	}
+	var out []Finding
+	for _, c := range g.Commitments() {
+		if c.Retired != nil || c.External == nil || *c.External != *in.External {
+			continue
+		}
+		msg := fmt.Sprintf("shares the hold %s:%s with unretired commitment %s; if %s is this intention's own hold imported before it was recognised, cancel it (intentions commitment cancel %s)", in.External.System, in.External.UID, c.ID, c.ID, c.ID)
+		if in.Retired == nil {
+			msg += fmt.Sprintf("; if it is a real event that shares the UID, clear the link (intentions intention edit %s --clear-external)", in.ID)
+		}
+		out = append(out, Finding{Severity: SeverityWarning, Code: "hold_imported", ID: in.ID, Message: msg})
+	}
+	return out
 }

@@ -315,7 +315,11 @@ finding under `findings` in its result. The next revision refuses both.
   delete the event from the calendar (the link stays, and the workspace needs
   no write); after `fulfilled`, leave it. If the event is gone or moved in the
   calendar, the placement is the truth: rewrite it from the placement, or
-  write a new one and replace the link.
+  write a new one and replace the link. A `hold_imported` warning means an
+  unretired commitment carries the same link: usually your own hold,
+  imported before it was recognised, so `commitment cancel` it; if it is
+  someone else's event that shares the UID, `--clear-external` on the
+  intention and write a fresh hold. When you can't tell which, ask the person.
 - **No supply is an answer, not an obstacle.** When `resolve` reports no
   candidates, read the reason and tell the person: the window has passed, it
   lies beyond the horizon, a target it waits on is unplaced, or they have

@@ -752,3 +752,28 @@ func TestCalendarHoldOverMCP(t *testing.T) {
 		t.Error("clear: [external] left the link")
 	}
 }
+
+// A client recording a hold link that an imported commitment already carries
+// is accepted, and the result names the commitment under findings.
+func TestHoldImportedBeforeRecognisedOverMCP(t *testing.T) {
+	h := newHarness(t, "claude-ai", Options{})
+	h.ok("availability_add", map[string]any{"subject": ada, "capacity": "PT3H", "window": map[string]any{"calendar": "2026-09/2026-12", "clock": "09:00/12:00"}, "cadence": "FREQ=WEEKLY;BYDAY=TU"})
+	a := str(h.ok("intention_add", map[string]any{"title": "Draft chapter", "duration": "PT1H", "window": map[string]any{"calendar": "2026-W38"}}), "id")
+	h.ok("select", map[string]any{"id": a, "candidate": 1})
+	cmt := "cmt_01a06d15-3f8a-7d61-8c2b-9a4e6f1d3b05"
+	body := "id: " + cmt + "\nparties:\n  - uri: " + ada + "\n    status: accepted\nplacement:\n  start: 2026-09-15T09:00:00+10:00\n  duration: PT1H\n" +
+		"origin: import\nexternal:\n  system: icalendar\n  uid: abc-123@cal.example\ntitle: Imported\nsource:\n  author: " + ada +
+		"\ntimestamp: 2026-09-08T14:02:00Z\nacknowledgements: []\n"
+	if err := os.WriteFile(filepath.Join(h.ws.Root, "commitments", cmt+".yaml"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := h.ok("intention_edit", map[string]any{"id": a, "external": map[string]any{"system": "icalendar", "uid": "abc-123@cal.example"}})
+	found := false
+	for _, f := range list(r, "findings") {
+		m := f.(map[string]any)
+		found = found || (m["code"] == "hold_imported" && strings.Contains(m["message"].(string), cmt))
+	}
+	if !found || !strings.Contains(h.file("intentions/"+a+".yaml"), "uid: abc-123@cal.example") {
+		t.Errorf("hold_imported over MCP: %v", r)
+	}
+}

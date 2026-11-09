@@ -946,3 +946,9 @@ with the fix that the commitment is the intention's own hold imported before
 it was recognised and is retired as `cancelled`. A warning rather than an
 error, because the workspace is still consistent as data, and the person may
 judge that the commitment is a real event that happens to share the UID.
+
+**Resolution (`eab9c4b`):** Settled as proposed, with the second fix we had
+left out: the warning also offers clearing the intention's `external` when
+the commitment is a real event sharing the UID, and a write setting such a
+link is accepted with the warning in its result. The next release reports it
+as `hold_imported` ([#13](https://github.com/nodelogicau/intentions-cli/issues/13)).

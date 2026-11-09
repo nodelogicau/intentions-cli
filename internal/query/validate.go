@@ -217,13 +217,16 @@ func (v *validator) referential() {
 
 // holds reports each pair of intentions, retired or not, carrying the same
 // calendar hold link, on the later id and naming the earlier: every hold is an
-// event of its own. The link's single-object rules come through structural.
+// event of its own. It also warns on each intention whose link an unretired
+// commitment carries (SharedHolds). The link's single-object rules come
+// through structural.
 func (v *validator) holds() {
 	first := map[model.External]string{}
 	for _, in := range v.g.Intentions() {
 		if in.External == nil {
 			continue
 		}
+		v.findings = append(v.findings, SharedHolds(v.g, in)...)
 		if other, ok := first[*in.External]; ok {
 			v.add(SeverityError, "hold_duplicate", in.ID, "carries the hold %s:%s, which %s already carries; each hold is its own event, so clear the link on the one that did not write it", in.External.System, in.External.UID, other)
 			continue

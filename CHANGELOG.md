@@ -5,6 +5,20 @@ All notable changes to `intentions` are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A warning for a hold imported before it was recognised** (#13, format
+  change `hold-imported-before-recognised`, nodelogicau/intentions#36).
+  When an intention, retired or not, and an unretired commitment carry the
+  same `external` `system` and `uid`, `validate` warns `hold_imported` on the
+  intention, once per commitment. The warning offers two fixes: if the
+  commitment is the intention's own hold, imported by an older importer or
+  by a merge, run `commitment cancel`. If it is a real event that shares the
+  UID, clear the intention's link with `--clear-external`. A write that sets
+  such a link is accepted, and the same warning appears under `findings` in
+  the CLI and MCP results. The exit status, the import rule, `window-clash`
+  and every hash are unchanged.
+
 ## [0.17.0] - 2026-11-03
 
 Implements the calendar hold link within `intentions/0.2`, also admitted

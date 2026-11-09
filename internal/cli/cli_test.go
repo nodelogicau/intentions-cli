@@ -2674,3 +2674,47 @@ func TestCalendarHold(t *testing.T) {
 	mustOK(t, run(t, ws, "", "intention", "edit", b, "--external", "icalendar:q"), "hold again")
 	mustOK(t, run(t, ws, "", "intention", "edit", b, "--party", room, "--clear-external"), "gain parties and drop the hold in one write")
 }
+
+// TestHoldImportedBeforeRecognised covers recording a hold link that an
+// imported commitment already carries: accepted, with the warning in the
+// result, until the commitment is cancelled.
+func TestHoldImportedBeforeRecognised(t *testing.T) {
+	ws := initWS02(t)
+	tt := addIntention(t, ws, "--title", "being someone who writes").str("id")
+	mustOK(t, run(t, ws, "", "intention", "firm", tt), "firm terminus")
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--capacity", "PT3H", "--calendar", "2026-09/2026-12", "--clock", "09:00/12:00", "--cadence", "FREQ=WEEKLY;BYDAY=TU"), "supply")
+	a := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Draft chapter", "--duration", "PT1H", "--calendar", "2026-09/2026-12", "--serves", tt+":for-the-sake-of"), "add").str("id")
+	mustOK(t, run(t, ws, "", "select", a, "--candidate", "1", "--now", rnow), "place")
+	cmt := writeImport(t, ws, "cmt_01a06d15-3f8a-7d61-8c2b-9a4e6f1d3b05", "2026-09-15T09:00:00+10:00", "PT1H", "accepted",
+		"external:\n  system: icalendar\n  uid: abc-123@cal.example\n")
+
+	hasWarning := func(r result) bool {
+		for _, f := range listOf(r.json["findings"]) {
+			m := f.(map[string]any)
+			if m["code"] == "hold_imported" && m["severity"] == "warning" && strings.Contains(m["message"].(string), cmt) {
+				return true
+			}
+		}
+		return false
+	}
+	r := mustOK(t, run(t, ws, "", "intention", "edit", a, "--external", "icalendar:abc-123@cal.example", "--harness", "claude"), "record the link")
+	if !hasWarning(r) {
+		t.Errorf("the write carries no hold_imported: %v", r.json)
+	}
+	if !strings.Contains(readFile(t, ws, "intentions/"+a+".yaml"), "uid: abc-123@cal.example") {
+		t.Error("the write was not applied")
+	}
+	if v := mustOK(t, run(t, ws, "", "validate"), "validate"); v.json["ok"] != true || int(v.json["counts"].(map[string]any)["warning"].(float64)) < 1 {
+		t.Errorf("validate: %v", v.json)
+	}
+	if tx := text(t, ws, "intention", "edit", a, "--description", "touched"); tx.code != 0 || !strings.Contains(tx.stdout, "warning hold_imported") {
+		t.Errorf("text output: %d\n%s", tx.code, tx.stdout)
+	}
+
+	mustOK(t, run(t, ws, "", "commitment", "cancel", cmt, "--now", rnow), "cancel the imported hold")
+	if r := mustOK(t, run(t, ws, "", "intention", "edit", a, "--description", "again"), "edit after cancel"); hasWarning(r) {
+		t.Errorf("warning after cancel: %v", r.json)
+	}
+}
+
+func listOf(v any) []any { l, _ := v.([]any); return l }
