@@ -3,9 +3,7 @@
 ## Purpose
 
 Creating, configuring and discovering an Intentions workspace: `init`, the `intentions.yaml` marker, the directory layout, the `.intentions` pointer, the `workspace` verb and the pointer-writing verb.
-
 ## Requirements
-
 ### Requirement: Workspace initialisation
 `intentions init [dir] [--pointer]` SHALL create `intentions.yaml` carrying `format: intentions/0.2`, the directories `desires/`, `intentions/`, `availability/`, `commitments/`, `resolutions/`, an empty `index.yaml`, and an `intentions.md` stub. It SHALL require an author (`--author` or `INTENTIONS_AUTHOR`) and SHALL accept `--subject`, `--timezone`, `--hemisphere`, `--availability-horizon`, `--horizon` (`resolver.horizon`, the one planning horizon). There SHALL be no `--generation-horizon`. There SHALL be no `--week-start`. With `--pointer` and an explicit `dir` other than the current directory, it SHALL also write `./.intentions` containing the relative path to `dir`; `--pointer` without such a `dir` SHALL be a usage error. It SHALL refuse with exit code 1 when `intentions.yaml` already exists. A workspace created before `desires/` existed SHALL gain the directory on its first desire write.
 
@@ -46,7 +44,7 @@ Creating, configuring and discovering an Intentions workspace: `init`, the `inte
 - **THEN** the command exits with code 2 naming an unknown flag
 
 ### Requirement: Configuration file contents
-`intentions.yaml` SHALL declare `format` (one of `intentions/0.1`, `intentions/0.2`; any other value SHALL be refused by every verb naming the file's version and the versions this binary implements), `hash`, `resolver.timezone`, `resolver.horizon` (the one planning horizon, shared by resolution and instance generation, absent means `P4W`), `availability.default_horizon`, and `defaults.source.author`. It MAY declare `resolver.hemisphere` (`north` or `south`, absent means `north`), `resolver.step` (an ISO 8601 duration, the candidate grid, absent means `PT15M`), `resolver.scope` (`personal`, `organisation` or `public`, absent means `personal`), and `defaults.subject`. It SHALL NOT declare `resolver.week_start` or `generation.horizon`. Keys this implementation does not know SHALL be preserved when the file is rewritten; an unknown key under `resolver` or `generation` SHALL be ignored and reported by `validate` at info level. Every command SHALL fail with a usage error if `format` is not `intentions/0.1` or `hash` is not `sha256`.
+`intentions.yaml` SHALL declare `format` (one of `intentions/0.1`, `intentions/0.2`; any other value SHALL be refused by every verb naming the file's version and the versions this binary implements), `hash`, `resolver.timezone`, `resolver.horizon` (the one planning horizon, shared by resolution and instance generation, absent means `P4W`), `availability.default_horizon`, and `defaults.source.author`. It MAY declare `resolver.hemisphere` (`north` or `south`, absent means `north`), `resolver.step` (an ISO 8601 duration, the candidate grid, absent means `PT15M`), `resolver.scope` (`personal`, `organisation` or `public`, absent means `personal`), `defaults.subject`, and `calendar.addresses` (a map from a subject URI to a list of calendar addresses, each an absolute URI such as `mailto:ben@example.org`, identifying that particular in imported events; no address SHALL appear under two subjects, and the key is outside every projection). It SHALL NOT declare `resolver.week_start` or `generation.horizon`. Keys this implementation does not know SHALL be preserved when the file is rewritten; an unknown key under `resolver` or `generation` SHALL be ignored and reported by `validate` at info level. Every command SHALL fail with a usage error if `format` is not `intentions/0.1` or `hash` is not `sha256`.
 
 #### Scenario: Newer format refused
 - **WHEN** `intentions.yaml` carries `format: intentions/0.3`
@@ -79,6 +77,14 @@ Creating, configuring and discovering an Intentions workspace: `init`, the `inte
 #### Scenario: Invalid step refused
 - **WHEN** `intentions.yaml` carries `resolver.step: 15m`
 - **THEN** every workspace verb exits with code 2 naming the key
+
+#### Scenario: Calendar addresses
+- **WHEN** `intentions.yaml` declares `calendar.addresses` mapping `https://example.org/people/ben` to `[mailto:ben@example.org, mailto:ben@work.example]`
+- **THEN** every verb loads it, an import maps either address to that URI, and `config` rewrites keep the key
+
+#### Scenario: Address under two subjects
+- **WHEN** `calendar.addresses` lists `mailto:x@example.org` under two subjects
+- **THEN** every workspace verb exits with code 2 naming the address
 
 ### Requirement: Workspace discovery
 Discovery SHALL locate the workspace by, in order: `--workspace`; `INTENTIONS_WORKSPACE`; the nearest ancestor of the current directory (including itself) containing `intentions.yaml` or a `.intentions` file whose trimmed content is a path to a directory containing `intentions.yaml`, relative paths resolved against the pointer's own directory. An `INTENTIONS_WORKSPACE` naming a directory without `intentions.yaml` SHALL be the no-workspace error, never a fallback to search.
@@ -140,3 +146,4 @@ An availability is an assertion about a particular's capacity, so a workspace SH
 #### Scenario: Declaring capacity narrows it
 - **WHEN** a party who was untracked declares one availability
 - **THEN** they become tracked, and an intention naming them resolves only within that availability, which is stricter than before they declared it
+

@@ -62,7 +62,7 @@ Objects a selected placement overlaps SHALL be listed in `displaced` and SHALL N
 - **THEN** the record's `displaced` list does not include it
 
 ### Requirement: Replacement
-`select` SHALL refuse a placed intention unless `--replace` is given, in which case the previous placement is cleared and the new one written in the same act with a new RESOLUTION record; the previous record is left as it is. When an unretired commitment rests on the previous placement, the replacing selection SHALL cancel it, with the new resolution's id as the `reason` of its `cancelled` retirement, and SHALL write a fresh commitment for the new placement with every party at `tentative`, because a placement its parties accepted cannot move under them without their act. The result SHALL name the cancelled commitment and the new one.
+`select` SHALL refuse a placed intention unless `--replace` is given, in which case the previous placement is cleared and the new one written in the same act with a new RESOLUTION record; the previous record is left as it is. When an unretired commitment rests on the previous placement, the replacing selection SHALL cancel it, with the new resolution's id as the `reason` of its `cancelled` retirement, and SHALL write a fresh commitment for the new placement with every party at `tentative`, because a placement its parties accepted cannot move under them without their act. A commitment with `origin: import` naming the intention SHALL NOT be cancelled: the replacing selection SHALL clear its `intention`, since the event still stands in the person's calendar, and SHALL write no commitment for it. The result SHALL name the cancelled commitment and the new one, and any import it unlinked.
 
 #### Scenario: Placed without replace
 - **WHEN** `select int_A --candidate 1` runs on a placed intention
@@ -79,6 +79,10 @@ Objects a selected placement overlaps SHALL be listed in `displaced` and SHALL N
 #### Scenario: Nothing to carry
 - **WHEN** the replaced intention has no commitment, or its commitment is already retired
 - **THEN** the replacement writes no commitment and cancels nothing
+
+#### Scenario: Replacement unlinks an adopted import
+- **WHEN** `select int_A --candidate 1 --replace` runs on an intention adopted by imported cmt_C
+- **THEN** cmt_C is unretired, carries no `intention`, and the result names it as unlinked
 
 ### Requirement: Replacement keeps the hold link
 A replacing selection SHALL keep the intention's `external`, so that the harness moves the same calendar event to the new placement instead of writing a second one.

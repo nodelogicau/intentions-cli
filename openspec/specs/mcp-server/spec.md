@@ -16,7 +16,7 @@
 - **THEN** the process exits with code 5 and stdout is empty
 
 ### Requirement: Tool surface
-The server SHALL expose tools named `workspace_status`, `desire_add`, `desire_edit`, `desire_adopt`, `desire_retire`, `desire_show`, `desire_list`, `intention_add`, `intention_edit`, `intention_firm`, `intention_retire`, `intention_show`, `intention_list`, `availability_add`, `availability_renew`, `availability_supersede`, `availability_retire`, `availability_list`, `commitment_accept`, `commitment_decline`, `commitment_cancel`, `commitment_show`, `commitment_list`, `generate`, `resolve`, `select`, `unresolved`, `check`, `acknowledge`, `bounds`, `validate`, and `migrate`. Each tool's structured result SHALL equal the corresponding CLI verb's `--json` output. Every write SHALL apply the same rules and refusals as the verb. Query tools SHALL be annotated read-only and no tool destructive. Inputs that name a window SHALL take `{calendar, clock, relative}`; a duration SHALL be a string or `{nominal, min, max}`; `serves` a list of `{id, role}`. `desire_adopt` SHALL write the intention first and the desire's retirement second, return both, refuse a retired desire, and refuse a bare adoption naming what is missing; `desire_retire` SHALL accept `abandoned` and `superseded` and refuse `adopted`.
+The server SHALL expose tools named `workspace_status`, `desire_add`, `desire_edit`, `desire_adopt`, `desire_retire`, `desire_show`, `desire_list`, `intention_add`, `intention_edit`, `intention_firm`, `intention_retire`, `intention_show`, `intention_list`, `availability_add`, `availability_renew`, `availability_supersede`, `availability_retire`, `availability_list`, `commitment_import`, `commitment_adopt`, `commitment_accept`, `commitment_decline`, `commitment_cancel`, `commitment_show`, `commitment_list`, `generate`, `resolve`, `select`, `unresolved`, `check`, `acknowledge`, `bounds`, `validate`, and `migrate`. Each tool's structured result SHALL equal the corresponding CLI verb's `--json` output. Every write SHALL apply the same rules and refusals as the verb. Query tools SHALL be annotated read-only and no tool destructive. Inputs that name a window SHALL take `{calendar, clock, relative}`; a duration SHALL be a string or `{nominal, min, max}`; `serves` a list of `{id, role}`. `desire_adopt` SHALL write the intention first and the desire's retirement second, return both, refuse a retired desire, and refuse a bare adoption naming what is missing; `desire_retire` SHALL accept `abandoned` and `superseded` and refuse `adopted`.
 
 #### Scenario: Add, resolve, select over MCP
 - **WHEN** a client calls `availability_add`, then `intention_add{title, duration: "PT90M", window: {calendar: "2026-W38"}}`, then `resolve{id}`, then `select{id, candidate: 1}`
@@ -46,7 +46,7 @@ The server SHALL expose `unresolved{subject?, scope?, now?}` as a read-only tool
 - **THEN** the result has two entries, one `ready` and one `incomplete`, and `counts` reflects both
 
 ### Requirement: Commitment tools
-The server SHALL expose `commitment_accept`, `commitment_decline`, `commitment_cancel`, `commitment_show` and `commitment_list`, whose structured results equal the corresponding CLI verbs' `--json` output. The answering tools SHALL be described as recording the person's own answer, never the model's inference.
+The server SHALL expose `commitment_accept`, `commitment_decline`, `commitment_cancel`, `commitment_show`, `commitment_list`, `commitment_import` (taking the event object as `event`, and optional `subject` and `commitment`) and `commitment_adopt` (taking `id`, `intention`, and optional `replace`), whose structured results equal the corresponding CLI verbs' `--json` output. The answering tools SHALL be described as recording the person's own answer, never the model's inference. `commitment_adopt` SHALL be described as the person's selection, made only on their instruction.
 
 #### Scenario: Accept over MCP
 - **WHEN** a client calls `commitment_accept{id}` for a commitment listing the workspace's default subject
@@ -55,6 +55,14 @@ The server SHALL expose `commitment_accept`, `commitment_decline`, `commitment_c
 #### Scenario: Cancel frees the intention
 - **WHEN** a client calls `commitment_cancel{id, reason}` and then `unresolved{}`
 - **THEN** the commitment is retired as cancelled and the intention it named is listed again
+
+#### Scenario: Import over MCP
+- **WHEN** a client calls `commitment_import{event}` for a new event
+- **THEN** the outcome is `created` and the result equals `commitment import --json` for the same event
+
+#### Scenario: Adopt over MCP
+- **WHEN** a client calls `commitment_adopt{id, intention}`
+- **THEN** the source records the client as harness, the record's `selector` is `person`, and the result equals `commitment adopt --json`
 
 ### Requirement: The harness boundary holds
 `intention_firm` and `select` with `policy` SHALL require, for a source carrying a harness, an active, firm terminus of the subject carrying the matching condition that the intention satisfies, exactly as the CLI does; a tentative policy SHALL be an error result naming the draft and the command by which the person firms it. A client identifying itself in `initialize` is a harness unless the call names an author with no harness. `intention_firm` without `policy` from a harness SHALL be an error result. When the intention is a terminus, `intention_firm` SHALL refuse any call naming a `policy` and any call whose source carries a harness; since every call through this server carries the client as harness, a terminus is never firmed through it, and the tool's description SHALL say the person firms it in the CLI.

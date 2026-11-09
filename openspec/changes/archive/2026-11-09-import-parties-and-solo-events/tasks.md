@@ -42,4 +42,4 @@
 - [x] 7.2 README: scope row (import is now in the CLI's reach for parsed events), verb rows, configuration, a paragraph each on Parties on import and Adopting, Consistency, Validation, and the Status upgrade note. `docs/mcp.md`: the two tools.
 - [x] 7.3 SPEC-FEEDBACK: record that the CLI takes parsed occurrences rather than raw iCalendar, and the replacement-unlinks decision, as a possible upstream clarification.
 - [x] 7.4 CHANGELOG under Unreleased, with the upgrade note and the re-import version note.
-- [ ] 7.5 Reply on intentions-cli#14.
+- [x] 7.5 Reply on intentions-cli#14.
