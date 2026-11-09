@@ -952,3 +952,42 @@ left out: the warning also offers clearing the intention's `external` when
 the commitment is a real event sharing the UID, and a write setting such a
 link is accepted with the warning in its result. The next release reports it
 as `hold_imported` ([#13](https://github.com/nodelogicau/intentions-cli/issues/13)).
+
+## 32. Re-importing an occurrence, and replacing an adopted placement
+
+**The draft says:** since `import-parties-and-solo-events` (nodelogicau/intentions#35),
+"each import of an event SHALL apply this mapping", "a re-import SHALL NOT
+clear or change a commitment's `intention`", and a recurring event is
+imported as "one commitment per occurrence ..., each carrying the same `uid`
+plus the occurrence's placement". Adopting "may replace an existing
+placement, as a re-selection". Replacement under Resolution says a replacing
+selection cancels the commitment resting on the previous placement.
+
+**The problem:** two cases the text leaves open.
+1. *Which commitment a re-import updates.* For a single event it can only be
+   the one carrying the `uid`. For a recurring event every occurrence shares
+   the `uid`, and a commitment stores no recurrence id, so an occurrence the
+   organiser moved can't be told from a new occurrence. "An adopted
+   commitment is re-imported with a later start" (scenario Event moved)
+   assumes the importer finds it.
+2. *A replacing selection on an adopted intention.* Replacement cancels "the
+   commitment that rested on" the previous placement. For an adopted import,
+   cancelling it would record that the venue's event is cancelled, which the
+   person didn't say and which re-import then can't undo.
+
+**We decided:** the next release's `commitment import` takes an occurrence's
+`recurrence_id` (iCalendar `RECURRENCE-ID`, JSCalendar `recurrenceId`, the
+original start) and matches the commitment at the same start, else the one
+still at `recurrence_id`, else creates one. Without `recurrence_id`, the only
+commitment with the `uid` is the match, moved or not, and several with none
+at the start are refused, with `--commitment <id>` to name the match. A
+retired match is never brought back. A replacing `select` on an adopted
+intention clears the import's `intention` and cancels nothing; a
+resolution's commitment is still cancelled.
+
+**Proposed text:** under Parties on import (or External reference only), say
+that a re-import updates the commitment for the same occurrence, identified
+by `uid` and, for a recurring event, the occurrence's original start, and
+that an importer never revives a commitment the person retired. Under
+Replacement, say that a commitment whose `origin` is `import` is released
+(its `intention` cleared), not cancelled.

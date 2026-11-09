@@ -14,6 +14,8 @@ type Selection struct {
 	Intention  *model.Intention
 	Commitment *model.Commitment
 	Cancelled  *model.Commitment // a live commitment the replacement had to cancel
+	Unlinked   *model.Commitment // an adopted import the replacement released
+	Adopted    *model.Commitment // the import an adoption named the intention on
 	Replaced   *temporal.Placement
 	Candidate  Candidate
 }
@@ -116,6 +118,19 @@ func Select(e Env, in *model.Intention, opts SelectOptions) (Selection, Result, 
 			if c.Retired != nil || c.Intention != in.ID || c.ID == "" {
 				continue
 			}
+			if c.Origin == model.OriginImport {
+				// The event still stands in the person's calendar; the
+				// new placement only stops it being this intention's.
+				unlinked := *c
+				unlinked.Intention = ""
+				unlinked.Timestamp = opts.Timestamp
+				if err := e.WS.WriteObject(&unlinked); err != nil {
+					return sel, res, err
+				}
+				e.G.Add(&unlinked)
+				sel.Unlinked = &unlinked
+				continue
+			}
 			cancelled := *c
 			cancelled.Retired = &model.Retired{Kind: "cancelled", Reason: "superseded by " + rec.ID, Source: opts.Source, Timestamp: opts.Timestamp}
 			cancelled.Timestamp = opts.Timestamp
@@ -149,11 +164,17 @@ func Select(e Env, in *model.Intention, opts SelectOptions) (Selection, Result, 
 // Describe renders a selection for a text result.
 func (s Selection) Describe() string {
 	out := fmt.Sprintf("Selected candidate %s (rank %d) for %s: resolution %s", s.Candidate.Start, s.Candidate.Rank, s.Intention.ID, s.Resolution.ID)
+	if s.Adopted != nil {
+		out = fmt.Sprintf("Adopted %s for %s at %s: resolution %s", s.Adopted.ID, s.Intention.ID, s.Resolution.Placement.Start.Raw, s.Resolution.ID)
+	}
 	if s.Commitment != nil {
 		out += ", commitment " + s.Commitment.ID
 	}
 	if s.Cancelled != nil {
 		out += " (cancelling " + s.Cancelled.ID + ")"
+	}
+	if s.Unlinked != nil {
+		out += " (releasing adopted " + s.Unlinked.ID + ")"
 	}
 	if len(s.Candidate.Displaces) > 0 {
 		out += fmt.Sprintf("; displaces %v", s.Candidate.Displaces)

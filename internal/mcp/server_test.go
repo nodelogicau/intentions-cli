@@ -177,7 +177,7 @@ func TestInstructionsPromptAndTools(t *testing.T) {
 	for _, tl := range tools.Tools {
 		names[tl.Name] = tl
 	}
-	want := []string{"workspace_status", "desire_add", "desire_edit", "desire_adopt", "desire_retire", "desire_show", "desire_list", "intention_add", "intention_edit", "intention_firm", "intention_retire", "intention_show", "intention_list", "availability_add", "availability_renew", "availability_supersede", "availability_retire", "availability_list", "commitment_accept", "commitment_decline", "commitment_cancel", "commitment_show", "commitment_list", "generate", "resolve", "select", "unresolved", "check", "acknowledge", "bounds", "validate", "migrate"}
+	want := []string{"workspace_status", "desire_add", "desire_edit", "desire_adopt", "desire_retire", "desire_show", "desire_list", "intention_add", "intention_edit", "intention_firm", "intention_retire", "intention_show", "intention_list", "availability_add", "availability_renew", "availability_supersede", "availability_retire", "availability_list", "commitment_import", "commitment_adopt", "commitment_accept", "commitment_decline", "commitment_cancel", "commitment_show", "commitment_list", "generate", "resolve", "select", "unresolved", "check", "acknowledge", "bounds", "validate", "migrate"}
 	if len(names) != len(want) {
 		t.Errorf("%d tools, want %d", len(names), len(want))
 	}
@@ -205,6 +205,7 @@ func TestInstructionsPromptAndTools(t *testing.T) {
 		"desire_add": {"title"}, "desire_edit": {"id"}, "desire_adopt": {"id"}, "desire_retire": {"id", "kind"}, "desire_show": {"id"},
 		"intention_add": {"title"}, "intention_edit": {"id"}, "intention_firm": {"id"}, "intention_retire": {"id", "kind"}, "intention_show": {"id"},
 		"availability_add": {"subject", "capacity", "window"}, "availability_renew": {"id", "valid_until"}, "availability_supersede": {"id"}, "availability_retire": {"id", "kind"},
+		"commitment_import": {"event"}, "commitment_adopt": {"id", "intention"},
 		"commitment_accept": {"id"}, "commitment_decline": {"id"}, "commitment_cancel": {"id"}, "commitment_show": {"id"},
 		"resolve": {"id"}, "select": {"id"}, "acknowledge": {"id", "kind"},
 	}
@@ -776,4 +777,39 @@ func TestHoldImportedBeforeRecognisedOverMCP(t *testing.T) {
 	if !found || !strings.Contains(h.file("intentions/"+a+".yaml"), "uid: abc-123@cal.example") {
 		t.Errorf("hold_imported over MCP: %v", r)
 	}
+}
+
+// Import and adopt over MCP give the CLI's results, with the client as harness.
+func TestImportAndAdoptOverMCP(t *testing.T) {
+	h := newHarness(t, "claude-ai", Options{})
+	h.ok("availability_add", map[string]any{"subject": ada, "capacity": "PT6H", "window": map[string]any{"calendar": "2026-09/2026-12", "clock": "18:00/23:00"}})
+	in := str(h.ok("intention_add", map[string]any{"title": "See the quartet", "duration": "PT2H", "window": map[string]any{"calendar": "2026-09/2026-12"}}), "id")
+	ev := map[string]any{"system": "icalendar", "uid": "ticket-1@venue.example", "start": "2026-09-18T19:00:00+10:00", "duration": "PT2H", "title": "Quartet"}
+	r := h.ok("commitment_import", map[string]any{"event": ev})
+	cmt := str(r, "id")
+	if str(r, "outcome") != "created" || !strings.Contains(h.file("commitments/"+cmt+".yaml"), "harness: claude-ai") {
+		t.Errorf("import: %v", r)
+	}
+	found := false
+	for _, f := range list(r, "findings") {
+		found = found || f.(map[string]any)["code"] == "directed_at_no_one"
+	}
+	if !found {
+		t.Errorf("import findings: %v", r)
+	}
+	if again := h.ok("commitment_import", map[string]any{"event": ev}); str(again, "outcome") != "unchanged" {
+		t.Errorf("re-import: %v", again)
+	}
+	h.fail("commitment_import", map[string]any{"event": map[string]any{"system": "icalendar", "uid": "x", "start": "2026-09-18T19:00:00+10:00", "duration": "PT1H", "cn": "Ada"}}, "usage")
+
+	a := h.ok("commitment_adopt", map[string]any{"id": cmt, "intention": in})
+	rec := a["resolution"].(map[string]any)
+	if rec["selector"] != "person" || str(a, "adopted") != cmt || !strings.Contains(h.file("commitments/"+cmt+".yaml"), "intention: "+in) {
+		t.Errorf("adopt: %v", a)
+	}
+	if src, _ := rec["source"].(map[string]any); src["harness"] != "claude-ai" {
+		t.Errorf("adopt source: %v", rec["source"])
+	}
+	b := str(h.ok("intention_add", map[string]any{"title": "Dinner", "duration": "PT2H", "window": map[string]any{"calendar": "2026-09/2026-12"}, "parties": []string{room}}), "id")
+	h.fail("commitment_adopt", map[string]any{"id": cmt, "intention": b}, "refused")
 }

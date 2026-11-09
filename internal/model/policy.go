@@ -464,3 +464,78 @@ func CheckAnswer(c *Commitment, party, status, subject string) (int, error) {
 	}
 	return -1, refuse("party", "%s is not a party to %s; its parties are %s. Answering for another party is an iTIP reply, which arrives by import", party, c.ID, strings.Join(uris, ", "))
 }
+
+// AdoptionProblem names why an imported commitment cannot stand as the
+// occasion of an intention: the intention's subject is not a party, the
+// intention has parties (it gets its commitment by resolution), or it
+// carries a hold link (the imported event is its calendar presence). Empty
+// rule when none applies.
+func AdoptionProblem(c *Commitment, in *Intention) (rule, msg string) {
+	party := false
+	for _, p := range c.Parties {
+		if p.URI == in.Subject {
+			party = true
+		}
+	}
+	switch {
+	case !party:
+		return "adopted_subject_not_party", fmt.Sprintf("%s's subject %s is not a party to %s; an event is an intention's occasion only when its subject attends", in.ID, in.Subject, c.ID)
+	case len(in.Parties) > 0:
+		return "adopted_with_parties", fmt.Sprintf("%s has parties, and an intention with parties gets its commitment by resolution, not by adopting an import", in.ID)
+	case in.External != nil:
+		return "adopted_with_hold", fmt.Sprintf("%s carries the hold %s:%s, and the imported event %s would be a second calendar presence; clear the hold first (intentions intention edit %s --clear-external) and release it", in.ID, in.External.System, in.External.UID, c.ID, in.ID)
+	}
+	return "", ""
+}
+
+// CheckAdopt refuses adopting c for in where the result would not stand:
+// c retired or not imported, in retired, an AdoptionProblem, another
+// unretired commitment naming in, or in placed elsewhere without replace.
+func CheckAdopt(c *Commitment, in *Intention, all []*Commitment, replace bool) error {
+	switch {
+	case c.Retired != nil:
+		return refuse("adopt_retired", "%s is retired (%s); a retired commitment occupies no time and cannot be adopted", c.ID, c.Retired.Kind)
+	case c.Origin != OriginImport:
+		return refuse("adopt_not_import", "%s came from resolution and already belongs to %s; only an imported commitment is adopted", c.ID, c.Intention)
+	case in.Retired != nil:
+		return refuse("retired", "%s is retired (%s) and cannot be placed", in.ID, in.Retired.Kind)
+	}
+	if rule, msg := AdoptionProblem(c, in); rule != "" {
+		return refuse(rule, "%s", msg)
+	}
+	for _, o := range all {
+		if o.ID != c.ID && o.Retired == nil && o.Intention == in.ID {
+			return refuse("intention_two_commitments", "%s is already the intention of %s; cancel it, or re-place %s, before adopting another", in.ID, o.ID, in.ID)
+		}
+	}
+	if in.Placement != nil && c.Intention != in.ID && !replace {
+		return refuse("replace", "%s is already placed at %s; pass --replace to place it at %s's occasion instead", in.ID, in.Placement.Start.Raw, c.ID)
+	}
+	return nil
+}
+
+// AdoptedBy returns the unretired imported commitment naming in, if any.
+func AdoptedBy(all []*Commitment, id string) *Commitment {
+	for _, c := range all {
+		if c.Retired == nil && c.Origin == OriginImport && c.Intention == id {
+			return c
+		}
+	}
+	return nil
+}
+
+// CheckAdoptedEdit refuses giving an adopted intention a hold link or new
+// parties: either would leave the imported commitment naming it invalid.
+func CheckAdoptedEdit(all []*Commitment, before, after *Intention) error {
+	c := AdoptedBy(all, after.ID)
+	if c == nil {
+		return nil
+	}
+	if after.External != nil && (before == nil || before.External == nil) {
+		return refuse("adopted_with_hold", "%s is the intention of imported %s, whose event is already its calendar presence; a hold would be a second one (cancel %s, or re-place %s, first)", after.ID, c.ID, c.ID, after.ID)
+	}
+	if len(after.Parties) > 0 && (before == nil || len(before.Parties) == 0) {
+		return refuse("adopted_with_parties", "%s is the intention of imported %s, and an intention with parties gets its commitment by resolution (cancel %s, or re-place %s, first)", after.ID, c.ID, c.ID, after.ID)
+	}
+	return nil
+}

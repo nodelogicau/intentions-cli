@@ -162,7 +162,7 @@ func cycles(e resolve.Env) []Flag {
 func clashes(e resolve.Env, p resolve.Placed, placed []resolve.Placed) []Flag {
 	var out []Flag
 	for _, q := range placed {
-		if q.ID == p.ID {
+		if q.ID == p.ID || fulfils(p, q) || fulfils(q, p) {
 			continue
 		}
 		shares := ""
@@ -178,6 +178,13 @@ func clashes(e resolve.Env, p resolve.Placed, placed []resolve.Placed) []Flag {
 		out = append(out, Flag{Kind: WindowClash, Subject: p.ID, Counterpart: q.ID, CounterpartVersion: versionOf(e, q.ID), Detail: fmt.Sprintf("overlaps %s (%s to %s) on %s's time", q.ID, fmtT(q.Interval.Start), fmtT(q.Interval.End), shares)})
 	}
 	return out
+}
+
+// fulfils reports whether a is a commitment naming b as its intention: the
+// two are one occupation and never clash with each other.
+func fulfils(a, b resolve.Placed) bool {
+	c, ok := a.Object.(*model.Commitment)
+	return ok && c.Intention != "" && c.Intention == b.ID
 }
 
 func fmtT(t interface{ Format(string) string }) string { return t.Format("2006-01-02T15:04:05Z07:00") }

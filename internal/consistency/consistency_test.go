@@ -301,3 +301,57 @@ func TestHabitInstances(t *testing.T) {
 		t.Errorf("after revert: %+v", flags)
 	}
 }
+
+// TestAdoptedImportIsOneOccupation: an adopted import and its intention at
+// one interval consume the subject's capacity once and never clash; once the
+// event moves, each occupies its own time.
+func TestAdoptedImportIsOneOccupation(t *testing.T) {
+	for _, tc := range []struct {
+		name, event string
+		roomFor     bool // another hour still fits on the day
+	}{
+		{"same interval", "2026-09-15T19:00:00+10:00", true},
+		{"moved", "2026-09-15T20:00:00+10:00", false},
+	} {
+		ws := newWS(t)
+		av := availability("PT2H", "2026-09-15", "18:00/22:00")
+		in := intention("Concert", "PT1H", "2026-09-15", "2026-09-15T19:00:00+10:00")
+		c := commitment(tc.event, "PT1H", false)
+		c.Intention = in.ID
+		other := intention("Practice", "PT1H", "2026-09-15", "")
+		write(t, ws, av, in, c, other)
+		e := env(t, ws)
+		flags, err := Check(e, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, f := range flags {
+			if f.Kind == WindowClash && (f.Subject == c.ID && f.Counterpart == in.ID || f.Subject == in.ID && f.Counterpart == c.ID) {
+				t.Errorf("%s: the pair clashes: %v", tc.name, f)
+			}
+		}
+		res, err := resolve.Resolve(e, other, resolve.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := len(res.All()) > 0; got != tc.roomFor {
+			t.Errorf("%s: another hour fits = %v, want %v (%s)", tc.name, got, tc.roomFor, res.Reason)
+		}
+	}
+}
+
+func TestAdoptedImportDeclined(t *testing.T) {
+	ws := newWS(t)
+	in := intention("Concert", "PT1H", "2026-09-15", "2026-09-15T19:00:00+10:00")
+	c := commitment("2026-09-15T19:00:00+10:00", "PT1H", false)
+	c.Intention = in.ID
+	c.Parties[0].Status = "declined"
+	write(t, ws, availability("PT4H", "2026-09-15", "18:00/22:00"), in, c)
+	flags, err := Check(env(t, ws), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := kinds(flags, c.ID)[PartyDeclined]; !ok {
+		t.Errorf("party-declined on an adopted import: %v", flags)
+	}
+}

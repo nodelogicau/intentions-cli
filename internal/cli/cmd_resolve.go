@@ -544,9 +544,9 @@ func printUnresolved(w io.Writer, entries []resolve.UnresolvedEntry) {
 func (a *app) commitmentCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "commitment",
-		Short: "Answer, cancel, show and list commitments",
+		Short: "Import, adopt, answer, cancel, show and list commitments",
 	}
-	cmd.AddCommand(a.commitmentAnswerCmd("accept"), a.commitmentAnswerCmd("decline"), a.commitmentCancelCmd(), a.commitmentShowCmd(), a.commitmentListCmd())
+	cmd.AddCommand(a.commitmentImportCmd(), a.commitmentAdoptCmd(), a.commitmentAnswerCmd("accept"), a.commitmentAnswerCmd("decline"), a.commitmentCancelCmd(), a.commitmentShowCmd(), a.commitmentListCmd())
 	return cmd
 }
 

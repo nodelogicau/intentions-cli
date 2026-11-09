@@ -77,3 +77,21 @@ func (p Placement) Bounds(ctx Context) Interval {
 		Add(time.Duration(d.Hours)*time.Hour + time.Duration(d.Minutes)*time.Minute + time.Duration(d.Seconds)*time.Second)
 	return Interval{Start: start, End: end}
 }
+
+// SamePlacement reports whether two placements occupy the same time at the
+// same place: the same start instant (or calendar day), the same duration,
+// and the same location. The offset a start was written with is not part of
+// the comparison.
+func SamePlacement(a, b Placement) bool {
+	if a.Start.AllDay != b.Start.AllDay {
+		return false
+	}
+	if a.Start.AllDay {
+		if a.Start.Raw != b.Start.Raw {
+			return false
+		}
+	} else if !a.Start.Time.Equal(b.Start.Time) {
+		return false
+	}
+	return a.Duration.String() == b.Duration.String() && a.Location == b.Location
+}

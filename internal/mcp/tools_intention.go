@@ -53,6 +53,7 @@ func (s *Server) registerTools() {
 		Description: "Every availability (active by default), filtered by subject, conditional, scope, or retired, each with its effective validity horizon."},
 		s.availabilityList)
 	s.registerCommitmentTools()
+	s.registerImportTools()
 	s.registerDesireTools()
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "generate", Annotations: additive,
 		Description: "Materialise instances of recurring intentions over a horizon (default resolver.horizon from now). Idempotent on (recurring, occurrence); a retired instance is never regenerated. Use it when the person asks to plan a named period, narrowed with `horizon` and `recurring`; `resolve` already materialises what its own range needs, so creating a recurring intention should not be followed by a generate."},
@@ -415,6 +416,9 @@ func (s *Server) intentionEdit(ctx context.Context, req *sdk.CallToolRequest, in
 		return errResult(err), nil, nil
 	}
 	if err := model.CheckHold(g.Intentions(), before, &o); err != nil {
+		return errResult(err), nil, nil
+	}
+	if err := model.CheckAdoptedEdit(g.Commitments(), before, &o); err != nil {
 		return errResult(err), nil, nil
 	}
 	if ps := model.Check(&o); len(ps) > 0 {

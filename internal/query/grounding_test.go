@@ -536,3 +536,71 @@ func TestHoldImportedBeforeRecognised(t *testing.T) {
 		t.Errorf("write findings: %v", fs)
 	}
 }
+
+func TestImportAndAdoptionFindings(t *testing.T) {
+	ws := newWS02(t)
+	tt := firmTerminus("int_t")
+	s, _ := temporal.ParsePlacementStart("2026-09-21T19:00:00+10:00")
+	later, _ := temporal.ParsePlacementStart("2026-09-22T19:00:00+10:00")
+	hour, _ := temporal.ParseDurationSpec("PT1H")
+	ada := model.Source{Author: "https://example.com/people/ada"}
+	placed := func(id string) *model.Intention {
+		o := withDuration(intention(id))
+		o.Serves = []model.Ref{{ID: "int_t", Role: model.RoleForTheSakeOf}}
+		o.Placement = &temporal.Placement{Start: s, Duration: hour}
+		return o
+	}
+	imported := func(id, uid, intention string, start temporal.PlacementStart, parties ...string) *model.Commitment {
+		ps := []model.Party{{URI: ada.Author, Status: "accepted"}}
+		for _, p := range parties {
+			ps = append(ps, model.Party{URI: p, Status: "tentative"})
+		}
+		return &model.Commitment{ID: id, Parties: model.SortParties(ps), Placement: &temporal.Placement{Start: start, Duration: hour}, Origin: model.OriginImport,
+			Intention: intention, External: &model.External{System: "icalendar", UID: uid}, Source: ada, Timestamp: time.Now(), Acknowledgements: []model.Acknowledgement{}}
+	}
+	withParties := placed("int_p")
+	withParties.Parties = []string{"https://example.com/people/sam"}
+	withHold := placed("int_h")
+	withHold.External = &model.External{System: "icalendar", UID: "hold"}
+	notParty := placed("int_n")
+	notParty.Subject = "https://example.com/people/sam"
+	moved, twice, ok := placed("int_m"), placed("int_2"), placed("int_ok")
+	own := placed("int_own")
+	own.External = &model.External{System: "icalendar", UID: "own"}
+	write(t, ws, tt, withParties, withHold, notParty, moved, twice, ok, own,
+		imported("cmt_p", "p", "int_p", s), imported("cmt_h", "h", "int_h", s), imported("cmt_n", "n", "int_n", s),
+		imported("cmt_m", "m", "int_m", later), imported("cmt_2a", "a", "int_2", s), imported("cmt_2b", "b", "int_2", s),
+		imported("cmt_ok", "ok", "int_ok", s), imported("cmt_solo", "solo", "", s), imported("cmt_meet", "meet", "", s, "https://example.com/people/sam"),
+		imported("cmt_own", "own", "", s))
+	r := run(t, ws)
+	want := map[string]string{
+		"cmt_p": "error: adopted_with_parties", "cmt_h": "error: adopted_with_hold", "cmt_n": "error: adopted_subject_not_party",
+		"cmt_m": "warning: adopted_moved", "int_2": "error: intention_two_commitments", "cmt_solo": "info: directed_at_no_one",
+	}
+	for id, w := range want {
+		code := strings.SplitN(w, ": ", 2)[1]
+		if f := findingsFor(r, id); !strings.HasPrefix(f[code], strings.SplitN(w, ":", 2)[0]+":") {
+			t.Errorf("%s: want %s, got %v", id, w, f)
+		}
+	}
+	if f := findingsFor(r, "int_2"); !strings.Contains(f["intention_two_commitments"], "cmt_2a") || !strings.Contains(f["intention_two_commitments"], "cmt_2b") {
+		t.Errorf("two commitments named: %v", f)
+	}
+	for _, id := range []string{"cmt_ok", "cmt_meet", "cmt_own"} {
+		for code := range findingsFor(r, id) {
+			if code == "directed_at_no_one" || strings.HasPrefix(code, "adopted") {
+				t.Errorf("%s: unexpected %s", id, code)
+			}
+		}
+	}
+	if f := findingsFor(r, "int_own"); f["hold_imported"] == "" {
+		t.Errorf("own hold: %v", f)
+	}
+	found := false
+	for _, f := range r.Findings {
+		found = found || f.Code == "calendar_addresses_missing" && f.Severity == SeverityInfo
+	}
+	if !found {
+		t.Error("calendar_addresses_missing")
+	}
+}

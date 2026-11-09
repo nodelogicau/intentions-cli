@@ -112,9 +112,12 @@ func (e Env) PlacedObjects() []Placed {
 	// nobody else. Where it fulfils an intention, the pair counts once
 	// against each particular, so the statuses are recorded here and the
 	// intention below claims only what the commitment does not.
+	// Only a commitment at the intention's own interval stands in for it; an
+	// adopted event that has since moved occupies its new time, and the
+	// intention still occupies its old one until it is adopted again.
 	fulfils := map[string]map[string]string{}
 	for _, c := range e.G.Commitments() {
-		if c.Retired == nil && c.Placement != nil && c.Intention != "" && !c.IsTransparent() {
+		if c.Retired == nil && c.Placement != nil && c.Intention != "" && !c.IsTransparent() && e.sameInterval(c) {
 			statuses := map[string]string{}
 			for _, p := range c.Parties {
 				statuses[p.URI] = p.Status
@@ -286,4 +289,16 @@ func fmtTime(t time.Time) string { return t.Format(time.RFC3339) }
 
 func describe(iv temporal.Interval) string {
 	return fmt.Sprintf("%s to %s", fmtTime(iv.Start), fmtTime(iv.End))
+}
+
+// sameInterval reports whether c carries the interval of the intention it
+// names.
+func (e Env) sameInterval(c *model.Commitment) bool {
+	obj, ok := e.G.Get(c.Intention)
+	in, isIn := obj.(*model.Intention)
+	if !ok || !isIn || in.Placement == nil {
+		return false
+	}
+	a, b := c.Placement.Bounds(e.Ctx), in.Placement.Bounds(e.Ctx)
+	return a.Start.Equal(b.Start) && a.End.Equal(b.End)
 }

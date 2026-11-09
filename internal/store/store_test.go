@@ -230,3 +230,41 @@ func TestAtomicWrite(t *testing.T) {
 		t.Error("expected failure")
 	}
 }
+
+func TestCalendarAddresses(t *testing.T) {
+	base := "format: intentions/0.2\nhash: sha256\nresolver:\n  timezone: Australia/Melbourne\navailability:\n  default_horizon: P13W\ndefaults:\n  subject: https://example.org/people/ben\n  source:\n    author: https://example.org/people/ben\n"
+	c, err := ParseConfig([]byte(base + "calendar:\n  addresses:\n    https://example.org/people/ben:\n      - mailto:Ben@Example.org\n      - mailto:ben@work.example\n"))
+	if err != nil || c.Validate() != nil {
+		t.Fatalf("parse: %v %v", err, c.Validate())
+	}
+	if s, ok := c.SubjectFor("MAILTO:ben@example.ORG"); !ok || s != "https://example.org/people/ben" {
+		t.Errorf("lookup is case-insensitive for mailto: %q %v", s, ok)
+	}
+	if _, ok := c.SubjectFor("mailto:sam@example.com"); ok {
+		t.Error("an unlisted address maps to no subject")
+	}
+	out, err := c.Marshal()
+	if err != nil || !strings.Contains(string(out), "calendar:\n  addresses:\n    https://example.org/people/ben:\n      - mailto:Ben@Example.org\n") {
+		t.Errorf("round trip keeps the key:\n%s", out)
+	}
+	fresh := NewConfig()
+	fresh.Defaults.Source.Author = "https://example.org/people/ben"
+	fresh.Calendar.Addresses = map[string][]string{"https://example.org/people/ben": {"mailto:ben@example.org"}}
+	if out, _ := fresh.Marshal(); !strings.Contains(string(out), "calendar:\n  addresses:\n") {
+		t.Errorf("a fresh config writes the key:\n%s", out)
+	}
+	for name, extra := range map[string]string{
+		"shared address": "calendar:\n  addresses:\n    https://example.org/people/ben:\n      - mailto:x@example.org\n    https://example.org/people/sam:\n      - mailto:X@example.org\n",
+		"not a URI":      "calendar:\n  addresses:\n    https://example.org/people/ben:\n      - ben at example\n",
+		"not a list":     "calendar:\n  addresses:\n    https://example.org/people/ben: mailto:ben@example.org\n",
+		"subject":        "calendar:\n  addresses:\n    ben:\n      - mailto:ben@example.org\n",
+	} {
+		c, err := ParseConfig([]byte(base + extra))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "calendar.addresses") {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}

@@ -17,6 +17,7 @@ The CLI has no importer. README scope puts iCalendar and JSCalendar import and e
 
 **The harness parses and the CLI maps.** `commitment import` takes one parsed occurrence as JSON (`--event <file>`, or `-` for stdin; MCP takes the same object as `event`). Its fields:
 - `system`, `uid`;
+- `recurrence_id` for an occurrence of a recurring event (its original start);
 - `start` (RFC 3339, or a calendar day for an all-day event), `duration`;
 - optional `title`, `location` (a URI; free text is the harness's to drop), `transparent`;
 - optional `organizer {address, status?}` and `attendees [{address, status?, non_participant?}]`.
@@ -37,11 +38,11 @@ The subject URI itself counts as naming them, so an event naming `https://…/be
 
 **Which commitment a re-import updates.** In order:
 1. `--commitment <id>` names it outright. It must carry the same `system` and `uid`.
-2. Otherwise, the commitments carrying the `system` and `uid`, retired or not, are the candidates. Exactly one is the match.
-3. If there are several (a recurring event), the one whose `placement.start` instant equals the occurrence's `start` is the match.
-4. If several remain and none matches by start, the import is refused as ambiguous, listing the ids and naming `--commitment`.
+2. Otherwise, the commitments carrying the `system` and `uid`, retired or not, are the candidates.
+3. For an occurrence with `recurrence_id`, the match is the candidate at `start`, else the one still at `recurrence_id` (the occurrence moved), else none: a new occurrence.
+4. Without `recurrence_id` (a single event), exactly one candidate is the match, moved or not. Of several, the one at `start` is the match; if none is, the import is refused as ambiguous, listing the ids and naming `recurrence_id` and `--commitment`.
 
-When there is no match, a new commitment is created. A match that is retired is reported as `retired` and nothing is written, because a commitment's retirement is terminal and re-importing must not undo the person's cancellation. A match that is unretired is rewritten: parties, placement, location, transparency and title. Its id, `intention`, `external`, source, acknowledgements and `origin` are kept, and its `timestamp` and `source` are restamped to the import's act. Identical content reports `unchanged` and writes nothing. Alternative considered: matching on `uid` and start only. Rejected, because a moved single event would then import as a second commitment.
+When there is no match, a new commitment is created. A match that is retired is reported as `retired` and nothing is written, because a commitment's retirement is terminal and re-importing must not undo the person's cancellation. A match that is unretired is rewritten: parties, placement, location, transparency and title. Its id, `intention`, `external`, source, acknowledgements and `origin` are kept, and its `timestamp` and `source` are restamped to the import's act. Identical content reports `unchanged` and writes nothing. Alternative considered: matching on `uid` and start only. Rejected: a moved single event would import as a second commitment, and without `recurrence_id` a new occurrence can't be told from a moved one. The format stores no recurrence id on a commitment, so an occurrence moved twice is still found by its current start.
 
 **Hold recognition comes first.** Before any match is attempted, an event whose `system` and `uid` match an intention's `external` (retired or not) gives `recognised` with the intention's id, and nothing is written. This is the rule from #12, now applied in code rather than left to the skill.
 

@@ -367,6 +367,9 @@ func (a *app) intentionEditCmd() *cobra.Command {
 			if err := model.CheckHold(g.Intentions(), before, &o); err != nil {
 				return err
 			}
+			if err := model.CheckAdoptedEdit(g.Commitments(), before, &o); err != nil {
+				return err
+			}
 			if ps := model.Check(&o); len(ps) > 0 {
 				return ps
 			}

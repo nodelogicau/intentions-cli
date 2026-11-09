@@ -69,6 +69,7 @@ func Validate(ws *store.Workspace, g *store.Graph) Report {
 	v.graph()
 	v.instances()
 	v.holds()
+	v.imports()
 	v.versions()
 	v.index()
 	v.terms()

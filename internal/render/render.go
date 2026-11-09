@@ -4,8 +4,10 @@ package render
 
 import (
 	"github.com/nodelogicau/intentions-cli/internal/consistency"
+	"github.com/nodelogicau/intentions-cli/internal/importer"
 	"github.com/nodelogicau/intentions-cli/internal/model"
 	"github.com/nodelogicau/intentions-cli/internal/projection"
+	"github.com/nodelogicau/intentions-cli/internal/query"
 	"github.com/nodelogicau/intentions-cli/internal/resolve"
 	"github.com/nodelogicau/intentions-cli/internal/store"
 	"github.com/nodelogicau/intentions-cli/internal/temporal"
@@ -73,6 +75,15 @@ func Selection(sel resolve.Selection, res resolve.Result, flags []consistency.Fl
 		cm, _ := model.ToMap(sel.Cancelled)
 		out["cancelled_commitment"] = cm
 	}
+	if sel.Unlinked != nil {
+		cm, _ := model.ToMap(sel.Unlinked)
+		out["unlinked_commitment"] = cm
+	}
+	if sel.Adopted != nil {
+		cm, _ := model.ToMap(sel.Adopted)
+		out["commitment"] = cm
+		out["adopted"] = sel.Adopted.ID
+	}
 	if sel.Replaced != nil {
 		out["replaced"] = map[string]any{"start": sel.Replaced.Start.Raw, "duration": sel.Replaced.Duration.String(), "location": sel.Replaced.Location}
 	}
@@ -80,6 +91,47 @@ func Selection(sel resolve.Selection, res resolve.Result, flags []consistency.Fl
 		out["policy"] = policy
 	}
 	return out
+}
+
+// Import renders what an import did, for the CLI and MCP alike.
+func Import(r importer.Result, flags []consistency.Flag, findings []query.Finding) map[string]any {
+	out := map[string]any{"outcome": r.Outcome}
+	if r.Commitment != nil {
+		cm, _ := model.ToMap(r.Commitment)
+		out["object"] = cm
+		out["id"] = r.Commitment.ID
+		v, _ := projection.Version(r.Commitment)
+		out["version"] = v
+	}
+	if r.Intention != "" {
+		out["intention"] = r.Intention
+	}
+	if r.PreviousVersion != "" {
+		out["previous_version"] = r.PreviousVersion
+	}
+	if flags == nil {
+		flags = []consistency.Flag{}
+	}
+	out["flags"] = flags
+	if len(findings) > 0 {
+		out["findings"] = findings
+	}
+	return out
+}
+
+// ImportText is the one-line text summary of an import.
+func ImportText(r importer.Result) string {
+	switch r.Outcome {
+	case importer.Recognised:
+		return "Recognised the hold of " + r.Intention + "; nothing imported"
+	case importer.Retired:
+		return r.Commitment.ID + " is retired (" + r.Commitment.Retired.Kind + "); the event was not brought back"
+	case importer.Unchanged:
+		return "Unchanged " + r.Commitment.ID
+	case importer.Updated:
+		return "Updated " + r.Commitment.ID + " (" + r.PreviousVersion + " -> " + r.Commitment.Version + ")"
+	}
+	return "Imported " + r.Commitment.ID + " (" + r.Commitment.Version + ")"
 }
 
 // Acknowledgement renders an appended entry.

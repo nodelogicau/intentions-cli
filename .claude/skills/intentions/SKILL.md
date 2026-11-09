@@ -131,6 +131,8 @@ modifiers inside double quotes, so `"$id:in-order-to"` silently corrupts the id.
 | Answer a commitment | `intentions commitment accept\|decline <id> [--party <uri>] --json` — only when the person has said so; no policy authorises it |
 | Cancel a commitment | `intentions commitment cancel <id> [--reason "<why>"] --json` → the intention it was for loses its placement and may be resolved again |
 | What is outstanding | `intentions commitment list [--party <uri>] [--status tentative] --json` |
+| Import a calendar event | `intentions commitment import --event - --json` with one parsed occurrence as JSON on stdin → `{outcome, object?, flags, findings?}`; one call per occurrence |
+| An event is an intention's occasion | `intentions commitment adopt <cmt_id> <int_id> [--replace] --json` — the person's selection, on their word only |
 | What clashes | `intentions check [<id>]... --json` → `{flags: [{kind, subject, counterpart, counterpart_version, detail}]}`; seven kinds, never decisions |
 | Proceed anyway | `intentions acknowledge <id> --kind <kind> --counterpart <id> --reason "<why>" --json` — only on the person's word; lapses when the counterpart changes |
 | Health check | `intentions validate --json`; `intentions index --check --json` |
@@ -367,7 +369,40 @@ finding under `findings` in its result. The next revision refuses both.
 ## Rules for commitments
 
 A commitment is the interpersonal object: `select` writes one whenever the
-intention has parties, with everyone at `tentative`.
+intention has parties, with everyone at `tentative`. The other kind comes from
+the person's calendar by import.
+
+- **Import through the verb, never by writing a file.** Parse the event
+  yourself and pass each occurrence to `commitment import --event -` as
+  `{system, uid, start, duration, recurrence_id?, title?, location?,
+  transparent?, organizer?, attendees?}`. Each organizer or attendee is
+  `{address, status?, non_participant?}`: the address is the calendar address
+  (JSCalendar `sendTo`, `imip` first), the status is `PARTSTAT` or
+  `participationStatus` as written, and `non_participant` marks
+  `ROLE=NON-PARTICIPANT` or `roles` holding only `informational`. JSCalendar
+  participants all go in `attendees`. Give `recurrence_id` (the original
+  start) for every occurrence of a recurring event, so a moved one is found.
+  Pass a `location` only when it is a URI, `transparent: true` for
+  `TRANSP:TRANSPARENT` or `freeBusyStatus: free`, and a calendar day as
+  `start` for an all-day event. The CLI maps the parties, so every harness
+  writes the same commitment.
+- **Read the outcome.** `created` and `updated` wrote a commitment (a
+  re-import keeps the intention it was adopted for). `unchanged` wrote
+  nothing. `recognised` means the event is your own hold: nothing to do.
+  `retired` means the person cancelled it, and it stays cancelled; don't
+  bring it back another way.
+- **Calendar addresses find the person.** `calendar_addresses_missing` means
+  the import can only recognise the person by their subject URI, so their own
+  attendee entry shows up as a stranger. Ask for their calendar addresses and
+  put them under `calendar.addresses` in `intentions.yaml`.
+- **An event directed at no one may be an intention's occasion.**
+  `directed_at_no_one` marks an import whose only party is the person: a
+  ticket, a booking, a block they made. When it is the occasion of something
+  they intend (the concert they meant to see), offer `commitment adopt
+  <cmt> <int>`. Adopting is the person's selection: the intention takes the
+  event's placement and the two count as one occupation. Do it only when
+  they say so. The intention must have no parties and no hold link. If the
+  event later moves, `adopted_moved` appears; adopt again to follow it.
 
 - **A party's status is theirs.** `accept` and `decline` record what the person
   told you and nothing else. No policy authorises them, no flag implies them,

@@ -6,6 +6,7 @@ package store
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -50,6 +51,13 @@ type Config struct {
 		Subject string       `json:"subject,omitempty"`
 		Source  model.Source `json:"source"`
 	} `json:"defaults"`
+	// Calendar.Addresses maps a subject URI to the calendar addresses that
+	// identify that particular in imported events. Outside every hash.
+	Calendar struct {
+		Addresses map[string][]string `json:"addresses,omitempty"`
+	} `json:"calendar"`
+	// calendarErr is a malformed calendar.addresses, reported by Validate.
+	calendarErr string
 
 	doc *yaml.Node
 }
@@ -91,6 +99,7 @@ func ParseConfig(data []byte) (Config, error) {
 	c.Defaults.Source.Author = getPath(root, "defaults", "source", "author")
 	c.Defaults.Source.Harness = getPath(root, "defaults", "source", "harness")
 	c.Defaults.Source.Model = getPath(root, "defaults", "source", "model")
+	c.Calendar.Addresses, c.calendarErr = parseAddresses(root)
 	return c, nil
 }
 
@@ -132,6 +141,100 @@ func (c Config) Validate() error {
 	}
 	if c.Defaults.Subject != "" && !model.ValidURI(c.Defaults.Subject) {
 		return fmt.Errorf("%s: defaults.subject %q is not an absolute URI", ConfigFile, c.Defaults.Subject)
+	}
+	if c.calendarErr != "" {
+		return fmt.Errorf("%s: calendar.addresses %s", ConfigFile, c.calendarErr)
+	}
+	owner := map[string]string{}
+	for _, subject := range sortedKeys(c.Calendar.Addresses) {
+		if !model.ValidURI(subject) {
+			return fmt.Errorf("%s: calendar.addresses: subject %q is not an absolute URI", ConfigFile, subject)
+		}
+		for _, a := range c.Calendar.Addresses[subject] {
+			if !model.ValidURI(a) {
+				return fmt.Errorf("%s: calendar.addresses: %q under %s is not an absolute URI", ConfigFile, a, subject)
+			}
+			k := NormaliseAddress(a)
+			if other, ok := owner[k]; ok && other != subject {
+				return fmt.Errorf("%s: calendar.addresses: %s is listed under both %s and %s; an address identifies one particular", ConfigFile, a, other, subject)
+			}
+			owner[k] = subject
+		}
+	}
+	return nil
+}
+
+// NormaliseAddress is the form a calendar address is compared and written
+// in: a mailto: address lowercased in full, anything else as given.
+func NormaliseAddress(a string) string {
+	a = strings.TrimSpace(a)
+	if strings.HasPrefix(strings.ToLower(a), "mailto:") {
+		return strings.ToLower(a)
+	}
+	return a
+}
+
+// SubjectFor returns the subject under which calendar.addresses lists the
+// address, if any.
+func (c Config) SubjectFor(address string) (string, bool) {
+	k := NormaliseAddress(address)
+	for _, subject := range sortedKeys(c.Calendar.Addresses) {
+		for _, a := range c.Calendar.Addresses[subject] {
+			if NormaliseAddress(a) == k {
+				return subject, true
+			}
+		}
+	}
+	return "", false
+}
+
+func sortedKeys(m map[string][]string) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// parseAddresses reads calendar.addresses: a mapping from subject URI to a
+// sequence of addresses. Absent is no map; any other shape is an error.
+func parseAddresses(root *yaml.Node) (map[string][]string, string) {
+	cal := child(root, "calendar")
+	if cal == nil {
+		return nil, ""
+	}
+	n := child(cal, "addresses")
+	if n == nil {
+		return nil, ""
+	}
+	if n.Kind != yaml.MappingNode {
+		return nil, "must map each subject URI to a list of addresses"
+	}
+	out := map[string][]string{}
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		k, v := n.Content[i].Value, n.Content[i+1]
+		if v.Kind != yaml.SequenceNode {
+			return nil, fmt.Sprintf("under %s must be a list of addresses", k)
+		}
+		for _, a := range v.Content {
+			if a.Kind != yaml.ScalarNode {
+				return nil, fmt.Sprintf("under %s must be a list of addresses", k)
+			}
+			out[k] = append(out[k], a.Value)
+		}
+	}
+	return out, ""
+}
+
+func child(m *yaml.Node, key string) *yaml.Node {
+	if m == nil || m.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == key {
+			return m.Content[i+1]
+		}
 	}
 	return nil
 }
@@ -227,6 +330,18 @@ func (c Config) Marshal() ([]byte, error) {
 	}
 	if c.Defaults.Source.Model != "" {
 		setPath(root, c.Defaults.Source.Model, "defaults", "source", "model")
+	}
+	if c.doc == nil && len(c.Calendar.Addresses) > 0 {
+		addrs := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		for _, subject := range sortedKeys(c.Calendar.Addresses) {
+			seq := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+			for _, a := range c.Calendar.Addresses[subject] {
+				seq.Content = append(seq.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: a})
+			}
+			addrs.Content = append(addrs.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: subject}, seq)
+		}
+		cal := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{{Kind: yaml.ScalarNode, Tag: "!!str", Value: "addresses"}, addrs}}
+		root.Content = append(root.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "calendar"}, cal)
 	}
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)

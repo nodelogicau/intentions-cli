@@ -7,6 +7,32 @@ All notable changes to `intentions` are recorded here. The format follows
 
 ### Added
 
+- **Calendar import through the CLI** (#14, format change
+  `import-parties-and-solo-events`, nodelogicau/intentions#35).
+  `commitment import --event <file|->`, and `commitment_import` over MCP,
+  take one occurrence the harness has parsed (`system`, `uid`, `start`,
+  `duration`, and optionally `recurrence_id`, `title`, a URI `location`,
+  `transparent`, `organizer`, `attendees`) and write the commitment
+  themselves. Parties are mapped by rule: non-participants are dropped; an
+  address under the new `calendar.addresses` in `intentions.yaml` becomes
+  that subject's URI; `PARTSTAT` and `participationStatus` map to
+  `accepted`, `tentative` or `declined`; and the subject is always a party.
+  An intention's own hold is recognised and skipped. A re-import updates the
+  same commitment, keeping the intention it was adopted for, and a cancelled
+  one stays cancelled.
+- **Adopting an imported commitment.** `commitment adopt <cmt> <int>
+  [--replace]`, and `commitment_adopt`, record the person's selection that an
+  imported event (a ticket, a booking) is their intention's occasion. It
+  writes a RESOLUTION record with `selector: person`, places the intention at
+  the event, and names the intention on the commitment, which stays an
+  import. It is refused for an intention with parties or a hold link, one
+  whose subject isn't a party, or one another commitment names. `intention
+  edit` refuses to give an adopted intention a hold link or parties.
+- **New findings.** Errors: `adopted_subject_not_party`,
+  `adopted_with_parties`, `adopted_with_hold`, `intention_two_commitments`.
+  Warning: `adopted_moved`, with adopting again as the fix. Info:
+  `directed_at_no_one` and `calendar_addresses_missing`.
+
 - **A warning for a hold imported before it was recognised** (#13, format
   change `hold-imported-before-recognised`, nodelogicau/intentions#36).
   When an intention, retired or not, and an unretired commitment carry the
@@ -18,6 +44,21 @@ All notable changes to `intentions` are recorded here. The format follows
   such a link is accepted, and the same warning appears under `findings` in
   the CLI and MCP results. The exit status, the import rule, `window-clash`
   and every hash are unchanged.
+
+### Changed
+
+- **A commitment and the intention it fulfils are one occupation.** They
+  never `window-clash` each other, whatever the commitment's origin, and the
+  person's capacity is spent once only where their times agree. An adopted
+  event that has moved now occupies its new time while the intention still
+  holds the old one, where before the intention's time stopped counting.
+- **A replacing `select` releases an adopted import** (clears its
+  `intention`) instead of cancelling the venue's event. A resolution's
+  commitment is still cancelled.
+- **Upgrade before adopting.** v0.17.0 and earlier report a `window-clash`
+  between an adopted commitment and its intention. A hand-written imported
+  commitment may get different `parties`, and a new version, on its first
+  re-import, lapsing acknowledgements on it as any re-import change does.
 
 ## [0.17.0] - 2026-11-03
 

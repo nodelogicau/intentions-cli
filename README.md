@@ -31,10 +31,10 @@ tool to decide, for raising upstream.
 
 | Implemented | Deferred to follow-on changes |
 |---|---|
-| Workspace: `init`, discovery, `intentions.yaml`, `workspace pointer` | iCalendar and JSCalendar import and export (the harness's, with the hold link and lookup below); iTIP |
+| Workspace: `init`, discovery, `intentions.yaml`, `workspace pointer` | Parsing iCalendar and JSCalendar, and export (the harness's: `commitment import` takes the parsed occurrence, and holds use the link and lookup below); iTIP |
 | Intentions: add, edit, firm, retire, show, list | Presence, federation |
 | Availability: add, edit, renew, supersede, retire, show, list | |
-| Commitments: accept, decline, cancel, show, list | |
+| Commitments: import, adopt, accept, decline, cancel, show, list | |
 | The temporal engine: durations, EDTF, clock anchors, cadence, bounds | |
 | Projection versioning (`sha256:` of RFC 8785 canonical JSON) | |
 | `generate`, `resolve`, `select`: instances, ranked candidates, the recorded act, commitments for parties | |
@@ -136,6 +136,8 @@ intentions intention add --title "Read the board pack" --json
 | `resolve <id> [--limit] [--step] [--scope]` | Ranked candidate placements for an intention; writes nothing but the instances it generates |
 | `select <id> (--candidate N \| --policy <id>) [--replace]` | The recorded act: RESOLUTION record, placement, and a commitment when there are parties |
 | `unresolved [--subject <uri>]` | Every active intention without a placement and what stands in its way: `ready`, `blocked`, `no_candidates`, `incomplete`, `unresolvable`; soonest deadline first |
+| `commitment import --event <file\|-> [--subject] [--commitment]` | Import one calendar occurrence the harness parsed: parties mapped by rule, own holds recognised, re-imports updating in place |
+| `commitment adopt <cmt> <int> [--replace]` | The person's selection that an imported event is their intention's occasion: a RESOLUTION record, the intention placed at the event |
 | `commitment accept\|decline <id> [--party <uri>]` | Record that a party has accepted or declined; only ever on the person's word |
 | `commitment cancel <id> [--reason]` | Cancel it and clear the placement of the intention it was for, so that intention may be resolved again |
 | `commitment show <id>`, `commitment list` | Show one with its intention and flags; list active (or `--cancelled`) by party, status or intention |
@@ -144,7 +146,7 @@ intentions intention add --title "Read the board pack" --json
 | `show <id>` | Show any object, including commitments and resolutions written by other tools |
 | `version-of <id> [--projection]` | The computed version, and the canonical JSON it hashes |
 | `bounds [<id>] [--calendar] [--clock]` | Clock-time bounds of a window in the resolver context, with overrides |
-| `validate` | Check the whole workspace; exits 4 on any error. An intention reaching no firm terminus of its subject is a warning (`unserved`) naming the fix; a record selected under a policy since withdrawn is a warning (`selector_withdrawn`); a means whose end was abandoned is a warning (`abandoned_end`); an intention whose hold link an unretired commitment also carries is a warning (`hold_imported`) naming both fixes; a terminus retired as `fulfilled` (`terminus_fulfilled`) or superseded by anything but a terminus of its subject (`terminus_successor`) is an error; a tentative terminus is info (`draft_terminus`) |
+| `validate` | Check the whole workspace; exits 4 on any error. An intention reaching no firm terminus of its subject is a warning (`unserved`) naming the fix; a record selected under a policy since withdrawn is a warning (`selector_withdrawn`); a means whose end was abandoned is a warning (`abandoned_end`); an intention whose hold link an unretired commitment also carries is a warning (`hold_imported`) naming both fixes; an adopted import whose event moved is a warning (`adopted_moved`); an import adopted for an intention whose subject isn't a party, that has parties or a hold link (`adopted_subject_not_party`, `adopted_with_parties`, `adopted_with_hold`), and an intention two commitments name (`intention_two_commitments`), are errors; an import directed at no one (`directed_at_no_one`) and imports without `calendar.addresses` (`calendar_addresses_missing`) are info; a terminus retired as `fulfilled` (`terminus_fulfilled`) or superseded by anything but a terminus of its subject (`terminus_successor`) is an error; a tentative terminus is info (`draft_terminus`) |
 | `index [--check]` | Rebuild `index.yaml`, or verify it and exit 4 on drift |
 | `migrate [--check]` | Move a `intentions/0.1` workspace to `intentions/0.2`: the person's act, refused while any intention is unserved; `--check` reports and writes nothing |
 | `skill show\|install` | Print or install the embedded agent skill for a harness; `install --check` for CI |
@@ -266,6 +268,55 @@ warning under `findings`. The CLI writes no events: the hold's shape (start and
 duration, a URI location, the title, always opaque, `STATUS` from stability)
 and releasing it after `abandoned` or `superseded` are the harness's, set out
 in the skill.
+
+### Calendar import
+
+The harness parses the calendar; the CLI decides what crosses. `commitment
+import --event <file|->` takes one occurrence as JSON: `system`, `uid`,
+`start` (a calendar day for an all-day event), `duration`, and optionally
+`recurrence_id` (the original start, for every occurrence of a recurring
+event), `title`, a URI `location`, `transparent`, `organizer` and
+`attendees`, each `{address, status, non_participant}`. Nothing else crosses.
+
+**Parties on import.** Non-participants and entries with no address are
+dropped. An address listed under `calendar.addresses` in `intentions.yaml`
+becomes that subject's URI; any other `mailto:` is lowercased. `ACCEPTED` is
+`accepted`; `TENTATIVE`, `NEEDS-ACTION` or none is `tentative`; `DECLINED` and
+`DELEGATED` are `declined`, in either format's spelling. An organizer with no
+attendee entry is `accepted`. The subject (`defaults.subject`, or
+`--subject`) is always a party: as mapped when the event names them,
+`accepted` when it names no one (a ticket, a block they made), `tentative`
+when it names only others.
+
+```yaml
+calendar:
+  addresses:
+    https://example.org/people/ben:
+      - mailto:ben@example.org
+      - mailto:ben@work.example
+```
+
+**Re-import.** An event that is an intention's own hold creates nothing
+(`recognised`). Otherwise the commitment carrying the same `system` and
+`uid` is updated in place, keeping its id, its acknowledgements and the
+intention it was adopted for: for a recurring occurrence, the one at the same
+start or still at `recurrence_id`; for a single event, the one there is. One
+the person cancelled stays cancelled (`retired`). Several single-event
+matches with none at the start are refused; `--commitment <id>` names the
+one meant.
+
+**Adopting.** A person who meant to see the quartet and has the ticket in
+their calendar says so with `commitment adopt <cmt> <int>`. It is a selection
+by the person: a RESOLUTION record with `selector: person` and
+`candidates_considered: 1`, the intention placed at the event, and the
+commitment naming the intention while staying an import. The intention must be
+the subject's own, with no parties and no hold link, and no other commitment
+may name it; a placed intention needs `--replace`. The two are then one
+occupation: they never clash, and where their times agree the person's
+capacity is spent once. If the venue moves the event, the re-import keeps the
+link and `validate` warns `adopted_moved` until it is adopted again.
+Cancelling the commitment clears the intention's placement; a replacing
+`select` releases the import without cancelling the venue's event.
 
 ## Agent skill
 
@@ -400,6 +451,14 @@ An intention's `external`, the calendar hold link, is admitted under 0.1 and
 (v0.16.0 and earlier) keeps the field verbatim but neither validates it nor
 knows it marks a hold. Upgrade every binary that shares a workspace before a
 harness records holds.
+
+Adopting is new in this release. A binary older than it (v0.17.0 and
+earlier) reports a `window-clash` between an adopted commitment and its
+intention, and doesn't know the import findings. Upgrade every binary that
+shares a workspace before anyone adopts. An imported commitment written by
+hand before `commitment import` existed may get different `parties`, and so
+a new version, on its first re-import; acknowledgements on it lapse as for
+any re-import change.
 
 `intentions migrate` moves a workspace from 0.1 to 0.2. It refuses while any
 intention is unserved, naming them; otherwise it rewrites the shapes and

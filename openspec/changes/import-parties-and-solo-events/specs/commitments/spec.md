@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Import a calendar event
-`intentions commitment import --event <file|->` SHALL read one parsed calendar occurrence as JSON with `system` (`icalendar` or `jscalendar`), `uid`, `start` (RFC 3339 datetime, or a calendar day for an all-day event), `duration`, and optionally `title`, `location` (an absolute URI), `transparent`, `organizer {address, status?}` and `attendees [{address, status?, non_participant?}]`. Unknown keys, a missing required field, or a `location` that is not a URI SHALL be a usage error (exit 2). `--subject <uri>` SHALL name the particular the import is made for, defaulting to `defaults.subject`; with neither, the import SHALL be refused.
+`intentions commitment import --event <file|->` SHALL read one parsed calendar occurrence as JSON with `system` (`icalendar` or `jscalendar`), `uid`, `start` (RFC 3339 datetime, or a calendar day for an all-day event), `duration`, and optionally `recurrence_id` (an occurrence's original start, iCalendar `RECURRENCE-ID` or JSCalendar `recurrenceId`, given for every occurrence of a recurring event), `title`, `location` (an absolute URI), `transparent`, `organizer {address, status?}` and `attendees [{address, status?, non_participant?}]`. Unknown keys, a missing required field, or a `location` that is not a URI SHALL be a usage error (exit 2). `--subject <uri>` SHALL name the particular the import is made for, defaulting to `defaults.subject`; with neither, the import SHALL be refused.
 
 The verb SHALL, in order:
 - give outcome `recognised`, naming the intention and writing nothing, when the `system` and `uid` match any intention's `external`, retired or not;
-- find the match: the commitment named by `--commitment <id>` (which SHALL carry the same `system` and `uid`); otherwise the one commitment, retired or not, carrying that `system` and `uid`; otherwise, of several, the one whose `placement.start` is the same instant as `start`; several with none matching by start SHALL be refused naming each id and `--commitment`;
+- find the match: the commitment named by `--commitment <id>` (which SHALL carry the same `system` and `uid`); otherwise, for an occurrence with `recurrence_id`, the commitment carrying that `system` and `uid`, retired or not, whose `placement.start` is the same instant as `start`, else as `recurrence_id`, else none; otherwise the one commitment carrying that `system` and `uid`, or of several the one starting at `start`, several with none at `start` being refused naming each id, `recurrence_id` and `--commitment`;
 - give outcome `retired`, writing nothing, when the match is retired;
 - give outcome `created` when there is no match, writing a commitment with `origin: import`, no `intention`, the mapped `parties`, the placement, `location`, `transparent: true` only when given true, `title`, `external`, and empty `acknowledgements`;
 - otherwise rewrite the match's `parties`, placement, `location`, `transparent` and `title` and restamp its `source` and `timestamp`, keeping its id, `intention`, `external` and `acknowledgements`, with outcome `updated`, or `unchanged` with nothing written when nothing differs.
@@ -33,12 +33,20 @@ The result SHALL carry `outcome`, the object when one exists, `previous_version`
 - **THEN** nothing is written and the outcome is `retired`, naming the commitment
 
 #### Scenario: Recurring occurrences
-- **WHEN** two occurrences sharing a `uid` are imported, then the second again with a changed title
-- **THEN** two commitments exist, and the re-import updates the one whose start matches
+- **WHEN** three occurrences sharing a `uid` are imported with their `recurrence_id`, then the second again with a changed title
+- **THEN** three commitments exist, and the re-import updates the one whose start matches
+
+#### Scenario: Moved occurrence
+- **WHEN** an occurrence is imported again with a new `start` and its original start as `recurrence_id`
+- **THEN** the commitment at the original start is updated to the new start
+
+#### Scenario: Moved single event
+- **WHEN** an event without `recurrence_id`, carried by one commitment, is imported with a later start
+- **THEN** that commitment is updated to the later start
 
 #### Scenario: Ambiguous re-import
-- **WHEN** two commitments share the `uid` and the imported start matches neither
-- **THEN** the import is refused naming both ids and `--commitment`
+- **WHEN** two commitments share the `uid`, the event carries no `recurrence_id`, and its start matches neither
+- **THEN** the import is refused naming both ids, `recurrence_id` and `--commitment`
 
 ### Requirement: Parties on import
 Each `attendees` entry and the `organizer` SHALL become one party, except an entry with `non_participant: true` or an empty `address`. A party's `uri` SHALL be the subject URI under which `calendar.addresses` lists the address (a `mailto:` address compared without regard to case), else the address itself, a `mailto:` address lowercased in full. Entries mapping to one `uri` SHALL give one party, an attendee's status taking precedence over the organizer's. `status`, compared without regard to case, SHALL map `ACCEPTED` to `accepted`, `TENTATIVE`, `NEEDS-ACTION` or absent to `tentative`, and `DECLINED` or `DELEGATED` to `declined`; any other value SHALL be a usage error. An organizer with no attendee entry SHALL be `accepted`.

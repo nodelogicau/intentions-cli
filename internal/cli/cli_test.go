@@ -2718,3 +2718,136 @@ func TestHoldImportedBeforeRecognised(t *testing.T) {
 }
 
 func listOf(v any) []any { l, _ := v.([]any); return l }
+
+func codesIn(r result) map[string]int {
+	got := map[string]int{}
+	for _, f := range listOf(r.json["findings"]) {
+		got[f.(map[string]any)["code"].(string)]++
+	}
+	return got
+}
+
+// TestImportAndAdopt covers a concert ticket imported, adopted for the
+// intention it is the occasion of, moved, re-adopted, released by a
+// replacing selection, and cancelled.
+func TestImportAndAdopt(t *testing.T) {
+	ws := initWS02(t)
+	tt := addIntention(t, ws, "--title", "being someone who hears live music").str("id")
+	mustOK(t, run(t, ws, "", "intention", "firm", tt), "firm terminus")
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--capacity", "PT6H", "--calendar", "2026-09/2026-12", "--clock", "18:00/23:00"), "evenings")
+	concert := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "See the quartet", "--duration", "PT2H", "--calendar", "2026-09/2026-12", "--serves", tt+":for-the-sake-of"), "intention").str("id")
+
+	ticket := `{"system":"icalendar","uid":"ticket-1@venue.example","start":"2026-09-18T19:00:00+10:00","duration":"PT2H","title":"Quartet"}`
+	imp := mustOK(t, run(t, ws, ticket, "commitment", "import", "--event", "-", "--now", rnow), "import")
+	cmt := imp.str("id")
+	if imp.str("outcome") != "created" || codesIn(imp)["directed_at_no_one"] != 1 {
+		t.Fatalf("import: %v", imp.json)
+	}
+	if body := readFile(t, ws, "commitments/"+cmt+".yaml"); !strings.Contains(body, "uri: "+ada+"\n    status: accepted") || !strings.Contains(body, "origin: import") {
+		t.Errorf("ticket parties:\n%s", body)
+	}
+	v := mustOK(t, run(t, ws, "", "validate"), "validate")
+	if c := codesIn(v); c["directed_at_no_one"] != 1 || c["calendar_addresses_missing"] != 1 {
+		t.Errorf("validate before adopting: %v", c)
+	}
+	if again := mustOK(t, run(t, ws, ticket, "commitment", "import", "--event", "-", "--now", rnow), "re-import"); again.str("outcome") != "unchanged" {
+		t.Errorf("re-import: %v", again.json)
+	}
+
+	// Refusals.
+	refused := func(what, says string, args ...string) {
+		t.Helper()
+		if r := run(t, ws, "", append([]string{"commitment", "adopt"}, args...)...); r.code != 2 || !strings.Contains(errMsg(r), says) {
+			t.Errorf("%s: %d %s", what, r.code, errMsg(r))
+		}
+	}
+	withParties := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Dinner", "--duration", "PT2H", "--calendar", "2026-09/2026-12", "--party", room, "--serves", tt+":for-the-sake-of"), "with parties").str("id")
+	refused("with parties", "gets its commitment by resolution", cmt, withParties)
+	held := mustOK(t, run(t, ws, "", "intention", "add", "--now", rnow, "--title", "Practice", "--duration", "PT1H", "--calendar", "2026-09/2026-12", "--serves", tt+":for-the-sake-of"), "held").str("id")
+	mustOK(t, run(t, ws, "", "select", held, "--candidate", "1", "--now", rnow), "place held")
+	mustOK(t, run(t, ws, "", "intention", "edit", held, "--external", "icalendar:hold-9"), "hold")
+	refused("with a hold", "--clear-external", cmt, held)
+
+	// Adopt: a person's selection, one occupation.
+	ad := mustOK(t, run(t, ws, "", "commitment", "adopt", cmt, concert, "--now", rnow), "adopt")
+	rec := ad.json["resolution"].(map[string]any)
+	if rec["selector"] != "person" || rec["candidates_considered"].(float64) != 1 || ad.str("adopted") != cmt {
+		t.Errorf("adopt record: %v", ad.json)
+	}
+	for _, d := range listOf(rec["displaced"]) {
+		if d == cmt {
+			t.Error("displaced names the adopted commitment")
+		}
+	}
+	if body := readFile(t, ws, "commitments/"+cmt+".yaml"); !strings.Contains(body, "intention: "+concert) || !strings.Contains(body, "origin: import") || strings.Contains(body, "resolution:") {
+		t.Errorf("adopted commitment:\n%s", body)
+	}
+	if body := readFile(t, ws, "intentions/"+concert+".yaml"); !strings.Contains(body, "start: 2026-09-18T19:00:00+10:00") {
+		t.Errorf("intention placement:\n%s", body)
+	}
+	chk := mustOK(t, run(t, ws, "", "check", "--now", rnow), "check")
+	for _, f := range listOf(chk.json["flags"]) {
+		m := f.(map[string]any)
+		if m["kind"] == "window-clash" && (m["subject"] == cmt && m["counterpart"] == concert || m["subject"] == concert && m["counterpart"] == cmt) {
+			t.Errorf("the pair clashes: %v", m)
+		}
+	}
+	if c := codesIn(mustOK(t, run(t, ws, "", "validate"), "validate adopted")); c["directed_at_no_one"] != 0 || c["adopted_moved"] != 0 {
+		t.Errorf("validate after adopting: %v", c)
+	}
+	refused("two commitments", "already the intention of", mustOK(t, run(t, ws, strings.Replace(ticket, "ticket-1", "ticket-2", 1), "commitment", "import", "--event", "-", "--now", rnow), "second ticket").str("id"), concert)
+
+	// Edits that would break the adoption are refused.
+	if r := run(t, ws, "", "intention", "edit", concert, "--external", "icalendar:x"); r.code != 2 || !strings.Contains(errMsg(r), cmt) {
+		t.Errorf("hold on an adopted intention: %d %s", r.code, errMsg(r))
+	}
+	if r := run(t, ws, "", "intention", "edit", concert, "--party", room); r.code != 2 || !strings.Contains(errMsg(r), "by resolution") {
+		t.Errorf("parties on an adopted intention: %d %s", r.code, errMsg(r))
+	}
+
+	// The venue moves the show; the import keeps the adoption; adopting again fixes it.
+	moved := strings.Replace(ticket, "2026-09-18T19:00", "2026-09-19T19:00", 1)
+	if r := mustOK(t, run(t, ws, moved, "commitment", "import", "--event", "-", "--now", rnow), "moved"); r.str("outcome") != "updated" || codesIn(r)["adopted_moved"] != 1 {
+		t.Errorf("moved import: %v", r.json)
+	}
+	if !strings.Contains(readFile(t, ws, "commitments/"+cmt+".yaml"), "intention: "+concert) {
+		t.Error("re-import cleared intention")
+	}
+	if v := mustOK(t, run(t, ws, "", "validate"), "validate moved"); codesIn(v)["adopted_moved"] != 1 || v.json["ok"] != true {
+		t.Errorf("validate moved: %v", v.json)
+	}
+	mustOK(t, run(t, ws, "", "commitment", "adopt", cmt, concert, "--now", rnow), "adopt again without --replace")
+	if codesIn(mustOK(t, run(t, ws, "", "validate"), "validate re-adopted"))["adopted_moved"] != 0 {
+		t.Error("adopting again left adopted_moved")
+	}
+
+	// A replacing selection releases the import instead of cancelling it.
+	sel := mustOK(t, run(t, ws, "", "select", concert, "--candidate", "1", "--replace", "--now", rnow), "replace")
+	if um, ok := sel.json["unlinked_commitment"].(map[string]any); !ok || um["id"] != cmt {
+		t.Errorf("replace: %v", sel.json)
+	}
+	body := readFile(t, ws, "commitments/"+cmt+".yaml")
+	if strings.Contains(body, "intention:") || strings.Contains(body, "retired:") {
+		t.Errorf("released import:\n%s", body)
+	}
+
+	// Adopt with --replace over that selection, then the venue cancels.
+	refused("placed without replace", "--replace", cmt, concert)
+	mustOK(t, run(t, ws, "", "commitment", "adopt", cmt, concert, "--replace", "--now", rnow), "adopt with --replace")
+	mustOK(t, run(t, ws, "", "commitment", "cancel", cmt, "--now", rnow), "venue cancels")
+	if strings.Contains(readFile(t, ws, "intentions/"+concert+".yaml"), "placement:") {
+		t.Error("cancelling the adopted commitment left the placement")
+	}
+	refused("retired", "is retired", cmt, concert)
+	if r := mustOK(t, run(t, ws, ticket, "commitment", "import", "--event", "-", "--now", rnow), "re-import cancelled"); r.str("outcome") != "retired" {
+		t.Errorf("cancelled event came back: %v", r.json)
+	}
+
+	// The intention's own hold is recognised.
+	if r := mustOK(t, run(t, ws, `{"system":"icalendar","uid":"hold-9","start":"2026-09-18T09:00:00+10:00","duration":"PT1H"}`, "commitment", "import", "--event", "-", "--now", rnow), "own hold"); r.str("outcome") != "recognised" || r.str("intention") != held {
+		t.Errorf("hold: %v", r.json)
+	}
+	if r := run(t, ws, `{"system":"icalendar","uid":"x","start":"2026-09-18","duration":"PT1H"}`, "commitment", "import", "--event", "-"); r.code != 2 {
+		t.Errorf("bad event: %d", r.code)
+	}
+}
