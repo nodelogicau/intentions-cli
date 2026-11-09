@@ -16,4 +16,4 @@
 - [x] 3.2 README: add `hold_imported` to the Validation warnings, and a sentence under the calendar hold. `docs/mcp.md`: note that `intention_edit` findings may carry it.
 - [x] 3.3 SPEC-FEEDBACK item 31: add a Resolution line saying it was settled as proposed upstream (`2026-11-06-hold-imported-before-recognised`).
 - [x] 3.4 CHANGELOG under Unreleased.
-- [ ] 3.5 Reply on intentions-cli#13.
+- [x] 3.5 Reply on intentions-cli#13.

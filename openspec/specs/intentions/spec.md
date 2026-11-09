@@ -342,6 +342,8 @@ A write SHALL be refused (exit 2), with a message stating the rule and the fix, 
 
 Setting or clearing `external` SHALL be accepted from a source carrying a harness without `--policy`, and SHALL NOT change the intention's `source`, `stability` or `firmed_under`. Retirement SHALL keep `external`.
 
+A write that sets `external` to a `system` and `uid` an unretired commitment already carries SHALL be accepted, and its result SHALL carry the `hold_imported` warning under `findings`, as `validate` would report it. Any later write to that intention SHALL carry it too, until the commitment is cancelled or the link is cleared. MCP `intention_edit` SHALL do the same.
+
 `intention show` SHALL print the link in the object it prints. `intention list --external <uid>` SHALL list every intention whose `external.uid` is that value, retired ones included without `--retired`. `--external-system <system>` SHALL narrow the match to that system.
 
 #### Scenario: Harness records a hold on a firm intention
@@ -387,4 +389,12 @@ Setting or clearing `external` SHALL be accepted from a source carrying a harnes
 #### Scenario: Look up a UID that is no hold
 - **WHEN** `intention list --external not-a-hold --json` runs
 - **THEN** the result is an empty list and the command exits 0
+
+#### Scenario: Recording a link an imported commitment carries
+- **WHEN** `intention edit int_A --external icalendar:abc-123@cal.example --json` runs while unretired cmt_X carries that link
+- **THEN** the write is accepted, int_A carries the link, and the result's `findings` holds a `hold_imported` warning naming cmt_X
+
+#### Scenario: Cancelling the duplicate quiets the write
+- **WHEN** cmt_X is cancelled and int_A is edited again
+- **THEN** the result carries no `hold_imported` finding
 
