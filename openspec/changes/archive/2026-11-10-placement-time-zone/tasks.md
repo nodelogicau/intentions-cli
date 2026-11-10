@@ -26,4 +26,4 @@
 - [x] 5.1 Skill: `time_zone` in the import reduction, the zone in the hold export shape, and the `zone_offset_mismatch` fix. Regenerate the installed copy.
 - [x] 5.2 README: placement values, selection, Calendar import, Validation, and the Formats/Status upgrade note. `docs/mcp.md`: `time_zone` and `zone_dropped`.
 - [x] 5.3 CHANGELOG under Unreleased, with the upgrade note.
-- [ ] 5.4 Reply on intentions-cli#15.
+- [x] 5.4 Reply on intentions-cli#15.
