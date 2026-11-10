@@ -85,7 +85,7 @@ func Select(e Env, in *model.Intention, opts SelectOptions) (Selection, Result, 
 	}
 	sel.Candidate = chosen
 
-	start, _ := temporal.ParsePlacementStart(chosen.Interval.Start.In(e.Ctx.Location).Format(time.RFC3339))
+	start := temporal.WithZone(chosen.Interval.Start, e.Ctx.Location)
 	offered := in.Duration.Nominal
 	if d, err := temporal.ParseDuration(chosen.Duration); err == nil {
 		offered = d // a ranged duration may have been offered shorter

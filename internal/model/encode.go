@@ -169,7 +169,11 @@ func placementNode(p *temporal.Placement) *yaml.Node {
 		return nil
 	}
 	m := mapping()
-	addKV(m, "start", plain("!!timestamp", p.Start.Raw))
+	tag := "!!timestamp"
+	if p.Start.Zone != "" {
+		tag = "!!str" // a zoned start is no YAML timestamp, and is written plain
+	}
+	addKV(m, "start", plain(tag, p.Start.Raw))
 	addKV(m, "duration", durationSpecNode(&p.Duration))
 	addStr(m, "location", p.Location)
 	return m

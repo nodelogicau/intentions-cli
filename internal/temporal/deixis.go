@@ -70,11 +70,18 @@ func ParseCalendarOrDeixis(s string, ctx Context) (Calendar, error) {
 // ParseTimestamp accepts RFC 3339 with or without fractional seconds or an
 // offset and returns UTC at seconds precision.
 func ParseTimestamp(s string) (time.Time, error) {
+	if HasZoneSuffix(s) {
+		return time.Time{}, errZoneSuffix(s)
+	}
 	t, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(s))
 	if err != nil {
 		return time.Time{}, fmt.Errorf("invalid timestamp %q: must be RFC 3339", s)
 	}
 	return t.UTC().Truncate(time.Second), nil
+}
+
+func errZoneSuffix(s string) error {
+	return fmt.Errorf("invalid datetime %q: a time-zone suffix is admitted only on a placement's start", s)
 }
 
 // TimeLayout is the on-disk timestamp form: RFC 3339, UTC, seconds.
@@ -94,6 +101,9 @@ type ValidUntil struct {
 // ParseValidUntil accepts either form.
 func ParseValidUntil(s string) (ValidUntil, error) {
 	s = strings.TrimSpace(s)
+	if HasZoneSuffix(s) {
+		return ValidUntil{}, errZoneSuffix(s)
+	}
 	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
 		return ValidUntil{Raw: s, Time: t}, nil
 	}

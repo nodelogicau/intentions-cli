@@ -90,7 +90,7 @@ retired commitment is never brought back.`,
 				if err != nil {
 					return err
 				}
-				findings = query.CommitmentFindings(g, r.Commitment)
+				findings = query.ImportFindings(g, r.Commitment)
 				out = render.Import(r, fs, findings)
 			}
 			return a.emit(out, func(w io.Writer) {

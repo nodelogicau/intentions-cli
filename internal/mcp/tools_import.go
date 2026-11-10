@@ -75,7 +75,7 @@ func (s *Server) commitmentImport(ctx context.Context, req *sdk.CallToolRequest,
 		if err != nil {
 			return errResult(err), nil, nil
 		}
-		out = render.Import(r, flags, query.CommitmentFindings(g, r.Commitment))
+		out = render.Import(r, flags, query.ImportFindings(g, r.Commitment))
 	}
 	var fs []query.Finding
 	if f, ok := out["findings"].([]query.Finding); ok {

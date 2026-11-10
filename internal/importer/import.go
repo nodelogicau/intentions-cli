@@ -35,11 +35,12 @@ type Result struct {
 	Commitment      *model.Commitment // created, updated, unchanged, retired
 	Intention       string            // recognised: the hold's intention
 	PreviousVersion string            // updated
+	ZoneDropped     *ZoneDropped      // a time_zone that could not be kept
 }
 
 // Import brings ev into the workspace for opts.Subject.
 func Import(ws *store.Workspace, g *store.Graph, ev Event, opts Options) (Result, error) {
-	var res Result
+	res := Result{ZoneDropped: ev.Dropped()}
 	link := ev.External()
 	if owner := model.HoldOwner(g.Intentions(), link, ""); owner != "" {
 		res.Outcome, res.Intention = Recognised, owner

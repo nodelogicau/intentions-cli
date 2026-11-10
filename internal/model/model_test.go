@@ -513,3 +513,32 @@ func fieldOf(ps Problems) string {
 	sort.Strings(fs)
 	return strings.Join(fs, ",")
 }
+
+func TestZonedStartRoundTrip(t *testing.T) {
+	in := readFixture(t, "commitment.yaml")
+	zoned := bytes.Replace(in, []byte("start: 2026-09-15T10:00:00+10:00\n"), []byte("start: 2026-09-15T10:00:00+10:00[Australia/Brisbane]\n"), 1)
+	if bytes.Equal(in, zoned) {
+		t.Fatal("fixture changed")
+	}
+	obj, probs, err := Decode(zoned, TypeCommitment)
+	if err != nil || len(probs) > 0 {
+		t.Fatalf("decode: %v %v", err, probs)
+	}
+	obj.SetFormat(Format01)
+	c := obj.(*Commitment)
+	if c.Placement.Start.Zone != "Australia/Brisbane" {
+		t.Fatalf("zone %q", c.Placement.Start.Zone)
+	}
+	out, err := Encode(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(zoned, out) {
+		t.Errorf("zoned start not kept byte for byte\n--- in\n%s\n--- out\n%s", zoned, out)
+	}
+	// A suffix on any other datetime is unparseable, naming the field.
+	bad := bytes.Replace(in, []byte("timestamp: "), []byte("timestamp: 2026-09-01T00:00:00Z[UTC]\nx_was: "), 1)
+	if _, probs, _ := Decode(bad, TypeCommitment); len(probs) == 0 || probs[0].Field != "timestamp" || !strings.Contains(probs[0].Message, "only on a placement") {
+		t.Errorf("suffixed timestamp: %v", probs)
+	}
+}

@@ -12,8 +12,8 @@ decision. It comes down to whether your harness already has a shell.
 
 | | Always in context | When planning work happens |
 |---|---|---|
-| MCP server | ~17,000 tokens (34 tool schemas ≈ 11,500, instructions ≈ 5,300) | the same |
-| Skill + CLI | ~160 tokens (the skill's frontmatter description) | ~3,400 tokens (the body loads when triggered) |
+| MCP server | ~17,000 tokens (34 tool schemas ≈ 11,500, instructions ≈ 5,500) | the same |
+| Skill + CLI | ~160 tokens (the skill's frontmatter description) | ~3,500 tokens (the body loads when triggered) |
 
 **Use the skill and the CLI in harnesses that have a shell**: Claude Code,
 Cursor's agent, Codex.
@@ -169,7 +169,7 @@ take the same keys either way. Every optional field may be omitted;
 | `resolve` | `id`, `limit?`, `step?`, `scope?`, `now?` | `{intention, candidates, candidates_considered, generated, range?, reason?, blocked_on?, no_supply?, presumed?, excluded?}` |
 | `select` | `id`, `candidate` **or** `policy`, `replace?`, `scope?`, `now?` | `{resolution, intention, candidate, commitment?, replaced?, flags, policy?}` |
 | `unresolved` | `subject?`, `scope?`, `now?` | `{entries: [{id, title, subject, activity?, duration?, window?, status, reason?, blocked_on?, candidates, best_rank?, range?, deadline?, timestamp}], count, counts}` |
-| `commitment_import` | `event{system, uid, start, duration, recurrence_id?, title?, location?, transparent?, organizer?, attendees?}`, `subject?`, `commitment?`, `timestamp?`, `source?` | `{outcome, id?, object?, version?, previous_version?, intention?, flags, findings?}`; `outcome` is `created`, `updated`, `unchanged`, `recognised` (the event is an intention's own hold; nothing written) or `retired` (cancelled; stays so). Parties are mapped by rule from `organizer` and `attendees` (`{address, status?, non_participant?}`) and `calendar.addresses` |
+| `commitment_import` | `event{system, uid, start, duration, recurrence_id?, title?, location?, transparent?, organizer?, attendees?, time_zone?}`, `subject?`, `commitment?`, `timestamp?`, `source?` | `{outcome, id?, object?, version?, previous_version?, intention?, flags, findings?, zone_dropped?}`; `outcome` is `created`, `updated`, `unchanged`, `recognised` (the event is an intention's own hold; nothing written) or `retired` (cancelled; stays so). Parties are mapped by rule from `organizer` and `attendees` (`{address, status?, non_participant?}`) and `calendar.addresses`. A `time_zone` the tz database knows becomes the start's `[Zone]` suffix; any other is dropped and reported as `zone_dropped{time_zone, reason}` |
 | `commitment_adopt` | `id`, `intention`, `replace?`, `now?`, `source?` | `{resolution, intention, commitment, adopted, candidate, candidates_considered: 1, flags, replaced?}`; the person's selection that an imported event is the intention's occasion, made only on their word |
 | `commitment_accept` / `commitment_decline` | `id`, `party?`, `source?` | `{…, previous_version, party, status, source, flags}` |
 | `commitment_cancel` | `id`, `reason?`, `timestamp?`, `source?` | `{…, previous_version, cancelled, freed?}` |

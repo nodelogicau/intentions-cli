@@ -109,6 +109,9 @@ func Import(r importer.Result, flags []consistency.Flag, findings []query.Findin
 	if r.PreviousVersion != "" {
 		out["previous_version"] = r.PreviousVersion
 	}
+	if r.ZoneDropped != nil {
+		out["zone_dropped"] = r.ZoneDropped
+	}
 	if flags == nil {
 		flags = []consistency.Flag{}
 	}
@@ -121,6 +124,14 @@ func Import(r importer.Result, flags []consistency.Flag, findings []query.Findin
 
 // ImportText is the one-line text summary of an import.
 func ImportText(r importer.Result) string {
+	s := importText(r)
+	if r.ZoneDropped != nil {
+		s += "; time_zone " + r.ZoneDropped.TimeZone + " dropped (" + r.ZoneDropped.Reason + ")"
+	}
+	return s
+}
+
+func importText(r importer.Result) string {
 	switch r.Outcome {
 	case importer.Recognised:
 		return "Recognised the hold of " + r.Intention + "; nothing imported"

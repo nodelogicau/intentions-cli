@@ -543,3 +543,59 @@ func TestRelativeBounds(t *testing.T) {
 		t.Errorf("starttofinish: %+v", c)
 	}
 }
+
+func TestPlacementZoneSuffix(t *testing.T) {
+	ok := map[string]string{
+		"2026-09-15T09:00:00+10:00[Australia/Melbourne]": "Australia/Melbourne",
+		"2026-09-15T00:00:00Z[Europe/London]":            "Europe/London",
+		"2026-09-15T09:00:00+10:00[Etc/GMT-10]":          "Etc/GMT-10",
+		"2026-09-15T09:00:00-10:00[Etc/GMT+10]":          "Etc/GMT+10",
+		"2026-09-15T09:00:00+10:00":                      "",
+	}
+	for s, zone := range ok {
+		p, err := ParsePlacementStart(s)
+		if err != nil {
+			t.Errorf("%s: %v", s, err)
+			continue
+		}
+		if p.Zone != zone || p.Raw != s {
+			t.Errorf("%s: zone %q raw %q", s, p.Zone, p.Raw)
+		}
+	}
+	bad := map[string]string{
+		"2026-09-15T09:00:00+10:00[+10:00]":                            "offset suffix",
+		"2026-09-15T09:00:00+10:00[u-ca=gregory]":                      "tags",
+		"2026-09-15T09:00:00+10:00[Australia/Melbourne][u-ca=iso8601]": "only one",
+		"2026-09-15T09:00:00+10:00[!Australia/Melbourne]":              "critical flag",
+		"2026-09-15[Australia/Melbourne]":                              "calendar day",
+		"2026-09-15T09:00:00+10:00[Austra lia]":                        "not an IANA",
+		"2026-09-15T09:00:00[Australia/Melbourne]":                     "RFC 3339",
+	}
+	for s, want := range bad {
+		if _, err := ParsePlacementStart(s); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: want error containing %q, got %v", s, want, err)
+		}
+	}
+	if _, err := ParseTimestamp("2026-09-15T09:00:00+10:00[Australia/Melbourne]"); err == nil || !strings.Contains(err.Error(), "only on a placement's start") {
+		t.Errorf("timestamp suffix: %v", err)
+	}
+	if _, err := ParseValidUntil("2026-09-15T09:00:00Z[UTC]"); err == nil {
+		t.Error("valid_until took a suffix")
+	}
+}
+
+func TestWithZone(t *testing.T) {
+	at := time.Date(2026, 9, 14, 23, 0, 0, 0, time.UTC)
+	mel, err := time.LoadLocation("Australia/Melbourne")
+	if err != nil {
+		t.Skip("no tz database")
+	}
+	if got := WithZone(at, mel); got.Raw != "2026-09-15T09:00:00+10:00[Australia/Melbourne]" || got.Zone != "Australia/Melbourne" || !got.Time.Equal(at) {
+		t.Errorf("melbourne: %+v", got)
+	}
+	for _, loc := range []*time.Location{time.UTC, time.Local, time.FixedZone("", 3600)} {
+		if got := WithZone(at, loc); got.Zone != "" || strings.Contains(got.Raw, "[") {
+			t.Errorf("%v: suffixed %s", loc, got.Raw)
+		}
+	}
+}

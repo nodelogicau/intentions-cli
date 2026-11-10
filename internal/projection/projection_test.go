@@ -277,3 +277,18 @@ func mustRead(t *testing.T, path string) []byte {
 	}
 	return b
 }
+
+func TestZoneOutsideProjection(t *testing.T) {
+	cm := load(t, "commitment.yaml", model.TypeCommitment).(*model.Commitment)
+	before := MustVersion(cm)
+	for _, s := range []string{"2026-09-15T10:00:00+10:00[Australia/Brisbane]", "2026-09-15T10:00:00+10:00[Australia/Melbourne]", "2026-09-15T00:00:00Z[Europe/London]"} {
+		p, err := temporal.ParsePlacementStart(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cm.Placement.Start = p
+		if MustVersion(cm) != before {
+			t.Errorf("%s moved the version", s)
+		}
+	}
+}

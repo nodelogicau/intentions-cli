@@ -146,7 +146,7 @@ intentions intention add --title "Read the board pack" --json
 | `show <id>` | Show any object, including commitments and resolutions written by other tools |
 | `version-of <id> [--projection]` | The computed version, and the canonical JSON it hashes |
 | `bounds [<id>] [--calendar] [--clock]` | Clock-time bounds of a window in the resolver context, with overrides |
-| `validate` | Check the whole workspace; exits 4 on any error. An intention reaching no firm terminus of its subject is a warning (`unserved`) naming the fix; a record selected under a policy since withdrawn is a warning (`selector_withdrawn`); a means whose end was abandoned is a warning (`abandoned_end`); an intention whose hold link an unretired commitment also carries is a warning (`hold_imported`) naming both fixes; an adopted import whose event moved is a warning (`adopted_moved`); an import adopted for an intention whose subject isn't a party, that has parties or a hold link (`adopted_subject_not_party`, `adopted_with_parties`, `adopted_with_hold`), and an intention two commitments name (`intention_two_commitments`), are errors; an import directed at no one (`directed_at_no_one`) and imports without `calendar.addresses` (`calendar_addresses_missing`) are info; a terminus retired as `fulfilled` (`terminus_fulfilled`) or superseded by anything but a terminus of its subject (`terminus_successor`) is an error; a tentative terminus is info (`draft_terminus`) |
+| `validate` | Check the whole workspace; exits 4 on any error. An intention reaching no firm terminus of its subject is a warning (`unserved`) naming the fix; a record selected under a policy since withdrawn is a warning (`selector_withdrawn`); a means whose end was abandoned is a warning (`abandoned_end`); an intention whose hold link an unretired commitment also carries is a warning (`hold_imported`) naming both fixes; an adopted import whose event moved is a warning (`adopted_moved`); an import adopted for an intention whose subject isn't a party, that has parties or a hold link (`adopted_subject_not_party`, `adopted_with_parties`, `adopted_with_hold`), and an intention two commitments name (`intention_two_commitments`), are errors; a placement start whose zone this binary doesn't know (`zone_unknown`), or whose offset isn't that zone's at that instant (`zone_offset_mismatch`, fixed by `select <int> --replace`), is a warning; an import directed at no one (`directed_at_no_one`) and imports without `calendar.addresses` (`calendar_addresses_missing`) are info; a terminus retired as `fulfilled` (`terminus_fulfilled`) or superseded by anything but a terminus of its subject (`terminus_successor`) is an error; a tentative terminus is info (`draft_terminus`) |
 | `index [--check]` | Rebuild `index.yaml`, or verify it and exit 4 on drift |
 | `migrate [--check]` | Move a `intentions/0.1` workspace to `intentions/0.2`: the person's act, refused while any intention is unserved; `--check` reports and writes nothing |
 | `skill show\|install` | Print or install the embedded agent skill for a harness; `install --check` for CI |
@@ -243,6 +243,17 @@ Anything displaced is listed on the record and left
 alone; `check` shows it as a `window-clash` on both until the person
 acknowledges it or re-resolves.
 
+**Zones.** A placement's start is an RFC 3339 datetime with its offset, and
+may end in one RFC 9557 suffix naming the IANA zone it is local to:
+`2026-09-15T09:00:00+10:00[Australia/Melbourne]`. `select` writes the
+`resolver.timezone` zone on the intention, the record and any commitment (UTC
+gets no suffix); `resolve` candidates stay plain instants. Only that one form
+is admitted: an offset suffix, a tag, the `!` flag, more than one suffix, a
+suffix on a calendar day, or a suffix on any other datetime is an error. The
+instant always comes from the offset, and versions hash the instant in UTC, so
+adding or changing a zone moves no version. Nothing back-fills existing
+placements.
+
 ### Calendar holds
 
 A harness that writes to the person's calendar may write a busy **hold** for
@@ -276,7 +287,16 @@ import --event <file|->` takes one occurrence as JSON: `system`, `uid`,
 `start` (a calendar day for an all-day event), `duration`, and optionally
 `recurrence_id` (the original start, for every occurrence of a recurring
 event), `title`, a URI `location`, `transparent`, `organizer` and
-`attendees`, each `{address, status, non_participant}`. Nothing else crosses.
+`attendees`, each `{address, status, non_participant}`, and `time_zone`, the
+zone the start names. Nothing else crosses.
+
+**Zones on import.** A `time_zone` this binary's tz database knows is kept as
+the start's suffix, with the offset left as given. UTC (`UTC`, `Etc/UTC`, or a
+start ending in `Z`) gets none. Any other name, such as a Windows zone, is
+dropped and reported as `zone_dropped`, so the CLI never records a zone it
+can't check. A `start` that already carries a suffix must name the same zone.
+A re-import that only gains or changes the zone is `updated`, with the version
+unchanged.
 
 **Parties on import.** Non-participants and entries with no address are
 dropped. An address listed under `calendar.addresses` in `intentions.yaml`
@@ -459,6 +479,11 @@ shares a workspace before anyone adopts. An imported commitment written by
 hand before `commitment import` existed may get different `parties`, and so
 a new version, on its first re-import; acknowledgements on it lapse as for
 any re-import change.
+
+A zone suffix on a placement start is new in this release, under 0.1 and 0.2,
+and outside both projections. A binary older than it (v0.17.0 and earlier)
+reports a zoned start as `unparseable`. Upgrade every binary that shares a
+workspace before selecting or importing with this release.
 
 `intentions migrate` moves a workspace from 0.1 to 0.2. It refuses while any
 intention is unserved, naming them; otherwise it rewrites the shapes and

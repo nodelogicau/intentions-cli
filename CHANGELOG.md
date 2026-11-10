@@ -7,6 +7,25 @@ All notable changes to `intentions` are recorded here. The format follows
 
 ### Added
 
+- **Time zones on placements** (#15, format change `placement-time-zone`,
+  nodelogicau/intentions#37). A placement's start may end in one RFC 9557
+  suffix naming an IANA zone, `2026-09-15T10:00:00+10:00[Australia/Melbourne]`,
+  so the record keeps which zone's clock it was placed on. Only that form is
+  admitted: offset suffixes, tags, the `!` flag, more than one suffix, a suffix
+  on a calendar day, and a suffix on any other datetime are errors. Files keep
+  the start byte for byte. Versions hash the instant in UTC, so no version
+  moves.
+- **`select` writes the resolver's zone** on the intention, the record and any
+  commitment. `commitment adopt` copies the event's zone. `resolve` candidates
+  stay plain instants, and nothing back-fills existing placements.
+- **`time_zone` on `commitment import`.** A known IANA name is kept as the
+  start's suffix with the offset as given; UTC gets none; any other name is
+  dropped and reported as `zone_dropped` in the result. A start already
+  carrying a suffix must agree. A re-import that only gains a zone is
+  `updated` with the version unchanged.
+- **Zone warnings.** `zone_offset_mismatch` (the written offset isn't the
+  zone's at that instant; re-place with `select <int> --replace`) and
+  `zone_unknown`. A `Z` start is never checked.
 - **Calendar import through the CLI** (#14, format change
   `import-parties-and-solo-events`, nodelogicau/intentions#35).
   `commitment import --event <file|->`, and `commitment_import` over MCP,
@@ -55,6 +74,9 @@ All notable changes to `intentions` are recorded here. The format follows
 - **A replacing `select` releases an adopted import** (clears its
   `intention`) instead of cancelling the venue's event. A resolution's
   commitment is still cancelled.
+- **Upgrade before zoned placements.** v0.17.0 and earlier report a zoned
+  start as `unparseable`. Upgrade every binary that shares a workspace before
+  selecting or importing with this release.
 - **Upgrade before adopting.** v0.17.0 and earlier report a `window-clash`
   between an adopted commitment and its intention. A hand-written imported
   commitment may get different `parties`, and a new version, on its first

@@ -40,9 +40,20 @@ type Event struct {
 	Transparent  bool    `json:"transparent,omitempty"`
 	Organizer    *Entry  `json:"organizer,omitempty"`
 	Attendees    []Entry `json:"attendees,omitempty"`
+	// TimeZone is the zone the event's start names (iCalendar
+	// DTSTART;TZID=, JSCalendar timeZone). A known IANA name is kept as the
+	// start's RFC 9557 suffix.
+	TimeZone string `json:"time_zone,omitempty"`
 
 	placement  temporal.Placement
 	recurrence *temporal.PlacementStart
+	dropped    *ZoneDropped
+}
+
+// ZoneDropped reports a time_zone the import could not keep.
+type ZoneDropped struct {
+	TimeZone string `json:"time_zone"`
+	Reason   string `json:"reason"`
 }
 
 // Decode reads an event strictly: unknown keys, a missing required field,
@@ -71,6 +82,9 @@ func (ev *Event) check() error {
 	start, err := temporal.ParsePlacementStart(ev.Start)
 	if err != nil {
 		return apperr.Usage("event: %v", err)
+	}
+	if start, err = ev.zone(start); err != nil {
+		return err
 	}
 	d, err := temporal.ParseDuration(ev.Duration)
 	if err != nil || d.IsZero() {
@@ -101,6 +115,35 @@ func (ev *Event) check() error {
 	}
 	return nil
 }
+
+// zone applies time_zone to the start: a known IANA name is appended as the
+// suffix with the offset kept as given; UTC gives none; an unknown name is
+// dropped and reported. A suffix already on start must agree.
+func (ev *Event) zone(start temporal.PlacementStart) (temporal.PlacementStart, error) {
+	tz := strings.TrimSpace(ev.TimeZone)
+	switch {
+	case start.Zone != "":
+		if tz != "" && tz != start.Zone {
+			return start, apperr.Usage("event: start carries [%s] but time_zone is %q; they must name the same zone", start.Zone, tz)
+		}
+		return start, nil
+	case tz == "" || start.AllDay || temporal.IsUTCZone(tz) || start.UTCStart():
+		return start, nil
+	}
+	if _, err := temporal.LoadZone(tz); err != nil {
+		ev.dropped = &ZoneDropped{TimeZone: tz, Reason: "not an IANA time-zone name this binary's tz database knows"}
+		return start, nil
+	}
+	zoned, err := temporal.ParsePlacementStart(start.Raw + "[" + tz + "]")
+	if err != nil {
+		ev.dropped = &ZoneDropped{TimeZone: tz, Reason: "not an IANA time-zone name"}
+		return start, nil
+	}
+	return zoned, nil
+}
+
+// Dropped is the time_zone the import could not keep, if any.
+func (ev Event) Dropped() *ZoneDropped { return ev.dropped }
 
 // Placement is the occurrence's placement, valid after Decode.
 func (ev Event) Placement() temporal.Placement { return ev.placement }

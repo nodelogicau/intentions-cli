@@ -360,7 +360,7 @@ func TestResolutionLoop(t *testing.T) {
 	h.fail("select", map[string]any{"id": str(a, "id")}, "usage")
 	s := h.ok("select", map[string]any{"id": str(a, "id"), "candidate": 1})
 	rec := s["resolution"].(map[string]any)
-	if rec["selector"] != "person" || rec["intention"] != str(a, "id") || s["intention"].(map[string]any)["placement"].(map[string]any)["start"] != "2026-09-15T09:00:00+10:00" {
+	if rec["selector"] != "person" || rec["intention"] != str(a, "id") || s["intention"].(map[string]any)["placement"].(map[string]any)["start"] != "2026-09-15T09:00:00+10:00[Australia/Melbourne]" {
 		t.Errorf("select: %v", s)
 	}
 	h.fail("select", map[string]any{"id": str(a, "id"), "candidate": 2}, "refused")
@@ -801,6 +801,15 @@ func TestImportAndAdoptOverMCP(t *testing.T) {
 		t.Errorf("re-import: %v", again)
 	}
 	h.fail("commitment_import", map[string]any{"event": map[string]any{"system": "icalendar", "uid": "x", "start": "2026-09-18T19:00:00+10:00", "duration": "PT1H", "cn": "Ada"}}, "usage")
+	// A zone this binary does not know is dropped and reported; a known one is kept.
+	dz := h.ok("commitment_import", map[string]any{"event": map[string]any{"system": "icalendar", "uid": "tz-1", "start": "2026-09-19T19:00:00+10:00", "duration": "PT1H", "time_zone": "AUS Eastern Standard Time"}})
+	if d, _ := dz["zone_dropped"].(map[string]any); d == nil || d["time_zone"] != "AUS Eastern Standard Time" || !strings.Contains(h.file("commitments/"+str(dz, "id")+".yaml"), "start: 2026-09-19T19:00:00+10:00\n") {
+		t.Errorf("zone_dropped: %v", dz)
+	}
+	kz := h.ok("commitment_import", map[string]any{"event": map[string]any{"system": "icalendar", "uid": "tz-2", "start": "2026-09-20T19:00:00+10:00", "duration": "PT1H", "time_zone": "Australia/Brisbane"}})
+	if kz["zone_dropped"] != nil || !strings.Contains(h.file("commitments/"+str(kz, "id")+".yaml"), "start: 2026-09-20T19:00:00+10:00[Australia/Brisbane]\n") {
+		t.Errorf("zone kept: %v", kz)
+	}
 
 	a := h.ok("commitment_adopt", map[string]any{"id": cmt, "intention": in})
 	rec := a["resolution"].(map[string]any)

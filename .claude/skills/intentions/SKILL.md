@@ -131,7 +131,7 @@ modifiers inside double quotes, so `"$id:in-order-to"` silently corrupts the id.
 | Answer a commitment | `intentions commitment accept\|decline <id> [--party <uri>] --json` — only when the person has said so; no policy authorises it |
 | Cancel a commitment | `intentions commitment cancel <id> [--reason "<why>"] --json` → the intention it was for loses its placement and may be resolved again |
 | What is outstanding | `intentions commitment list [--party <uri>] [--status tentative] --json` |
-| Import a calendar event | `intentions commitment import --event - --json` with one parsed occurrence as JSON on stdin → `{outcome, object?, flags, findings?}`; one call per occurrence |
+| Import a calendar event | `intentions commitment import --event - --json` with one parsed occurrence as JSON on stdin → `{outcome, object?, flags, findings?, zone_dropped?}`; one call per occurrence |
 | An event is an intention's occasion | `intentions commitment adopt <cmt_id> <int_id> [--replace] --json` — the person's selection, on their word only |
 | What clashes | `intentions check [<id>]... --json` → `{flags: [{kind, subject, counterpart, counterpart_version, detail}]}`; seven kinds, never decisions |
 | Proceed anyway | `intentions acknowledge <id> --kind <kind> --counterpart <id> --reason "<why>" --json` — only on the person's word; lapses when the counterpart changes |
@@ -310,7 +310,11 @@ finding under `findings` in its result. The next revision refuses both.
   only the placement's start and duration (all-day form for an all-day
   placement), `placement.location` when it is a URI, the title, `TRANSP:OPAQUE`
   (`freeBusyStatus: busy`), and `STATUS:TENTATIVE` or `CONFIRMED` from
-  stability: no description, no serves, no parties. Before importing any
+  stability: no description, no serves, no parties. A start ending in a zone,
+  like `2026-09-15T09:00:00+10:00[Australia/Melbourne]`, is written in that
+  zone: `DTSTART;TZID=Australia/Melbourne:20260915T090000` with the zone's
+  `VTIMEZONE`, or JSCalendar `start` as local time with `timeZone`. A start
+  with no zone is written at its fixed offset, as UTC if the calendar needs it. Before importing any
   event, run `intention list --external <uid>`; a match is your own hold, so
   import nothing for it. After `select --replace`, move the same event rather
   than writing a second. After a retirement as `abandoned` or `superseded`,
@@ -384,8 +388,12 @@ the person's calendar by import.
   start) for every occurrence of a recurring event, so a moved one is found.
   Pass a `location` only when it is a URI, `transparent: true` for
   `TRANSP:TRANSPARENT` or `freeBusyStatus: free`, and a calendar day as
-  `start` for an all-day event. The CLI maps the parties, so every harness
-  writes the same commitment.
+  `start` for an all-day event. Give `time_zone` with the zone the start
+  names (`DTSTART;TZID=`, JSCalendar `timeZone`), and pass `start` with the
+  offset it had at that instant; the CLI keeps a known IANA name as the
+  start's zone and reports anything else (such as a Windows zone name) as
+  `zone_dropped`. Don't translate or guess a zone. The CLI maps the parties,
+  so every harness writes the same commitment.
 - **Read the outcome.** `created` and `updated` wrote a commitment (a
   re-import keeps the intention it was adopted for). `unchanged` wrote
   nothing. `recognised` means the event is your own hold: nothing to do.
@@ -403,6 +411,13 @@ the person's calendar by import.
   event's placement and the two count as one occupation. Do it only when
   they say so. The intention must have no parties and no hold link. If the
   event later moves, `adopted_moved` appears; adopt again to follow it.
+- **A zone warning means the clock changed under a placement.**
+  `zone_offset_mismatch` says a start's written offset is no longer its
+  zone's offset at that instant, usually because the zone's rules changed.
+  The instant stands as written. Tell the person the local time has shifted,
+  and on their word re-place it with `select <int> --replace` (for an import,
+  re-import the event). `zone_unknown` means this binary doesn't know the
+  zone; the instant still holds.
 
 - **A party's status is theirs.** `accept` and `decline` record what the person
   told you and nothing else. No policy authorises them, no flag implies them,

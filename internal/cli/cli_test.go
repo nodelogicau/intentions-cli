@@ -1051,8 +1051,12 @@ func TestResolutionLoop(t *testing.T) {
 	if rec["selector"] != "person" || rec["intention"] != a.str("id") || rec["candidates_considered"].(float64) != 7 || len(rec["supply"].([]any)) != 1 {
 		t.Errorf("record: %v", rec)
 	}
-	if s.json["intention"].(map[string]any)["placement"].(map[string]any)["start"] != "2026-09-15T09:00:00+10:00" {
-		t.Errorf("placement: %v", s.json["intention"])
+	// The written placement carries the resolver's zone; the candidate stays an instant.
+	if s.json["intention"].(map[string]any)["placement"].(map[string]any)["start"] != "2026-09-15T09:00:00+10:00[Australia/Melbourne]" || rec["placement"].(map[string]any)["start"] != "2026-09-15T09:00:00+10:00[Australia/Melbourne]" || s.json["candidate"].(map[string]any)["start"] != "2026-09-15T09:00:00+10:00" {
+		t.Errorf("placement: %v", s.json)
+	}
+	if body := readFile(t, ws, "intentions/"+a.str("id")+".yaml"); !strings.Contains(body, "\n  start: 2026-09-15T09:00:00+10:00[Australia/Melbourne]\n") {
+		t.Errorf("zoned start not written plain:\n%s", body)
 	}
 	body := readFile(t, ws, "resolutions/"+rec["id"].(string)+".yaml")
 	if !strings.HasPrefix(body, "id: res_") || !strings.Contains(body, "\ntimestamp: 2026-09-10T00:00:00Z\nsupply:\n  - avl_") {
@@ -1133,7 +1137,7 @@ func TestResolutionLoop(t *testing.T) {
 	}
 	// Replace: a new record, the old placement reported.
 	rep := mustOK(t, run(t, ws, "", "select", a.str("id"), "--candidate", "2", "--replace", "--now", rnow), "replace")
-	if rep.json["replaced"].(map[string]any)["start"] != "2026-09-15T09:00:00+10:00" {
+	if rep.json["replaced"].(map[string]any)["start"] != "2026-09-15T09:00:00+10:00[Australia/Melbourne]" {
 		t.Errorf("replace: %v", rep.json["replaced"])
 	}
 	if fi, _ := os.ReadDir(filepath.Join(ws, "resolutions")); len(fi) != 5 {
@@ -1872,7 +1876,7 @@ func TestReplacementCarriesTheCommitment(t *testing.T) {
 			t.Errorf("fresh commitment party: %v", p)
 		}
 	}
-	if fresh["placement"].(map[string]any)["start"] != r.json["candidate"].(map[string]any)["start"] {
+	if fresh["placement"].(map[string]any)["start"] != r.json["candidate"].(map[string]any)["start"].(string)+"[Australia/Melbourne]" {
 		t.Errorf("fresh commitment placement: %v", fresh["placement"])
 	}
 	if r.json["cancelled_commitment"].(map[string]any)["id"] != cmt {
@@ -2849,5 +2853,130 @@ func TestImportAndAdopt(t *testing.T) {
 	}
 	if r := run(t, ws, `{"system":"icalendar","uid":"x","start":"2026-09-18","duration":"PT1H"}`, "commitment", "import", "--event", "-"); r.code != 2 {
 		t.Errorf("bad event: %d", r.code)
+	}
+}
+
+// TestPlacementZones covers the zone an import keeps or drops, adoption
+// copying it, and validate on hand-edited starts.
+func TestPlacementZones(t *testing.T) {
+	ws := initWS02(t)
+	imp := func(ev, what string) result {
+		t.Helper()
+		return mustOK(t, run(t, ws, ev, "commitment", "import", "--event", "-", "--now", rnow), what)
+	}
+	ev := func(uid, start, tz string) string {
+		s := `{"system":"icalendar","uid":"` + uid + `","start":"` + start + `","duration":"PT1H"`
+		if tz != "" {
+			s += `,"time_zone":"` + tz + `"`
+		}
+		return s + "}"
+	}
+	startOf := func(r result) string {
+		return r.json["object"].(map[string]any)["placement"].(map[string]any)["start"].(string)
+	}
+
+	// Kept: the offset as given, the name appended, written plain.
+	kept := imp(ev("a@x", "2026-09-18T19:00:00+01:00", "Europe/London"), "kept")
+	if startOf(kept) != "2026-09-18T19:00:00+01:00[Europe/London]" || kept.json["zone_dropped"] != nil {
+		t.Errorf("kept: %v", kept.json)
+	}
+	if body := readFile(t, ws, "commitments/"+kept.str("id")+".yaml"); !strings.Contains(body, "\n  start: 2026-09-18T19:00:00+01:00[Europe/London]\n") {
+		t.Errorf("kept file:\n%s", body)
+	}
+	// Dropped: an unknown name is reported, and no suffix is written.
+	dropped := imp(ev("b@x", "2026-09-18T19:00:00+10:00", "AUS Eastern Standard Time"), "dropped")
+	if startOf(dropped) != "2026-09-18T19:00:00+10:00" || dropped.json["zone_dropped"].(map[string]any)["time_zone"] != "AUS Eastern Standard Time" {
+		t.Errorf("dropped: %v", dropped.json)
+	}
+	// UTC: no suffix, nothing dropped.
+	for _, c := range [][2]string{{"2026-09-18T09:00:00Z", "Etc/UTC"}, {"2026-09-18T10:00:00Z", "UTC"}, {"2026-09-18T09:00:00Z", "Europe/London"}} {
+		u := imp(ev("u-"+c[1]+c[0]+"@x", c[0], c[1]), "utc")
+		if startOf(u) != c[0] || u.json["zone_dropped"] != nil {
+			t.Errorf("utc %v: %v", c, u.json)
+		}
+	}
+	// A start already carrying a suffix must agree with time_zone.
+	if r := run(t, ws, ev("c@x", "2026-09-18T19:00:00+10:00[Australia/Brisbane]", "Australia/Sydney"), "commitment", "import", "--event", "-", "--now", rnow); r.code != 2 || !strings.Contains(errMsg(r), "same zone") {
+		t.Errorf("disagreeing suffix: %d %s", r.code, errMsg(r))
+	}
+	if r := imp(ev("c@x", "2026-09-18T19:00:00+10:00[Australia/Brisbane]", "Australia/Brisbane"), "agreeing suffix"); startOf(r) != "2026-09-18T19:00:00+10:00[Australia/Brisbane]" {
+		t.Errorf("agreeing suffix: %v", r.json)
+	}
+	// A re-import that only gains a zone is updated, with the version unchanged.
+	plain := imp(ev("d@x", "2026-09-18T19:00:00+10:00", ""), "plain")
+	gained := imp(ev("d@x", "2026-09-18T19:00:00+10:00", "Australia/Brisbane"), "gained")
+	if gained.str("outcome") != "updated" || gained.str("id") != plain.str("id") || gained.str("previous_version") != gained.str("version") || startOf(gained) != "2026-09-18T19:00:00+10:00[Australia/Brisbane]" {
+		t.Errorf("gained: %v", gained.json)
+	}
+	if again := imp(ev("d@x", "2026-09-18T19:00:00+10:00", "Australia/Brisbane"), "again"); again.str("outcome") != "unchanged" {
+		t.Errorf("again: %v", again.json)
+	}
+	// A wrong offset for the zone comes back on the import's findings.
+	if wrong := imp(ev("e@x", "2026-07-15T10:00:00+11:00", "Australia/Melbourne"), "wrong offset"); codesIn(wrong)["zone_offset_mismatch"] != 1 {
+		t.Errorf("wrong offset: %v", wrong.json)
+	}
+
+	// Adoption copies the start, zone included.
+	mustOK(t, run(t, ws, "", "availability", "add", "--now", rnow, "--subject", ada, "--capacity", "PT6H", "--calendar", "2026-09/2026-12", "--clock", "08:00/23:00"), "supply")
+	tt := addIntention(t, ws, "--title", "being someone who travels").str("id")
+	mustOK(t, run(t, ws, "", "intention", "firm", tt), "firm terminus")
+	in := addIntention(t, ws, "--title", "London show", "--duration", "PT1H", "--calendar", "2026-09/2026-12", "--serves", tt+":for-the-sake-of").str("id")
+	ad := mustOK(t, run(t, ws, "", "commitment", "adopt", kept.str("id"), in, "--now", rnow), "adopt")
+	if ad.json["resolution"].(map[string]any)["placement"].(map[string]any)["start"] != "2026-09-18T19:00:00+01:00[Europe/London]" ||
+		!strings.Contains(readFile(t, ws, "intentions/"+in+".yaml"), "start: 2026-09-18T19:00:00+01:00[Europe/London]\n") {
+		t.Errorf("adopt: %v", ad.json)
+	}
+
+	// Validate on hand-edited files: an unknown zone and a mismatch warn
+	// (exit 0); a suffix on a timestamp or in a bad form is unparseable.
+	path := filepath.Join(ws, "intentions", in+".yaml")
+	body := readFileAt(t, path)
+	edit := func(old, new string) {
+		t.Helper()
+		if err := os.WriteFile(path, []byte(strings.Replace(body, old, new, 1)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want := func(code string, exit int) {
+		t.Helper()
+		r := run(t, ws, "", "validate")
+		if r.code != exit || codesIn(r)[code] == 0 {
+			t.Errorf("%s: exit %d %v", code, r.code, r.json)
+		}
+	}
+	edit("[Europe/London]", "[Mars/Olympus_Mons]")
+	want("zone_unknown", 0)
+	edit("2026-09-18T19:00:00+01:00[Europe/London]", "2026-09-18T05:00:00+11:00[Australia/Melbourne]")
+	r := run(t, ws, "", "validate")
+	for _, f := range listOf(r.json["findings"]) {
+		m := f.(map[string]any)
+		if m["code"] == "zone_offset_mismatch" && m["id"] == in {
+			if msg := m["message"].(string); !strings.Contains(msg, "+11:00") || !strings.Contains(msg, "+10:00") || !strings.Contains(msg, "--replace") {
+				t.Errorf("mismatch message: %s", msg)
+			}
+		}
+	}
+	if r.code != 0 || codesIn(r)["zone_offset_mismatch"] == 0 {
+		t.Errorf("mismatch: %d %v", r.code, r.json)
+	}
+	edit("2026-09-18T19:00:00+01:00[Europe/London]", "2026-09-18T00:00:00Z[Europe/London]")
+	if c := codesIn(run(t, ws, "", "validate")); c["zone_offset_mismatch"]+c["zone_unknown"] > 1 {
+		// the adopted commitment still carries its own London start; the Z start adds nothing
+		t.Errorf("Z start warned: %v", c)
+	}
+	for _, bad := range []string{"[+01:00]", "[Europe/London][u-ca=iso8601]", "[!Europe/London]"} {
+		edit("[Europe/London]", bad)
+		want("unparseable", 4)
+	}
+	edit("\ntimestamp: 2026-09-10T00:00:00Z\n", "\ntimestamp: 2026-09-10T00:00:00Z[UTC]\n")
+	r = run(t, ws, "", "validate")
+	found := false
+	for _, f := range listOf(r.json["findings"]) {
+		if m := f.(map[string]any); m["code"] == "unparseable" && strings.Contains(m["message"].(string), "timestamp") && strings.Contains(m["message"].(string), "only on a placement") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("suffixed timestamp: %v", r.json)
 	}
 }
