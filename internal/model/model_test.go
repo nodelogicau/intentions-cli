@@ -542,3 +542,50 @@ func TestZonedStartRoundTrip(t *testing.T) {
 		t.Errorf("suffixed timestamp: %v", probs)
 	}
 }
+
+func TestSplitSupersededByRoundTrip(t *testing.T) {
+	in := readFixture(t, "retired.yaml")
+	scalarLine := []byte("  superseded_by: int_01a06d20-5a3b-7e88-b1c4-7d9e0f2a4c66\n")
+	for _, c := range []struct {
+		name string
+		seq  string
+		want []string
+	}{
+		{"sorted", "  superseded_by:\n    - int_u\n    - int_v\n", []string{"int_u", "int_v"}},
+		{"unsorted kept as read", "  superseded_by:\n    - int_v\n    - int_u\n", []string{"int_v", "int_u"}},
+		{"one element decodes", "  superseded_by:\n    - int_u\n", []string{"int_u"}},
+	} {
+		split := bytes.Replace(in, scalarLine, []byte(c.seq), 1)
+		if bytes.Equal(in, split) {
+			t.Fatal("fixture changed")
+		}
+		obj, probs, err := Decode(split, TypeIntention)
+		if err != nil || len(probs) > 0 {
+			t.Fatalf("%s: decode: %v %v", c.name, err, probs)
+		}
+		obj.SetFormat(Format01)
+		r := obj.GetRetired()
+		if r.SupersededBy != "" || strings.Join(r.Successors(), ",") != strings.Join(c.want, ",") {
+			t.Errorf("%s: successors %v / %q", c.name, r.Successors(), r.SupersededBy)
+		}
+		if refs := obj.(*Intention).Refs(); !strings.Contains(strings.Join(refs, ","), "int_u") {
+			t.Errorf("%s: refs %v", c.name, refs)
+		}
+		out, err := Encode(obj)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(split, out) {
+			t.Errorf("%s: not kept byte for byte\n--- in\n%s\n--- out\n%s", c.name, split, out)
+		}
+	}
+	// The scalar form is untouched.
+	obj, _, _ := Decode(in, TypeIntention)
+	obj.SetFormat(Format01)
+	if r := obj.GetRetired(); r.SupersededByList != nil || len(r.Successors()) != 1 || r.SupersededByValue() != r.SupersededBy {
+		t.Errorf("scalar: %+v", r)
+	}
+	if out, _ := Encode(obj); !bytes.Equal(in, out) {
+		t.Errorf("scalar not kept byte for byte")
+	}
+}

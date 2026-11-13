@@ -101,19 +101,29 @@ func (c *checker) source(field string, s Source, needAuthor bool) {
 	}
 }
 
-func (c *checker) retired(t Type, r *Retired) {
+func (c *checker) retired(obj Object, r *Retired) {
 	if r == nil {
 		return
 	}
-	c.enum("retired.kind", r.Kind, RetirementKinds(t), true)
+	c.enum("retired.kind", r.Kind, RetirementKinds(obj.GetType()), true)
+	succ := r.Successors()
 	switch {
-	case r.Kind == "superseded" && r.SupersededBy == "":
+	case r.Kind == "superseded" && len(succ) == 0:
 		c.add("superseded_by", "retired.superseded_by", "superseded_by is required when kind is superseded")
-	case r.Kind != "superseded" && r.SupersededBy != "":
+	case r.Kind != "superseded" && len(succ) > 0:
 		c.add("superseded_by", "retired.superseded_by", "superseded_by is admitted only when kind is superseded")
 	}
-	if r.SupersededBy != "" && !ValidID(r.SupersededBy) {
-		c.add("invalid", "retired.superseded_by", "%q is not an identifier", r.SupersededBy)
+	if r.SupersededByList != nil {
+		if msg := SuccessorListProblem(obj, r.SupersededByList); msg != "" {
+			c.add("superseded_by", "retired.superseded_by", "%s", msg)
+		}
+	}
+	for _, id := range succ {
+		if !ValidID(id) {
+			c.add("invalid", "retired.superseded_by", "%q is not an identifier", id)
+		} else if id == obj.GetID() {
+			c.add("superseded_by", "retired.superseded_by", "%s names itself; an object cannot supersede itself", id)
+		}
 	}
 	switch {
 	case r.Kind == "adopted" && r.AdoptedAs == "":
@@ -249,7 +259,7 @@ func (c *checker) intention(o *Intention) {
 	if o.Acknowledgements == nil {
 		c.add("missing", "acknowledgements", "acknowledgements is required, possibly empty")
 	}
-	c.retired(TypeIntention, o.Retired)
+	c.retired(o, o.Retired)
 	if o.Retired != nil && o.Retired.Kind == "fulfilled" && o.IsTerminus() {
 		c.add("terminus_fulfilled", "retired.kind", "a terminus retired as fulfilled: a self-understanding is never discharged, so a terminus admits abandoned and superseded only")
 	}
@@ -280,7 +290,7 @@ func (c *checker) availability(o *Availability) {
 	if o.Timestamp.IsZero() {
 		c.add("missing", "timestamp", "timestamp is required")
 	}
-	c.retired(TypeAvailability, o.Retired)
+	c.retired(o, o.Retired)
 }
 
 func (c *checker) commitment(o *Commitment) {
@@ -329,7 +339,7 @@ func (c *checker) commitment(o *Commitment) {
 	if o.Acknowledgements == nil {
 		c.add("missing", "acknowledgements", "acknowledgements is required, possibly empty")
 	}
-	c.retired(TypeCommitment, o.Retired)
+	c.retired(o, o.Retired)
 }
 
 func (c *checker) resolution(o *Resolution) {

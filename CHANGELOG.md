@@ -7,6 +7,21 @@ All notable changes to `intentions` are recorded here. The format follows
 
 ### Added
 
+- **Split a terminus** (#16, format change `split-terminus`,
+  nodelogicau/intentions@e90e073). A terminus may be superseded by several
+  termini of its subject, recording that one
+  self-understanding was refined into several: `intention retire
+  --superseded-by` repeats, and `intention_retire` takes `superseded_by` as an
+  array. The file carries a block-sequence list sorted by id. One successor
+  is still written as an id. The grounding walk tries every successor and
+  grounds if any does, so a split with at least one firm successor keeps its
+  dependents grounded, and one of drafts only is refused. Validation reports
+  a list on anything but a terminus, of fewer than two, or with a repeated
+  entry (`superseded_by`), and each entry that dangles or isn't a terminus of
+  the subject. At info level, `split_terminus` names each unretired
+  intention whose `serves` reaches a split, with re-pointing as the fix, and
+  a split's result carries the same findings. `superseded_by` is outside
+  every projection, so no version moves.
 - **Time zones on placements** (#15, format change `placement-time-zone`,
   nodelogicau/intentions#37). A placement's start may end in one RFC 9557
   suffix naming an IANA zone, `2026-09-15T10:00:00+10:00[Australia/Melbourne]`,
@@ -74,6 +89,14 @@ All notable changes to `intentions` are recorded here. The format follows
 - **A replacing `select` releases an adopted import** (clears its
   `intention`) instead of cancelling the venue's event. A resolution's
   commitment is still cancelled.
+- **The `ungrounds` refusal's alternative** now reads: supersede it with one
+  or more termini of the subject, at least one of them firm.
+- **`--superseded-by` is repeatable** on `intention retire`, `desire retire`
+  and `availability retire`. Only a terminus takes more than one, and a
+  repeated value is refused rather than collapsed.
+- **Upgrade before splitting a terminus.** v0.17.0 and earlier fail to read
+  a list-valued `superseded_by`. Upgrade every binary that shares a
+  workspace before anyone splits a terminus.
 - **Upgrade before zoned placements.** v0.17.0 and earlier report a zoned
   start as `unparseable`. Upgrade every binary that shares a workspace before
   selecting or importing with this release.

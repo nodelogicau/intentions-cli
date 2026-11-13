@@ -59,35 +59,63 @@ func CheckRetirement(g Graph, obj Object, r Retired) error {
 	if r.AdoptedAs != "" {
 		return refuse("adopted_as", "adopted_as is written only by adoption")
 	}
+	succ := r.Successors()
 	switch {
-	case r.Kind == "superseded" && r.SupersededBy == "":
+	case r.Kind == "superseded" && len(succ) == 0:
 		return refuse("superseded_by", "kind superseded requires --superseded-by")
-	case r.Kind != "superseded" && r.SupersededBy != "":
+	case r.Kind != "superseded" && len(succ) > 0:
 		return refuse("superseded_by", "--superseded-by is admitted only with kind superseded")
 	}
-	if r.SupersededBy != "" {
-		target, ok := g.Get(r.SupersededBy)
+	t, isTerminus := obj.(*Intention)
+	isTerminus = isTerminus && t.IsTerminus()
+	if r.SupersededByList != nil {
+		if msg := SuccessorListProblem(obj, r.SupersededByList); msg != "" {
+			return refuse("superseded_by", "%s", msg)
+		}
+	}
+	for _, id := range succ {
+		target, ok := g.Get(id)
 		if !ok {
-			return refuse("dangling", "superseded_by %s does not exist", r.SupersededBy)
+			return refuse("dangling", "superseded_by %s does not exist", id)
 		}
 		if target.GetType() != obj.GetType() {
-			return refuse("superseded_by", "superseded_by %s is a %s, not a %s", r.SupersededBy, target.GetType(), obj.GetType())
+			return refuse("superseded_by", "superseded_by %s is a %s, not a %s", id, target.GetType(), obj.GetType())
 		}
-		if r.SupersededBy == obj.GetID() {
+		if id == obj.GetID() {
 			return refuse("superseded_by", "an object cannot supersede itself")
 		}
 	}
-	if t, ok := obj.(*Intention); ok && t.IsTerminus() {
+	if isTerminus {
 		if r.Kind == "fulfilled" {
 			return refuse("terminus_fulfilled", "%s is a terminus, and a self-understanding is never discharged; retire it as abandoned, or as superseded by the terminus that replaces it", t.ID)
 		}
-		if r.SupersededBy != "" {
-			if msg := TerminusSuccessor(g, t, r.SupersededBy); msg != "" {
+		for _, id := range succ {
+			if msg := TerminusSuccessor(g, t, id); msg != "" {
 				return refuse("terminus_successor", "%s", msg)
 			}
 		}
 	}
 	return nil
+}
+
+// SuccessorListProblem says why a list-valued superseded_by is malformed on
+// obj, or "" when it is two or more distinct ids on a terminus. Order is not
+// checked: writers sort, and readers accept any order.
+func SuccessorListProblem(obj Object, ids []string) string {
+	if t, ok := obj.(*Intention); !ok || !t.IsTerminus() {
+		return fmt.Sprintf("superseded_by on %s is a list; only a terminus may be superseded by several, so anything else names one successor", obj.GetID())
+	}
+	if len(ids) < 2 {
+		return fmt.Sprintf("superseded_by on %s is a list of %d; a single successor is written as an id, and a list names two or more", obj.GetID(), len(ids))
+	}
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if seen[id] {
+			return fmt.Sprintf("superseded_by on %s repeats %s; each successor is named once", obj.GetID(), id)
+		}
+		seen[id] = true
+	}
+	return ""
 }
 
 // TerminusSuccessor says why id cannot succeed terminus t, or "" when it is a

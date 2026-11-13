@@ -292,3 +292,16 @@ func TestZoneOutsideProjection(t *testing.T) {
 		}
 	}
 }
+
+// A split's successors are outside the projection: the version is the same
+// as for the same retirement by one successor.
+func TestSplitOutsideProjection(t *testing.T) {
+	one := load(t, "retired.yaml", model.TypeIntention).(*model.Intention)
+	split := load(t, "retired.yaml", model.TypeIntention).(*model.Intention)
+	r := *split.Retired
+	r.SupersededBy, r.SupersededByList = "", []string{"int_u", "int_v"}
+	split.Retired = &r
+	if MustVersion(one) != MustVersion(split) {
+		t.Error("split moved the version")
+	}
+}

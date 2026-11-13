@@ -167,7 +167,9 @@ func (v *validator) referential() {
 				}
 			}
 			if o.Retired != nil {
-				check("retired.superseded_by", o.Retired.SupersededBy, model.TypeDesire)
+				for _, s := range o.Retired.Successors() {
+					check("retired.superseded_by", s, model.TypeDesire)
+				}
 				check("retired.adopted_as", o.Retired.AdoptedAs, model.TypeIntention)
 			}
 		case *model.Intention:
@@ -191,10 +193,12 @@ func (v *validator) referential() {
 				check("window.relative.target", o.Window.Relative.Target, model.TypeIntention, model.TypeCommitment)
 			}
 			if o.Retired != nil {
-				check("retired.superseded_by", o.Retired.SupersededBy, model.TypeIntention)
-				if o.Retired.SupersededBy != "" && o.IsTerminus() {
-					if msg := model.TerminusSuccessor(v.g, o, o.Retired.SupersededBy); msg != "" {
-						v.add(SeverityError, "terminus_successor", id, "%s", msg)
+				for _, s := range o.Retired.Successors() {
+					check("retired.superseded_by", s, model.TypeIntention)
+					if o.IsTerminus() {
+						if msg := model.TerminusSuccessor(v.g, o, s); msg != "" {
+							v.add(SeverityError, "terminus_successor", id, "%s", msg)
+						}
 					}
 				}
 			}
@@ -203,7 +207,9 @@ func (v *validator) referential() {
 				check("window.relative.target", o.Window.Relative.Target, model.TypeIntention, model.TypeCommitment)
 			}
 			if o.Retired != nil {
-				check("retired.superseded_by", o.Retired.SupersededBy, model.TypeAvailability)
+				for _, s := range o.Retired.Successors() {
+					check("retired.superseded_by", s, model.TypeAvailability)
+				}
 			}
 		case *model.Commitment:
 			check("intention", o.Intention, model.TypeIntention)
@@ -269,6 +275,7 @@ func (v *validator) graph() {
 	for _, in := range v.g.Intentions() {
 		if in.Retired == nil {
 			v.abandonedEnds(in)
+			v.findings = append(v.findings, Splits(v.g, in)...)
 		}
 		if in.Retired != nil || inCycle[in.ID] {
 			continue

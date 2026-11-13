@@ -2388,7 +2388,7 @@ func TestTerminusRetirement(t *testing.T) {
 	// Sole ground of A, and through it B: refused, naming both and the ways out.
 	// This workspace is 0.1; the refusal holds under either version.
 	r := retire(ws, tt, "--kind", "abandoned")
-	if r.code != 2 || !strings.Contains(errMsg(r), a+", "+b) || !strings.Contains(errMsg(r), "intentions intention edit "+tt+" --stability tentative") || !strings.Contains(errMsg(r), "superseded by "+u) {
+	if r.code != 2 || !strings.Contains(errMsg(r), a+", "+b) || !strings.Contains(errMsg(r), "intentions intention edit "+tt+" --stability tentative") || !strings.Contains(errMsg(r), "one or more termini of the subject, at least one of them firm, such as "+u) {
 		t.Errorf("sole ground: %d %s %v", r.code, errMsg(r), r.json)
 	}
 	if strings.Contains(readFile(t, ws, "intentions/"+tt+".yaml"), "retired:") {
@@ -2978,5 +2978,103 @@ func TestPlacementZones(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("suffixed timestamp: %v", r.json)
+	}
+}
+
+func TestSplitTerminus(t *testing.T) {
+	retire := func(ws, id string, args ...string) result {
+		return run(t, ws, "", append([]string{"intention", "retire", id}, args...)...)
+	}
+	firmTerminus := func(ws, title string) string {
+		id := addIntention(t, ws, "--title", title).str("id")
+		mustOK(t, run(t, ws, "", "intention", "firm", id), "firm "+title)
+		return id
+	}
+	ws := initWS02(t)
+	tt := firmTerminus(ws, "being someone who looks after their health")
+	strong := firmTerminus(ws, "being someone who is strong in old age")
+	calm := addIntention(t, ws, "--title", "being someone with a calm mind").str("id")
+	sched := addIntention(t, ws, "--title", "Plan", "--duration", "PT1H", "--serves", strong+":for-the-sake-of").str("id")
+	a := addIntention(t, ws, "--title", "Swim", "--duration", "PT1H", "--serves", tt+":for-the-sake-of").str("id")
+	b := addIntention(t, ws, "--title", "Walk", "--duration", "PT1H", "--serves", tt+":for-the-sake-of").str("id")
+	file := "intentions/" + tt + ".yaml"
+
+	// Repeated successor, a scheduled entry, and only drafts: refused, nothing written.
+	if r := retire(ws, tt, "--kind", "superseded", "--superseded-by", strong, "--superseded-by", strong); r.code != 2 || !strings.Contains(errMsg(r), "repeats") {
+		t.Errorf("repeated: %d %s", r.code, errMsg(r))
+	}
+	if r := retire(ws, tt, "--kind", "superseded", "--superseded-by", strong, "--superseded-by", sched); r.code != 2 || !strings.Contains(errMsg(r), "not a terminus") {
+		t.Errorf("scheduled entry: %d %s", r.code, errMsg(r))
+	}
+	drafty := addIntention(t, ws, "--title", "being someone who sleeps well").str("id")
+	if r := retire(ws, tt, "--kind", "superseded", "--superseded-by", calm, "--superseded-by", drafty); r.code != 2 || !strings.Contains(errMsg(r), a) {
+		t.Errorf("split into drafts: %d %s", r.code, errMsg(r))
+	}
+	if r := retire(ws, sched, "--kind", "superseded", "--superseded-by", a, "--superseded-by", b); r.code != 2 || !strings.Contains(errMsg(r), "only a terminus") {
+		t.Errorf("split of a scheduled intention: %d %s", r.code, errMsg(r))
+	}
+	if strings.Contains(readFile(t, ws, file), "retired:") {
+		t.Fatal("file changed after refusal")
+	}
+
+	// The split: written sorted as a block sequence, with a finding per dependent.
+	r := mustOK(t, retire(ws, tt, "--kind", "superseded", "--superseded-by", calm, "--superseded-by", strong), "split")
+	first, second := calm, strong
+	if second < first {
+		first, second = second, first
+	}
+	if !strings.Contains(readFile(t, ws, file), "  superseded_by:\n    - "+first+"\n    - "+second+"\n") {
+		t.Errorf("file:\n%s", readFile(t, ws, file))
+	}
+	if got, _ := r.json["retired"].(map[string]any)["superseded_by"].([]any); len(got) != 2 || got[0] != first {
+		t.Errorf("result superseded_by: %v", r.json["retired"])
+	}
+	if got, _ := r.obj()["retired"].(map[string]any)["superseded_by"].([]any); len(got) != 2 {
+		t.Errorf("object superseded_by: %v", r.obj()["retired"])
+	}
+	fs, _ := r.json["findings"].([]any)
+	ids := map[string]bool{}
+	for _, f := range fs {
+		m := f.(map[string]any)
+		if m["code"] != "split_terminus" || m["severity"] != "info" {
+			t.Errorf("finding: %v", m)
+		}
+		ids[m["id"].(string)] = true
+	}
+	if len(fs) != 2 || !ids[a] || !ids[b] {
+		t.Errorf("split findings: %v", fs)
+	}
+
+	// validate: grounded through the firm successor, info only, exit 0.
+	v := run(t, ws, "", "validate")
+	if v.code != 0 || !strings.Contains(v.stdout, "split_terminus") || strings.Contains(v.stdout, "unserved") {
+		t.Errorf("validate after split: %d %s", v.code, v.stdout)
+	}
+	// Re-pointing quiets the finding for that dependent.
+	mustOK(t, run(t, ws, "", "intention", "edit", a, "--serves", strong+":for-the-sake-of"), "re-point")
+	v = run(t, ws, "", "validate", "--json")
+	for _, f := range v.json["findings"].([]any) {
+		if m := f.(map[string]any); m["code"] == "split_terminus" && m["id"] == a {
+			t.Errorf("re-pointed still reported: %v", m)
+		}
+	}
+
+	// Other verbs take one successor.
+	d1 := mustOK(t, run(t, ws, "", "desire", "add", "--title", "a"), "desire a").str("id")
+	d2 := mustOK(t, run(t, ws, "", "desire", "add", "--title", "b"), "desire b").str("id")
+	d3 := mustOK(t, run(t, ws, "", "desire", "add", "--title", "c"), "desire c").str("id")
+	if r := run(t, ws, "", "desire", "retire", d1, "--kind", "superseded", "--superseded-by", d2, "--superseded-by", d3); r.code != 2 {
+		t.Errorf("desire split: %d %s", r.code, errMsg(r))
+	}
+	av1 := addAvail(t, ws, "--calendar", "2026-W41", "--duration", "PT3H").str("id")
+	av2 := addAvail(t, ws, "--calendar", "2026-W42", "--duration", "PT3H").str("id")
+	av3 := addAvail(t, ws, "--calendar", "2026-W43", "--duration", "PT3H").str("id")
+	if r := run(t, ws, "", "availability", "retire", av1, "--kind", "superseded", "--superseded-by", av2, "--superseded-by", av3); r.code != 2 {
+		t.Errorf("availability split: %d %s", r.code, errMsg(r))
+	}
+	// A single successor is still a scalar.
+	mustOK(t, run(t, ws, "", "desire", "retire", d1, "--kind", "superseded", "--superseded-by", d2), "desire superseded")
+	if !strings.Contains(readFile(t, ws, "desires/"+d1+".yaml"), "superseded_by: "+d2+"\n") {
+		t.Errorf("desire file:\n%s", readFile(t, ws, "desires/"+d1+".yaml"))
 	}
 }

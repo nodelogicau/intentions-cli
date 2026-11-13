@@ -119,7 +119,7 @@ modifiers inside double quotes, so `"$id:in-order-to"` silently corrupts the id.
 | Record capacity | `intentions availability add --subject <uri> --capacity PT3H --calendar <edtf> [--clock HH:MM/HH:MM] [--activities <term>]... [--location <uri>]... [--cadence <rrule>] [--valid-until <edtf>] [--scope personal\|organisation\|public] --json` |
 | Extend capacity | `intentions availability renew <id> --valid-until <edtf> --json` |
 | Change capacity terms | `intentions availability supersede <id> [changed flags] --json` — never `edit` for window, capacity, activities or location |
-| Withdraw | `intentions intention retire <id> --kind fulfilled\|abandoned\|superseded [--superseded-by <id>] --reason "<why>" --json` (a terminus: `abandoned` or `superseded` by a terminus only); `intentions availability retire <id> --kind retracted\|superseded …` |
+| Withdraw | `intentions intention retire <id> --kind fulfilled\|abandoned\|superseded [--superseded-by <id>] --reason "<why>" --json` (a terminus: `abandoned` or `superseded` by a terminus only; repeat `--superseded-by` when it was refined into several); `intentions availability retire <id> --kind retracted\|superseded …` |
 | What a window means | `intentions bounds <id> --json` or `intentions bounds --calendar this-week --clock 09:00/12:00 --json`; writes nothing |
 | Generate instances | `intentions generate --horizon <P…> [--recurring <id>] --json` → `{created, skipped}`; idempotent. Only when the person asks to plan a named period, and narrow it to that period |
 | Rank placements | `intentions resolve <id> [--limit N] --json` → `{candidates: [{rank, start, end, displaces, supply}], candidates_considered, reason}`; writes nothing but instances |
@@ -172,6 +172,14 @@ On failure stderr carries `{"error": {"code", "message"}}`; a refused write says
   would lose its ground. A firm terminus is the person's to retire; you may
   retire only a tentative terminus you drafted yourself. A means whose end
   was abandoned is warned (`abandoned_end`): ask whether to retire it too.
+  When one self turns out to be several (*looking after my health* becomes
+  *strong in old age* and *a calm mind*), write each new terminus and
+  retire the old one superseded by all of them, `--superseded-by` repeated;
+  at least one must be firm for what rested on it to stay grounded. The
+  result and `validate` then name each dependent as `split_terminus` (info):
+  which successor it is for is the person's to say. Ask, for each one, and
+  re-point its `serves` entry only to the successor or successors they name;
+  never re-point on your own, and leave one that truly serves both alone.
 - **Draft tentative. Firm is the person's.** Every intention you add is
   `tentative`. Setting `firm` with a harness in the source is refused unless
   `--policy` names a terminus of the subject carrying `auto_firm` whose terms

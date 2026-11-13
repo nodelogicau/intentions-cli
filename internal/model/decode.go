@@ -493,7 +493,11 @@ func (d *decoder) retired(field string, v *yaml.Node) *Retired {
 		case "reason":
 			r.Reason = d.str(field+".reason", c)
 		case "superseded_by":
-			r.SupersededBy = d.str(field+".superseded_by", c)
+			if c.Kind == yaml.SequenceNode {
+				r.SupersededByList = d.strList(field+".superseded_by", c)
+			} else {
+				r.SupersededBy = d.str(field+".superseded_by", c)
+			}
 		case "adopted_as":
 			r.AdoptedAs = d.str(field+".adopted_as", c)
 		case "source":
