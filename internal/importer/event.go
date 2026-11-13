@@ -8,7 +8,6 @@ package importer
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/nodelogicau/intentions-cli/internal/apperr"
@@ -205,5 +204,3 @@ func Parties(ev Event, subject string, lookup Resolver, normalise func(string) s
 	}
 	return model.SortParties(out)
 }
-
-func describe(ev Event) string { return fmt.Sprintf("%s:%s at %s", ev.System, ev.UID, ev.Start) }
