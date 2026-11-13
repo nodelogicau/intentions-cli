@@ -822,3 +822,43 @@ func TestImportAndAdoptOverMCP(t *testing.T) {
 	b := str(h.ok("intention_add", map[string]any{"title": "Dinner", "duration": "PT2H", "window": map[string]any{"calendar": "2026-09/2026-12"}, "parties": []string{room}}), "id")
 	h.fail("commitment_adopt", map[string]any{"id": cmt, "intention": b}, "refused")
 }
+
+func TestSplitTerminusOverMCP(t *testing.T) {
+	h := newHarness(t, "claude-ai", Options{})
+	add := func(args map[string]any) string { return str(h.ok("intention_add", args), "id") }
+	own := add(map[string]any{"title": "being someone who looks after their health"})
+	u := add(map[string]any{"title": "being someone who is strong in old age"})
+	v := add(map[string]any{"title": "being someone with a calm mind"})
+	dep := add(map[string]any{"title": "Swim", "duration": "PT1H", "serves": []any{map[string]any{"id": own, "role": "for-the-sake-of"}}})
+	sched := add(map[string]any{"title": "Plan", "duration": "PT1H", "serves": []any{map[string]any{"id": u, "role": "for-the-sake-of"}}})
+
+	// An array on anything but a terminus is refused, and on a desire it is a usage error.
+	h.fail("intention_retire", map[string]any{"id": sched, "kind": "superseded", "superseded_by": []any{u, v}}, "refused")
+	d1 := str(h.ok("desire_add", map[string]any{"title": "a"}), "id")
+	d2 := str(h.ok("desire_add", map[string]any{"title": "b"}), "id")
+	h.fail("desire_retire", map[string]any{"id": d1, "kind": "superseded", "superseded_by": []any{d2}}, "usage")
+
+	// The client splits its own draft: sorted, mirrored in the result, findings named.
+	first, second := u, v
+	if second < first {
+		first, second = second, first
+	}
+	r := h.ok("intention_retire", map[string]any{"id": own, "kind": "superseded", "superseded_by": []any{second, first}})
+	if !strings.Contains(h.file("intentions/"+own+".yaml"), "  superseded_by:\n    - "+first+"\n    - "+second+"\n") {
+		t.Errorf("file:\n%s", h.file("intentions/"+own+".yaml"))
+	}
+	if got, _ := r["retired"].(map[string]any)["superseded_by"].([]any); len(got) != 2 || got[0] != first {
+		t.Errorf("result: %v", r["retired"])
+	}
+	fs := list(r, "findings")
+	if len(fs) != 1 || fs[0].(map[string]any)["code"] != "split_terminus" || fs[0].(map[string]any)["id"] != dep {
+		t.Errorf("findings: %v", fs)
+	}
+
+	// An array of one is written as an id.
+	w := add(map[string]any{"title": "being someone who sings"})
+	h.ok("intention_retire", map[string]any{"id": w, "kind": "superseded", "superseded_by": []any{u}})
+	if !strings.Contains(h.file("intentions/"+w+".yaml"), "superseded_by: "+u+"\n") {
+		t.Errorf("one-element array:\n%s", h.file("intentions/"+w+".yaml"))
+	}
+}

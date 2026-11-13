@@ -5,6 +5,7 @@
 package model
 
 import (
+	"sort"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -122,6 +123,48 @@ type Party struct {
 	Status string `json:"status"`
 }
 
+// Successors returns every id superseded_by names: the list, or the single
+// id as one element, or nil.
+func (r *Retired) Successors() []string {
+	if r == nil {
+		return nil
+	}
+	if r.SupersededByList != nil {
+		return r.SupersededByList
+	}
+	if r.SupersededBy != "" {
+		return []string{r.SupersededBy}
+	}
+	return nil
+}
+
+// SetSuccessors records the successors a writer was given: one as an id, two
+// or more as a list sorted by id. Repeats are kept, so that CheckRetirement
+// refuses them rather than a typo being silently collapsed.
+func (r *Retired) SetSuccessors(ids []string) {
+	r.SupersededBy, r.SupersededByList = "", nil
+	switch len(ids) {
+	case 0:
+	case 1:
+		r.SupersededBy = ids[0]
+	default:
+		r.SupersededByList = append([]string(nil), ids...)
+		sort.Strings(r.SupersededByList)
+	}
+}
+
+// SupersededByValue is superseded_by as results show it, mirroring the file:
+// a string for one successor, a list for a split, "" for none.
+func (r *Retired) SupersededByValue() any {
+	if r != nil && r.SupersededByList != nil {
+		return r.SupersededByList
+	}
+	if r == nil {
+		return ""
+	}
+	return r.SupersededBy
+}
+
 // Party statuses.
 var PartyStatuses = []string{"tentative", "accepted", "declined"}
 
@@ -134,9 +177,14 @@ type Retired struct {
 	Kind         string
 	Reason       string
 	SupersededBy string
-	AdoptedAs    string // on a desire retired as adopted: the intention it became
-	Source       Source
-	Timestamp    time.Time
+	// SupersededByList holds superseded_by when it is a sequence: a terminus
+	// refined into several. Decoded on any object, of any length, so that
+	// validate can report a misplaced, short or repeated list. Exactly one of
+	// SupersededBy and SupersededByList is set on a well-formed record.
+	SupersededByList []string
+	AdoptedAs        string // on a desire retired as adopted: the intention it became
+	Source           Source
+	Timestamp        time.Time
 }
 
 // Retirement kinds per type.
@@ -330,9 +378,7 @@ func (o *Intention) Refs() []string {
 	if o.Window != nil && o.Window.Relative != nil {
 		ids = append(ids, o.Window.Relative.Target)
 	}
-	if o.Retired != nil && o.Retired.SupersededBy != "" {
-		ids = append(ids, o.Retired.SupersededBy)
-	}
+	ids = append(ids, o.Retired.Successors()...)
 	return uniqueSorted(ids)
 }
 
@@ -409,9 +455,7 @@ func (o *Availability) Refs() []string {
 	if o.Window != nil && o.Window.Relative != nil {
 		ids = append(ids, o.Window.Relative.Target)
 	}
-	if o.Retired != nil && o.Retired.SupersededBy != "" {
-		ids = append(ids, o.Retired.SupersededBy)
-	}
+	ids = append(ids, o.Retired.Successors()...)
 	return uniqueSorted(ids)
 }
 
@@ -432,9 +476,7 @@ func (o *Commitment) Refs() []string {
 	if o.Resolution != "" {
 		ids = append(ids, o.Resolution)
 	}
-	if o.Retired != nil && o.Retired.SupersededBy != "" {
-		ids = append(ids, o.Retired.SupersededBy)
-	}
+	ids = append(ids, o.Retired.Successors()...)
 	return uniqueSorted(ids)
 }
 

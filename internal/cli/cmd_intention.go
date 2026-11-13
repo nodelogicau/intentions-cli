@@ -219,6 +219,20 @@ func attachFindings(out map[string]any, g *store.Graph, o *model.Intention) []qu
 	return fs
 }
 
+// splitResult puts on a split's result, under "findings", the split_terminus
+// finding for each unretired intention left resting on the split terminus o,
+// so the harness can ask about each at once. Nothing for any other retirement.
+func splitResult(out map[string]any, g *store.Graph, o *model.Intention) []query.Finding {
+	if o.Retired == nil || o.Retired.SupersededByList == nil {
+		return nil
+	}
+	fs := query.SplitResult(g, o)
+	if len(fs) > 0 {
+		out["findings"] = fs
+	}
+	return fs
+}
+
 func printFindings(w io.Writer, fs []query.Finding) {
 	for _, f := range fs {
 		fmt.Fprintf(w, "  %s %s: %s\n", f.Severity, f.Code, f.Message)
@@ -481,7 +495,8 @@ func (a *app) intentionFirmCmd() *cobra.Command {
 
 func (a *app) intentionRetireCmd() *cobra.Command {
 	var act actFlags
-	var kind, supersededBy, reason string
+	var kind, reason string
+	var supersededBy []string
 	cmd := &cobra.Command{
 		Use:   "retire <id>",
 		Short: "Append a retirement record: fulfilled, abandoned, or superseded (with --superseded-by)",
@@ -510,7 +525,8 @@ func (a *app) intentionRetireCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			r := model.Retired{Kind: kind, Reason: reason, SupersededBy: supersededBy, Source: resolveSource(ws, act), Timestamp: ts}
+			r := model.Retired{Kind: kind, Reason: reason, Source: resolveSource(ws, act), Timestamp: ts}
+			r.SetSuccessors(supersededBy)
 			if err := model.CheckRetirement(g, before, r); err != nil {
 				return err
 			}
@@ -529,14 +545,16 @@ func (a *app) intentionRetireCmd() *cobra.Command {
 				return err
 			}
 			out["previous_version"] = prev
-			out["retired"] = map[string]any{"kind": kind, "superseded_by": supersededBy, "reason": reason}
+			out["retired"] = map[string]any{"kind": kind, "superseded_by": r.SupersededByValue(), "reason": reason}
+			fs := splitResult(out, g, &o)
 			return a.emit(out, func(w io.Writer) {
 				fmt.Fprintf(w, "Retired %s as %s (%s -> %s)\n", o.ID, kind, prev, o.Version)
+				printFindings(w, fs)
 			})
 		}),
 	}
 	cmd.Flags().StringVar(&kind, "kind", "", "fulfilled, abandoned, or superseded (a terminus: abandoned or superseded only)")
-	cmd.Flags().StringVar(&supersededBy, "superseded-by", "", "the replacing intention (required with kind superseded)")
+	cmd.Flags().StringArrayVar(&supersededBy, "superseded-by", nil, "the replacing intention (required with kind superseded); repeat on a terminus refined into several")
 	cmd.Flags().StringVar(&reason, "reason", "", "prose reason")
 	addActFlags(cmd, &act)
 	return cmd

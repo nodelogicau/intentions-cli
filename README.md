@@ -124,7 +124,7 @@ intentions intention add --title "Read the board pack" --json
 | `intention add` | Create an intention. `--title` is required; `subject` defaults from `intentions.yaml`. An intention that is not a terminus should reach one through `--serves`; an unserved write is accepted and its result carries a warning under `findings` |
 | `intention edit <id>` | Edit fields in place. Prose edits leave the version unchanged; `--clear-<field>` removes one; `--external <system>:<uid>` records a calendar hold |
 | `intention firm <id>` | Set stability to firm. A harness must pass `--policy <int_id>` naming a firm terminus of the subject carrying `auto_firm`; the id is written to `firmed_under`, and a tentative policy is refused by name. On a terminus, refuses any policy and any harness: only the person firms one |
-| `intention retire <id>` | Append a retirement record: `--kind fulfilled\|abandoned\|superseded [--superseded-by id]`. A terminus admits `abandoned` and `superseded` (by a terminus of its subject) only; retiring one is refused when it would leave a served intention with no firm terminus, and refused for a harness unless the terminus is a tentative draft the harness wrote |
+| `intention retire <id>` | Append a retirement record: `--kind fulfilled\|abandoned\|superseded [--superseded-by id]...`. A terminus admits `abandoned` and `superseded` (by a terminus of its subject, or by several: repeat `--superseded-by`, and the result names each dependent left resting on the split) only; retiring one is refused when it would leave a served intention with no firm terminus, and refused for a harness unless the terminus is a tentative draft the harness wrote |
 | `intention show <id>`, `intention list` | Show one with its version and resolved serves targets; list active (or `--retired`, `--recurring`) with filters; `--external <uid>` finds a calendar hold's intention, retired or not |
 | `availability add` | Create an availability. `--subject`, `--capacity` and a window are required; `--activities` names the terms it is good for (`--duration` and `--conditional` still work as aliases) |
 | `availability edit <id>` | Edit prose or widen `--scope`. A change of terms is refused: use `supersede` |
@@ -146,7 +146,7 @@ intentions intention add --title "Read the board pack" --json
 | `show <id>` | Show any object, including commitments and resolutions written by other tools |
 | `version-of <id> [--projection]` | The computed version, and the canonical JSON it hashes |
 | `bounds [<id>] [--calendar] [--clock]` | Clock-time bounds of a window in the resolver context, with overrides |
-| `validate` | Check the whole workspace; exits 4 on any error. An intention reaching no firm terminus of its subject is a warning (`unserved`) naming the fix; a record selected under a policy since withdrawn is a warning (`selector_withdrawn`); a means whose end was abandoned is a warning (`abandoned_end`); an intention whose hold link an unretired commitment also carries is a warning (`hold_imported`) naming both fixes; an adopted import whose event moved is a warning (`adopted_moved`); an import adopted for an intention whose subject isn't a party, that has parties or a hold link (`adopted_subject_not_party`, `adopted_with_parties`, `adopted_with_hold`), and an intention two commitments name (`intention_two_commitments`), are errors; a placement start whose zone this binary doesn't know (`zone_unknown`), or whose offset isn't that zone's at that instant (`zone_offset_mismatch`, fixed by `select <int> --replace`), is a warning; an import directed at no one (`directed_at_no_one`) and imports without `calendar.addresses` (`calendar_addresses_missing`) are info; a terminus retired as `fulfilled` (`terminus_fulfilled`) or superseded by anything but a terminus of its subject (`terminus_successor`) is an error; a tentative terminus is info (`draft_terminus`) |
+| `validate` | Check the whole workspace; exits 4 on any error. An intention reaching no firm terminus of its subject is a warning (`unserved`) naming the fix; a record selected under a policy since withdrawn is a warning (`selector_withdrawn`); a means whose end was abandoned is a warning (`abandoned_end`); an intention whose hold link an unretired commitment also carries is a warning (`hold_imported`) naming both fixes; an adopted import whose event moved is a warning (`adopted_moved`); an import adopted for an intention whose subject isn't a party, that has parties or a hold link (`adopted_subject_not_party`, `adopted_with_parties`, `adopted_with_hold`), and an intention two commitments name (`intention_two_commitments`), are errors; a placement start whose zone this binary doesn't know (`zone_unknown`), or whose offset isn't that zone's at that instant (`zone_offset_mismatch`, fixed by `select <int> --replace`), is a warning; an import directed at no one (`directed_at_no_one`) and imports without `calendar.addresses` (`calendar_addresses_missing`) are info; a terminus retired as `fulfilled` (`terminus_fulfilled`) or superseded by anything but a terminus of its subject (`terminus_successor`) is an error; a `superseded_by` list on anything but a terminus, of fewer than two, or with a repeated entry is an error (`superseded_by`); a tentative terminus is info (`draft_terminus`); an intention whose `serves` reaches a split terminus is info (`split_terminus`), naming the successors to re-point to |
 | `index [--check]` | Rebuild `index.yaml`, or verify it and exit 4 on drift |
 | `migrate [--check]` | Move a `intentions/0.1` workspace to `intentions/0.2`: the person's act, refused while any intention is unserved; `--check` reports and writes nothing |
 | `skill show\|install` | Print or install the embedded agent skill for a harness; `install --check` for CI |
@@ -219,11 +219,24 @@ grounded, with no edits to the dependents. A terminus admits `abandoned` and
 `superseded` only, superseded by a terminus of its subject; it is never
 `fulfilled`. Retiring one is refused when an intention served now would be
 left with no firm terminus, naming those intentions and the two ways out:
-set the terminus tentative to withdraw it, or supersede it with a firm one.
+set the terminus tentative to withdraw it, or supersede it with one or more
+termini, at least one firm.
 A firm terminus is the person's to retire, and a harness may retire only a
 tentative terminus it drafted. An intention whose `in-order-to` or
 `instance-of` end was abandoned is warned (`abandoned_end`), so pending
 instances of an ended arrangement prompt the person to retire them.
+
+One self is often found to be two: *being someone who looks after their
+health* becomes *being someone who is strong in old age* and *being someone
+with a calm mind*. Retire the terminus superseded by both, with
+`--superseded-by` repeated; the file carries a block-sequence list sorted by
+id, and one successor is always written as an id. The walk tries every
+successor and grounds if any does. What rested on the old terminus stays
+grounded, but nothing yet says which successor each dependent is for, so the
+retire result and `validate` report each one at info level
+(`split_terminus`), with re-pointing its `serves` entry as the fix. Which self
+an intention is for is the person's to say, and a dependent may serve both.
+Only a terminus is split; anything else names one successor.
 
 ### Resolution
 
@@ -484,6 +497,11 @@ A zone suffix on a placement start is new in this release, under 0.1 and 0.2,
 and outside both projections. A binary older than it (v0.17.0 and earlier)
 reports a zoned start as `unparseable`. Upgrade every binary that shares a
 workspace before selecting or importing with this release.
+
+A terminus superseded by several is new in this release, under 0.1 and 0.2,
+and outside both projections. A binary older than it (v0.17.0 and earlier)
+fails to read a list-valued `superseded_by`. Upgrade every binary that
+shares a workspace before anyone splits a terminus.
 
 `intentions migrate` moves a workspace from 0.1 to 0.2. It refuses while any
 intention is unserved, naming them; otherwise it rewrites the shapes and

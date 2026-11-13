@@ -40,9 +40,9 @@ type Ground struct {
 // Grounding walks the serves graph outward from o through every role and
 // reports what it reaches. A firm, active terminus of o's own subject wins
 // outright. The walk passes through retired intentions: one retired as
-// superseded hands the walk to its superseded_by, any other retired
-// intention is walked through its own serves, and a retired terminus grounds
-// nothing. An intention already visited, by serves or by superseded_by, ends
+// superseded hands the walk to its superseded_by (each of them, for a split
+// terminus), any other retired intention is walked through its own serves,
+// and a retired terminus grounds nothing. An intention already visited, by serves or by superseded_by, ends
 // that path: a serves cycle is a validation error in its own right and is
 // refused at write, and a supersession loop simply grounds nothing.
 func Grounding(g Graph, o *Intention) Ground {
@@ -61,8 +61,18 @@ func Grounding(g Graph, o *Intention) Ground {
 			gr.Ends = append(gr.Ends, id)
 			return false
 		}
-		if t.Retired != nil && t.Retired.Kind == "superseded" && t.Retired.SupersededBy != "" {
-			return reach(t.Retired.SupersededBy)
+		if t.Retired != nil && t.Retired.Kind == "superseded" && len(t.Retired.Successors()) > 0 {
+			// A split continues at each successor and grounds if any
+			// does. One seen set serves every branch: whether a node
+			// grounds depends only on the node and o's subject, so a
+			// node that failed on one branch fails on any other, and a
+			// split then merge needs no per-path set.
+			for _, id := range t.Retired.Successors() {
+				if reach(id) {
+					return true
+				}
+			}
+			return false
 		}
 		if t.IsTerminus() {
 			switch {

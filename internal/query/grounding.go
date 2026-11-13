@@ -26,7 +26,8 @@ func (o overlay) Get(id string) (model.Object, bool) {
 
 // WriteFindings reports what validate would say about o once it is written
 // into g: an unserved warning when it reaches no firm terminus of its own
-// subject, a draft info finding when it is a tentative terminus, and a
+// subject, a draft info finding when it is a tentative terminus, a
+// split_terminus info finding for each split its serves reach, and a
 // hold_imported warning for each unretired commitment sharing its hold link.
 // Nil when nothing warrants a finding, so a result can omit the key.
 func WriteFindings(g *store.Graph, o *model.Intention) []Finding {
@@ -34,6 +35,7 @@ func WriteFindings(g *store.Graph, o *model.Intention) []Finding {
 		return nil
 	}
 	out := SharedHolds(g, o)
+	out = append(out, Splits(overlay{g, o}, o)...)
 	if o.IsTerminus() {
 		if o.Stability != "firm" {
 			out = append(out, Finding{Severity: SeverityInfo, Code: "draft_terminus", ID: o.ID, Message: draftMessage(o.ID)})
@@ -121,7 +123,7 @@ func RefuseRetirement(g *store.Graph, o *model.Intention, r model.Retired, edit 
 			break
 		}
 	}
-	return &model.Refusal{Rule: "ungrounds", Message: fmt.Sprintf("retiring %s would leave %s with no firm terminus of %s; to withdraw the reason, set it tentative (%s), or to replace it, retire it as superseded by %s", o.ID, strings.Join(lost, ", "), o.Subject, edit, successor)}
+	return &model.Refusal{Rule: "ungrounds", Message: fmt.Sprintf("retiring %s would leave %s with no firm terminus of %s; to withdraw the reason, set it tentative (%s), or to replace or refine it, retire it as superseded by one or more termini of the subject, at least one of them firm, such as %s", o.ID, strings.Join(lost, ", "), o.Subject, edit, successor)}
 }
 
 // SharedHolds reports one hold_imported warning for each unretired commitment
@@ -145,4 +147,80 @@ func SharedHolds(g *store.Graph, in *model.Intention) []Finding {
 		out = append(out, Finding{Severity: SeverityWarning, Code: "hold_imported", ID: in.ID, Message: msg})
 	}
 	return out
+}
+
+// split is one split_terminus finding with the terminus it names.
+type split struct {
+	terminus string
+	finding  Finding
+}
+
+// splitsOf follows the supersession chain from each serves target of in,
+// through single successors, and stops at the first intention superseded by
+// a list: that split leaves undecided which successor the entry is for. One
+// finding per split terminus, in serves order. A retired intention raises
+// nothing.
+func splitsOf(g model.Graph, in *model.Intention) []split {
+	if in.Retired != nil {
+		return nil
+	}
+	var out []split
+	reported := map[string]bool{}
+	for _, r := range in.Serves {
+		seen := map[string]bool{}
+		id := r.ID
+		for !seen[id] {
+			seen[id] = true
+			obj, ok := g.Get(id)
+			t, isIntention := obj.(*model.Intention)
+			if !ok || !isIntention || t.Retired == nil || t.Retired.Kind != "superseded" {
+				break
+			}
+			if list := t.Retired.SupersededByList; list != nil {
+				if !reported[t.ID] {
+					reported[t.ID] = true
+					via := ""
+					if t.ID != r.ID {
+						via = fmt.Sprintf(", which reaches %s through supersession", t.ID)
+					}
+					out = append(out, split{t.ID, Finding{Severity: SeverityInfo, Code: "split_terminus", ID: in.ID, Message: fmt.Sprintf(
+						"serves %s%s; %s was refined into %s, so which of them %s is for is undecided; ask the person and re-point the serves entry to the successor or successors it is for (`intentions intention edit %s --serves <id>:%s`)",
+						r.ID, via, t.ID, strings.Join(list, " and "), in.ID, in.ID, r.Role)}})
+				}
+				break
+			}
+			id = t.Retired.SupersededBy
+		}
+	}
+	return out
+}
+
+// Splits reports the split_terminus findings for in.
+func Splits(g model.Graph, in *model.Intention) []Finding {
+	var out []Finding
+	for _, s := range splitsOf(g, in) {
+		out = append(out, s.finding)
+	}
+	return out
+}
+
+// SplitFindings reports, for every unretired intention resting on terminus
+// id once it is split, its split_terminus finding naming id: what a split's
+// result carries, so the harness can ask about each dependent at once.
+func SplitFindings(g model.Graph, intentions []*model.Intention, id string) []Finding {
+	var out []Finding
+	for _, in := range intentions {
+		for _, s := range splitsOf(g, in) {
+			if s.terminus == id {
+				out = append(out, s.finding)
+			}
+		}
+	}
+	return out
+}
+
+// SplitResult is SplitFindings for terminus o as just retired, checked as the
+// workspace stands once the retirement lands.
+func SplitResult(g *store.Graph, o *model.Intention) []Finding {
+	return SplitFindings(overlay{g, o}, g.Intentions(), o.ID)
 }

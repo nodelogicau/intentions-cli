@@ -475,7 +475,8 @@ func (a *app) availabilitySupersedeCmd() *cobra.Command {
 
 func (a *app) availabilityRetireCmd() *cobra.Command {
 	var act actFlags
-	var kind, supersededBy, reason string
+	var kind, reason string
+	var supersededBy []string
 	cmd := &cobra.Command{
 		Use:   "retire <id>",
 		Short: "Append a retirement record: retracted, or superseded (with --superseded-by)",
@@ -504,7 +505,8 @@ func (a *app) availabilityRetireCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			r := model.Retired{Kind: kind, Reason: reason, SupersededBy: supersededBy, Source: resolveSource(ws, act), Timestamp: ts}
+			r := model.Retired{Kind: kind, Reason: reason, Source: resolveSource(ws, act), Timestamp: ts}
+			r.SetSuccessors(supersededBy)
 			if err := model.CheckRetirement(g, before, r); err != nil {
 				return err
 			}
@@ -520,7 +522,7 @@ func (a *app) availabilityRetireCmd() *cobra.Command {
 				return err
 			}
 			out["previous_version"] = prev
-			out["retired"] = map[string]any{"kind": kind, "superseded_by": supersededBy, "reason": reason}
+			out["retired"] = map[string]any{"kind": kind, "superseded_by": r.SupersededByValue(), "reason": reason}
 			out["flags"] = a.availabilityFlags(ws, g, &o, now)
 			return a.emit(out, func(w io.Writer) {
 				fmt.Fprintf(w, "Retired %s as %s (%s -> %s)\n", o.ID, kind, prev, o.Version)
@@ -529,7 +531,7 @@ func (a *app) availabilityRetireCmd() *cobra.Command {
 		}),
 	}
 	cmd.Flags().StringVar(&kind, "kind", "", "retracted or superseded")
-	cmd.Flags().StringVar(&supersededBy, "superseded-by", "", "the replacing availability (required with kind superseded)")
+	cmd.Flags().StringArrayVar(&supersededBy, "superseded-by", nil, "the replacing availability (required with kind superseded)")
 	cmd.Flags().StringVar(&reason, "reason", "", "prose reason")
 	addActFlags(cmd, &act)
 	return cmd

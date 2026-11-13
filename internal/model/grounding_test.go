@@ -169,3 +169,70 @@ func TestTerminusRetirementKinds(t *testing.T) {
 		t.Errorf("means superseded by a terminus: %v", err)
 	}
 }
+
+func TestSplitTerminus(t *testing.T) {
+	firm := terminus("int_u", "firm")
+	draft := terminus("int_v", "tentative")
+	draft2 := terminus("int_w", "tentative")
+	foreign := terminus("int_o", "firm")
+	foreign.Subject = "https://other/"
+	sched := scheduled("int_b")
+	split := func(id string, by ...string) *Intention {
+		o := terminus(id, "firm")
+		o.Retired = &Retired{Kind: "superseded", SupersededByList: by}
+		return o
+	}
+	oneFirm := split("int_t1", "int_u", "int_v")
+	drafts := split("int_t2", "int_v", "int_w")
+	// Split then merge: both branches meet at int_u.
+	m1 := terminus("int_m1", "firm")
+	m1.Retired = &Retired{Kind: "superseded", SupersededBy: "int_u"}
+	m2 := terminus("int_m2", "firm")
+	m2.Retired = &Retired{Kind: "superseded", SupersededBy: "int_u"}
+	merge := split("int_t3", "int_m1", "int_m2")
+	// A loop through a split ends.
+	loop := split("int_t4", "int_t4b", "int_v")
+	loopB := terminus("int_t4b", "firm")
+	loopB.Retired = &Retired{Kind: "superseded", SupersededBy: "int_t4"}
+	g := fakeGraph{objs: map[string]Object{"int_u": firm, "int_v": draft, "int_w": draft2, "int_o": foreign, "int_b": sched,
+		"int_t1": oneFirm, "int_t2": drafts, "int_t3": merge, "int_m1": m1, "int_m2": m2, "int_t4": loop, "int_t4b": loopB}}
+	for _, c := range []struct {
+		target string
+		kind   GroundKind
+	}{{"int_t1", Served}, {"int_t2", Draft}, {"int_t3", Served}, {"int_t4", Draft}} {
+		if gr := Grounding(g, scheduled("int_a", Ref{ID: c.target, Role: RoleForTheSakeOf})); gr.Kind != c.kind {
+			t.Errorf("%s: kind %v, want %v (%+v)", c.target, gr.Kind, c.kind, gr)
+		}
+	}
+
+	term := terminus("int_t", "firm")
+	g.objs["int_t"] = term
+	at := func(by ...string) Retired {
+		return Retired{Kind: "superseded", SupersededByList: by, Source: Source{Author: "a"}, Timestamp: time.Now()}
+	}
+	refused := func(err error, rule string) bool {
+		var r *Refusal
+		return errors.As(err, &r) && r.Rule == rule
+	}
+	if err := CheckRetirement(g, term, at("int_u", "int_v")); err != nil {
+		t.Errorf("split: %v", err)
+	}
+	if err := CheckRetirement(g, term, at("int_u")); !refused(err, "superseded_by") {
+		t.Errorf("one-element list: %v", err)
+	}
+	if err := CheckRetirement(g, term, at("int_u", "int_u")); !refused(err, "superseded_by") {
+		t.Errorf("repeated: %v", err)
+	}
+	if err := CheckRetirement(g, term, at("int_u", "int_t")); !refused(err, "superseded_by") {
+		t.Errorf("self: %v", err)
+	}
+	if err := CheckRetirement(g, term, at("int_u", "int_o")); !refused(err, "terminus_successor") || !strings.Contains(err.Error(), "int_o") {
+		t.Errorf("foreign entry: %v", err)
+	}
+	if err := CheckRetirement(g, term, at("int_u", "int_zz")); !refused(err, "dangling") {
+		t.Errorf("dangling entry: %v", err)
+	}
+	if err := CheckRetirement(g, sched, at("int_u", "int_v")); !refused(err, "superseded_by") || !strings.Contains(err.Error(), "only a terminus") {
+		t.Errorf("list on a means: %v", err)
+	}
+}

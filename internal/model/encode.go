@@ -228,7 +228,17 @@ func retiredNode(r *Retired) *yaml.Node {
 	m := mapping()
 	addStrAlways(m, "kind", r.Kind)
 	addStr(m, "reason", r.Reason)
-	addStr(m, "superseded_by", r.SupersededBy)
+	if r.SupersededByList != nil {
+		// Emitted in the order held: writers sort on the way in, and a
+		// record decoded unsorted is re-emitted as it was read.
+		seq := sequence()
+		for _, id := range r.SupersededByList {
+			seq.Content = append(seq.Content, scalar(id))
+		}
+		addKV(m, "superseded_by", seq)
+	} else {
+		addStr(m, "superseded_by", r.SupersededBy)
+	}
 	addStr(m, "adopted_as", r.AdoptedAs)
 	addKV(m, "source", sourceNode(r.Source))
 	addTime(m, "timestamp", r.Timestamp)

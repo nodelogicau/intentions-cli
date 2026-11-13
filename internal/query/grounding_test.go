@@ -312,7 +312,7 @@ func TestRefuseRetirement(t *testing.T) {
 	}
 	// Sole ground of int_a and, through it, int_b; int_both has int_u.
 	err = RefuseRetirement(g, tt, at("abandoned", "", person), "EDIT")
-	if rule(err) != "ungrounds" || !strings.Contains(err.Error(), "int_a, int_b") || strings.Contains(err.Error(), "int_both") || !strings.Contains(err.Error(), "EDIT") || !strings.Contains(err.Error(), "superseded by int_u") {
+	if rule(err) != "ungrounds" || !strings.Contains(err.Error(), "int_a, int_b") || strings.Contains(err.Error(), "int_both") || !strings.Contains(err.Error(), "EDIT") || !strings.Contains(err.Error(), "one or more termini of the subject, at least one of them firm, such as int_u") {
 		t.Errorf("sole ground: %v", err)
 	}
 	if err := RefuseRetirement(g, tt, at("superseded", "int_u", person), "EDIT"); err != nil {
@@ -602,5 +602,82 @@ func TestImportAndAdoptionFindings(t *testing.T) {
 	}
 	if !found {
 		t.Error("calendar_addresses_missing")
+	}
+}
+
+func splitInto(o *model.Intention, by ...string) *model.Intention {
+	o.Retired = &model.Retired{Kind: "superseded", SupersededByList: by, Source: o.Source, Timestamp: time.Now()}
+	return o
+}
+
+func TestSplitTerminus(t *testing.T) {
+	ws := newWS(t)
+	u := firmTerminus("int_u")
+	v := intention("int_v") // a draft successor
+	tt := splitInto(firmTerminus("int_t"), "int_u", "int_v")
+	s := retire(firmTerminus("int_s"), "superseded", "int_t") // reaches the split through one supersession
+	a := withDuration(intention("int_a"))
+	a.Serves = []model.Ref{{ID: "int_t", Role: model.RoleForTheSakeOf}}
+	b := withDuration(intention("int_b"))
+	b.Serves = []model.Ref{{ID: "int_s", Role: model.RoleForTheSakeOf}}
+	pointed := withDuration(intention("int_p"))
+	pointed.Serves = []model.Ref{{ID: "int_u", Role: model.RoleForTheSakeOf}}
+	gone := retire(withDuration(intention("int_g")), "abandoned", "")
+	gone.Serves = []model.Ref{{ID: "int_t", Role: model.RoleForTheSakeOf}}
+	des := &model.Desire{ID: "des_w", Subject: tt.Subject, Title: "w", Serves: []model.Ref{{ID: "int_t", Role: model.RoleForTheSakeOf}}, Source: tt.Source, Timestamp: time.Now()}
+	// Malformed lists, each an error on its own object.
+	other := firmTerminus("int_o")
+	other.Subject = "https://example.com/people/priya"
+	one := splitInto(firmTerminus("int_1"), "int_u")
+	rep := splitInto(firmTerminus("int_2"), "int_u", "int_u")
+	foreign := splitInto(firmTerminus("int_3"), "int_o", "int_u")
+	dangling := splitInto(firmTerminus("int_4"), "int_u", "int_zz")
+	self := splitInto(firmTerminus("int_5"), "int_5", "int_u")
+	onMeans := splitInto(withDuration(intention("int_6")), "int_a", "int_b")
+	unsorted := splitInto(firmTerminus("int_7"), "int_v", "int_u")
+	write(t, ws, u, v, tt, s, a, b, pointed, gone, des, other, one, rep, foreign, dangling, self, onMeans, unsorted)
+	r := run(t, ws)
+
+	fa := findingsFor(r, "int_a")
+	if !strings.HasPrefix(fa["split_terminus"], "info:") || !strings.Contains(fa["split_terminus"], "int_t was refined into int_u and int_v") || !strings.Contains(fa["split_terminus"], "re-point") || fa["unserved"] != "" {
+		t.Errorf("dependent of a split: %v", fa)
+	}
+	if fb := findingsFor(r, "int_b"); !strings.Contains(fb["split_terminus"], "reaches int_t through supersession") {
+		t.Errorf("through a single supersession first: %v", fb)
+	}
+	for _, id := range []string{"int_p", "int_g", "des_w", "int_7"} {
+		if f := findingsFor(r, id); len(f) != 0 {
+			t.Errorf("%s: %v", id, f)
+		}
+	}
+	for id, code := range map[string]string{"int_1": "superseded_by", "int_2": "superseded_by", "int_3": "terminus_successor", "int_4": "dangling", "int_5": "superseded_by", "int_6": "superseded_by"} {
+		if f := findingsFor(r, id); !strings.HasPrefix(f[code], "error:") {
+			t.Errorf("%s: want %s, got %v", id, code, f)
+		}
+	}
+
+	g, err := ws.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fs := SplitFindings(g, g.Intentions(), "int_t")
+	if len(fs) != 2 || fs[0].ID != "int_a" || fs[1].ID != "int_b" {
+		t.Errorf("split findings: %+v", fs)
+	}
+	// The refusal follows the walk: a split with a firm successor is
+	// accepted, one of drafts only is refused.
+	root := firmTerminus("int_r")
+	dep := withDuration(intention("int_dep"))
+	dep.Serves = []model.Ref{{ID: "int_r", Role: model.RoleForTheSakeOf}}
+	write(t, ws, root, dep, intention("int_w"))
+	g, _ = ws.Load()
+	at := func(by ...string) model.Retired {
+		return model.Retired{Kind: "superseded", SupersededByList: by, Source: model.Source{Author: root.Source.Author}, Timestamp: time.Now()}
+	}
+	if err := RefuseRetirement(g, root, at("int_u", "int_v"), "EDIT"); err != nil {
+		t.Errorf("split with a firm successor: %v", err)
+	}
+	if err := RefuseRetirement(g, root, at("int_v", "int_w"), "EDIT"); err == nil || !strings.Contains(err.Error(), "int_dep") {
+		t.Errorf("split into drafts: %v", err)
 	}
 }

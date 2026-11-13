@@ -29,7 +29,7 @@ func (s *Server) registerTools() {
 		Description: "Set stability to firm. A person's act needs nothing; a harness (you, when this session identifies one) must pass `policy`, a terminus of the subject carrying auto_firm whose terms the intention satisfies, and the file then records firmed_under. Refused otherwise: never firm because the person sounds sure. On a terminus it refuses any policy and any harness: a terminus is the person's word, firmed only by a call naming an author and no harness, and it grounds nothing until then."},
 		s.intentionFirm)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_retire", Annotations: additive,
-		Description: "Append a retirement record: fulfilled, abandoned, or superseded (with superseded_by). Nothing is deleted; the file stays and every reference to it still resolves. A retired intention refuses further edits. A terminus admits abandoned and superseded only, superseded by a terminus of its subject; a firm terminus, or a draft the person wrote, is the person's to retire in the CLI, and you may retire only a tentative terminus you drafted. Retiring a terminus that something still rests on is refused: suggest the person supersede it with a firm terminus when the reason has changed, or set it tentative to withdraw it."},
+		Description: "Append a retirement record: fulfilled, abandoned, or superseded (with superseded_by). Nothing is deleted; the file stays and every reference to it still resolves. A retired intention refuses further edits. A terminus admits abandoned and superseded only, superseded by a terminus of its subject, or by an array of two or more when one self was found to be several (the result then names each dependent left resting on the split: ask the person which successor each is for, and never re-point one yourself); a firm terminus, or a draft the person wrote, is the person's to retire in the CLI, and you may retire only a tentative terminus you drafted. Retiring a terminus that something still rests on is refused: suggest the person supersede it with one or more termini, at least one firm, when the reason has changed, or set it tentative to withdraw it."},
 		s.intentionRetire)
 	sdk.AddTool(s.srv, &sdk.Tool{Name: "intention_show", Annotations: readOnly,
 		Description: "One intention with its computed version, resolved serves targets, and current consistency flags. Results equal `intentions intention show --json`."},
@@ -506,7 +506,7 @@ func (s *Server) intentionFirm(ctx context.Context, req *sdk.CallToolRequest, in
 type retireIn struct {
 	ID           string    `json:"id"`
 	Kind         string    `json:"kind" jsonschema:"intentions: fulfilled | abandoned | superseded; availability: retracted | superseded; desires: abandoned | superseded (adopted is written only by desire_adopt)"`
-	SupersededBy string    `json:"superseded_by,omitempty" jsonschema:"the replacing object; required with kind superseded"`
+	SupersededBy any       `json:"superseded_by,omitempty" jsonschema:"the replacing object's id; required with kind superseded. On a terminus refined into several, an array of two or more termini of its subject"`
 	Reason       string    `json:"reason,omitempty"`
 	Timestamp    string    `json:"timestamp,omitempty"`
 	Source       *sourceIn `json:"source,omitempty"`
@@ -537,7 +537,15 @@ func (s *Server) retire(req *sdk.CallToolRequest, in retireIn, want model.Type) 
 	if err != nil {
 		return errResult(err), nil, nil
 	}
-	r := model.Retired{Kind: in.Kind, Reason: in.Reason, SupersededBy: in.SupersededBy, Source: s.source(req, in.Source), Timestamp: ts}
+	succ, isList, err := successorsIn(in.SupersededBy)
+	if err != nil {
+		return errResult(err), nil, nil
+	}
+	if isList && want != model.TypeIntention {
+		return errResult(apperr.Usage("superseded_by on a %s is a single id; only a terminus may be superseded by several", want)), nil, nil
+	}
+	r := model.Retired{Kind: in.Kind, Reason: in.Reason, Source: s.source(req, in.Source), Timestamp: ts}
+	r.SetSuccessors(succ)
 	if err := model.CheckRetirement(g, obj, r); err != nil {
 		return errResult(err), nil, nil
 	}
@@ -573,8 +581,39 @@ func (s *Server) retire(req *sdk.CallToolRequest, in retireIn, want model.Type) 
 		return errResult(err), nil, nil
 	}
 	out["previous_version"] = prev
-	out["retired"] = map[string]any{"kind": in.Kind, "superseded_by": in.SupersededBy, "reason": in.Reason}
-	return okResult(fmt.Sprintf("Retired %s as %s", in.ID, in.Kind)), out, nil
+	out["retired"] = map[string]any{"kind": in.Kind, "superseded_by": r.SupersededByValue(), "reason": in.Reason}
+	var fs []query.Finding
+	if o, ok := updated.(*model.Intention); ok && r.SupersededByList != nil {
+		if fs = query.SplitResult(g, o); len(fs) > 0 {
+			out["findings"] = fs
+		}
+	}
+	return okResult(fmt.Sprintf("Retired %s as %s", in.ID, in.Kind) + findingsText(fs)), out, nil
+}
+
+// successorsIn accepts superseded_by as a string or an array of strings,
+// and says whether it was an array. An array of one is one successor.
+func successorsIn(v any) ([]string, bool, error) {
+	switch t := v.(type) {
+	case nil:
+		return nil, false, nil
+	case string:
+		if Clean(t) == "" {
+			return nil, false, nil
+		}
+		return []string{Clean(t)}, false, nil
+	case []any:
+		out := make([]string, 0, len(t))
+		for i, e := range t {
+			id, ok := e.(string)
+			if !ok || Clean(id) == "" {
+				return nil, false, apperr.Usage("superseded_by[%d] must be an id", i)
+			}
+			out = append(out, Clean(id))
+		}
+		return out, true, nil
+	}
+	return nil, false, apperr.Usage("superseded_by must be an id or an array of ids")
 }
 
 func (s *Server) intentionRetire(ctx context.Context, req *sdk.CallToolRequest, in retireIn) (*sdk.CallToolResult, any, error) {

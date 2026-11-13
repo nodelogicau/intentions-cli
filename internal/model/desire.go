@@ -55,7 +55,8 @@ func (o *Desire) Refs() []string {
 		ids = append(ids, r.ID)
 	}
 	if o.Retired != nil {
-		ids = append(ids, o.Retired.SupersededBy, o.Retired.AdoptedAs)
+		ids = append(ids, o.Retired.Successors()...)
+		ids = append(ids, o.Retired.AdoptedAs)
 	}
 	return uniqueSorted(ids)
 }
@@ -84,7 +85,7 @@ func (c *checker) desire(o *Desire) {
 	if o.Timestamp.IsZero() {
 		c.add("missing", "timestamp", "timestamp is required")
 	}
-	c.retired(TypeDesire, o.Retired)
+	c.retired(o, o.Retired)
 }
 
 // CheckDesireServes refuses serves entries a desire may not carry: any role
