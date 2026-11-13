@@ -33,4 +33,4 @@
 - [x] 5.1 Skill: the split case in "A reason changes by supersession" (repeat `--superseded-by`, `split_terminus`, ask which successor each dependent is for, never re-point on your own), and the retire row of the verbs table. Regenerate the installed copy.
 - [x] 5.2 README: retirement, the walk, validation codes, and the Formats/Status upgrade note. `docs/mcp.md`: `superseded_by` as a string or an array on `intention_retire`.
 - [x] 5.3 CHANGELOG under Unreleased, with the upgrade note: every reader of a shared workspace is upgraded before anyone splits a terminus.
-- [ ] 5.4 Reply on intentions-cli#16.
+- [x] 5.4 Reply on intentions-cli#16.
