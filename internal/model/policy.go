@@ -87,7 +87,7 @@ func CheckRetirement(g Graph, obj Object, r Retired) error {
 	}
 	if isTerminus {
 		if r.Kind == "fulfilled" {
-			return refuse("terminus_fulfilled", "%s is a terminus, and a self-understanding is never discharged; retire it as abandoned, or as superseded by the terminus that replaces it", t.ID)
+			return refuse("terminus_fulfilled", "%s is a terminus, and a practice is never finished; retire it as abandoned, or as superseded by the terminus that replaces it", t.ID)
 		}
 		for _, id := range succ {
 			if msg := TerminusSuccessor(g, t, id); msg != "" {

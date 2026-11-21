@@ -103,7 +103,7 @@ func CheckDesireServes(g Graph, o *Desire) error {
 		}
 		t, isIntention := target.(*Intention)
 		if !isIntention || !t.IsTerminus() {
-			return refuse("serves_target", "serves target %s is not a terminus: a desire is for the sake of who the person is, an intention with no window, duration or serves", r.ID)
+			return refuse("serves_target", "serves target %s is not a terminus: a desire is for the sake of a practice the person holds, an intention with no window, duration or serves", r.ID)
 		}
 		if t.Retired != nil {
 			return refuse("serves_target", "serves target %s is retired", r.ID)
@@ -120,7 +120,7 @@ func CheckDesireServes(g Graph, o *Desire) error {
 // title, description, serves, reference, activity and location, the
 // duration and window supplied, and the act's source. It refuses a retired
 // desire, and refuses a bare adoption, one whose result would be a terminus:
-// an adopted want is a plan, and a self is declared, not adopted.
+// an adopted want is a plan, and a terminus is declared, not adopted.
 func Adopt(d *Desire, duration *temporal.DurationSpec, window *temporal.Window, act Source, at time.Time) (*Intention, Retired, error) {
 	if d.Retired != nil {
 		return nil, Retired{}, refuse("retired", "%s is retired (%s) and cannot be adopted", d.ID, d.Retired.Kind)
@@ -128,7 +128,7 @@ func Adopt(d *Desire, duration *temporal.DurationSpec, window *temporal.Window, 
 	if len(d.Serves) == 0 && duration == nil && window == nil {
 		var missing []string
 		missing = append(missing, "a why (edit the desire with --serves <terminus>:for-the-sake-of)", "a when (--duration, or --calendar, --clock or --relative)")
-		return nil, Retired{}, refuse("bare_adoption", "adopting %s as it stands would write a terminus, a self titled as a task; a want becomes a plan with %s", d.ID, strings.Join(missing, " or "))
+		return nil, Retired{}, refuse("bare_adoption", "adopting %s as it stands would write a terminus, a terminus titled as a task; a want becomes a plan with %s", d.ID, strings.Join(missing, " or "))
 	}
 	in := &Intention{
 		ID:               MintID(TypeIntention),

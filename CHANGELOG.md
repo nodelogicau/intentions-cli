@@ -81,6 +81,16 @@ All notable changes to `intentions` are recorded here. The format follows
 
 ### Changed
 
+- **A terminus is titled as a practice, not who the person is**
+  ([#19](https://github.com/nodelogicau/intentions-cli/issues/19), format
+  change `terminus-as-practice`). The generated `intentions.md`'s **Termini**
+  section, the agent skill and the messages that describe a terminus now say
+  it is titled as something the person chooses to keep doing (*following
+  through*), not as an identity (*being someone who follows through*) and
+  not as a task; the test is whether the title could ever be done. The
+  skill's first question becomes what the person means to keep doing, for
+  its own sake. `terminus_fulfilled` now says a practice is never finished.
+  Validation still never reads a terminus's wording.
 - **A commitment and the intention it fulfils are one occupation.** They
   never `window-clash` each other, whatever the commitment's origin, and the
   person's capacity is spent once only where their times agree. An adopted

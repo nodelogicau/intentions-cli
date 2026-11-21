@@ -168,7 +168,7 @@ func Unserved(g Graph, o *Intention, termini []string) string {
 	if len(termini) > 0 {
 		fmt.Fprintf(&b, ". Add --serves %s:for-the-sake-of, or serve an intention that reaches a terminus", termini[0])
 	} else if gr.Kind != Draft {
-		b.WriteString(". The workspace holds no firm terminus of this subject: add one first, titled as who the person is, and have them firm it")
+		b.WriteString(". The workspace holds no firm terminus of this subject: add one first, titled as a practice the person keeps up, and have them firm it")
 	}
 	return b.String()
 }

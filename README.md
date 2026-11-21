@@ -192,10 +192,10 @@ may still be a draft, and nothing an intention is made of. Nothing resolves,
 checks or grounds it, and two desires may conflict freely. Adopting one
 writes a tentative intention from it and retires it as `adopted` naming the
 intention; adoption is refused bare, since a want with no terminus and no
-duration or window would become a terminus, a self titled as an errand.
+duration or window would become a terminus, a terminus titled as an errand.
 
 A **terminus** is an intention with no window, no duration and no `serves`
-entries: a held self-understanding, or a **policy** when it carries
+entries: a held practice, or a **policy** when it carries
 `--auto-select` or `--auto-firm`. Conditions are admitted on termini only.
 Every other intention reaches a firm terminus of its own subject through
 `serves`, by any path of the three roles; one that does not is reported as
@@ -226,9 +226,8 @@ tentative terminus it drafted. An intention whose `in-order-to` or
 `instance-of` end was abandoned is warned (`abandoned_end`), so pending
 instances of an ended arrangement prompt the person to retire them.
 
-One self is often found to be two: *being someone who looks after their
-health* becomes *being someone who is strong in old age* and *being someone
-with a calm mind*. Retire the terminus superseded by both, with
+One practice is often found to be two: *looking after my health* becomes
+*staying strong into old age* and *keeping a calm mind*. Retire the terminus superseded by both, with
 `--superseded-by` repeated; the file carries a block-sequence list sorted by
 id, and one successor is always written as an id. The walk tries every
 successor and grounds if any does. What rested on the old terminus stays

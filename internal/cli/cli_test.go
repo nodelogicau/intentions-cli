@@ -215,7 +215,7 @@ func TestInitAndDiscovery(t *testing.T) {
 	}
 	if c, err := os.ReadFile(filepath.Join(ws, "intentions.md")); err != nil {
 		t.Error("missing intentions.md")
-	} else if s := string(c); !strings.Contains(s, "## Activity terms") || !strings.Contains(s, "## Termini") || !strings.Contains(s, "who the person is, not what they do") {
+	} else if s := string(c); !strings.Contains(s, "## Activity terms") || !strings.Contains(s, "## Termini") || !strings.Contains(s, "a practice the person chooses to keep doing") {
 		t.Errorf("intentions.md lacks the conventions:\n%s", s)
 	}
 	if strings.Contains(cfg, "week_start") {
