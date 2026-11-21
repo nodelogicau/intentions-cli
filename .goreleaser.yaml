@@ -69,8 +69,6 @@ homebrew_casks:
     commit_author:
       name: intentions-release
       email: noreply@nodelogic.au
-    url:
-      verified: github.com/nodelogicau/intentions-cli/
     binaries:
       - intentions
     # Homebrew deprecated `postflight`, which hooks.post.install generates,
