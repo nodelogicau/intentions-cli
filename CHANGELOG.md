@@ -5,6 +5,22 @@ All notable changes to `intentions` are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-22
+
+Implements four format changes within `intentions/0.2`: split termini
+(nodelogicau/intentions `split-terminus`,
+[#16](https://github.com/nodelogicau/intentions-cli/issues/16)), time zones on
+placements (nodelogicau/intentions#37,
+[#15](https://github.com/nodelogicau/intentions-cli/issues/15)), calendar
+import and adoption (nodelogicau/intentions#35,
+[#14](https://github.com/nodelogicau/intentions-cli/issues/14)) and the
+imported-hold warning (nodelogicau/intentions#36,
+[#13](https://github.com/nodelogicau/intentions-cli/issues/13)), and titles a
+terminus as a practice, not who the person is
+([#19](https://github.com/nodelogicau/intentions-cli/issues/19)). **Upgrade
+every binary that shares a workspace before splitting a terminus, placing
+with a zone, or adopting an import.**
+
 ### Added
 
 - **Split a terminus** (#16, format change `split-terminus`,
@@ -716,7 +732,8 @@ versioning, the temporal engine, intention and availability verbs, `validate`,
 `index`, `show`, `bounds`. Stops before resolution, consistency, commitments
 and calendar import. Raised the thirteen SPEC-FEEDBACK items.
 
-[Unreleased]: https://github.com/nodelogicau/intentions-cli/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/nodelogicau/intentions-cli/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/nodelogicau/intentions-cli/compare/v0.14.0...v0.15.0
