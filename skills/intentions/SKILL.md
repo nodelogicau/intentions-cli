@@ -57,9 +57,10 @@ what they still carry without a plan, and a session that shrinks it has done
 its work. Selecting still happens only on the person's word or under a policy.
 
 Termini first. If `intention list` shows no firm terminus of the person's,
-your first question is who they are trying to be, before you record anything
-they mean to do: every intention reaches a terminus, and the why is the price
-of entry (see "Every intention reaches a terminus" below).
+your first question is what they mean to keep doing, for its own sake, before
+you record anything they mean to do: every intention reaches a terminus, and
+the why is the price of entry (see "Every intention reaches a terminus"
+below).
 
 ## Setup
 
@@ -155,9 +156,10 @@ On failure stderr carries `{"error": {"code", "message"}}`; a refused write says
   not a terminus reaches a firm terminus of the person's own through that
   chain; one that does not is accepted with an `unserved` warning in the
   result, so ask what it is for and link it before you write. A terminus is
-  titled as who the person is, not what they do: *being someone who follows
-  through*, never *follow through*; the test is whether the title names a
-  person or a task. The workspace's `intentions.md` carries this convention
+  titled as a practice the person chooses to keep doing: *following
+  through*, never *being someone who follows through* and never *follow
+  through on the pack*; the test is whether the title could ever be done,
+  since a terminus never is. The workspace's `intentions.md` carries this convention
   under **Termini**. The graph is a DAG; a write that would close a cycle is
   refused. A terminus is a sink and cannot gain serves.
 - **A reason changes by supersession.** When what a terminus says no longer
@@ -171,8 +173,9 @@ On failure stderr carries `{"error": {"code", "message"}}`; a refused write says
   would lose its ground. A firm terminus is the person's to retire; you may
   retire only a tentative terminus you drafted yourself. A means whose end
   was abandoned is warned (`abandoned_end`): ask whether to retire it too.
-  When one self turns out to be several (*looking after my health* becomes
-  *strong in old age* and *a calm mind*), write each new terminus and
+  When one practice turns out to be several (*looking after my health*
+  becomes *staying strong into old age* and *keeping a calm mind*), write
+  each new terminus and
   retire the old one superseded by all of them, `--superseded-by` repeated;
   at least one must be firm for what rested on it to stay grounded. The
   result and `validate` then name each dependent as `split_terminus` (info):
@@ -232,7 +235,7 @@ where a passing remark goes.
   tentative intention carrying the want's title, activity, location and
   terminus plus the duration and window you pass, then retires the desire as
   `adopted` naming it. A bare adoption, no terminus and no when, is refused,
-  because it would write a terminus, a self titled as an errand. An adopted
+  because it would write a terminus, a terminus titled as an errand. An adopted
   intention obeys every intention rule: if its terminus is a draft, the
   result carries the `unserved` warning, which is the moment to ask the
   person to firm their terminus.
@@ -251,9 +254,9 @@ In this revision an unserved intention is a `validate` warning that names the
 fix, and a write that leaves one unserved is accepted and carries the same
 finding under `findings` in its result. The next revision refuses both.
 
-- **Who are you trying to be?** In a workspace with no firm terminus of the
+- **What do you mean to keep doing?** In a workspace with no firm terminus of the
   person's, that is your first question, before anything they mean to do.
-  Draft their answer as a terminus, titled as who they are, and tell them the
+  Draft their answer as a terminus, titled as that practice, and tell them the
   one command that makes it theirs: `intentions intention firm <id>`, run
   with their author and no harness. Do not run it.
 - **A draft grounds nothing.** A terminus you add is `tentative`; `validate`

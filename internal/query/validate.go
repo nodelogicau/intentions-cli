@@ -159,7 +159,7 @@ func (v *validator) referential() {
 				if t, ok := v.g.Get(r.ID); ok {
 					if ti, ok := t.(*model.Intention); ok {
 						if !ti.IsTerminus() {
-							v.add(SeverityError, "serves_target", id, "%s names %s, which is not a terminus; a desire serves only who the person is", f, r.ID)
+							v.add(SeverityError, "serves_target", id, "%s names %s, which is not a terminus; a desire serves only a terminus", f, r.ID)
 						} else if ti.Subject != o.Subject {
 							v.add(SeverityError, "serves_target", id, "%s names %s, a terminus of %s, not of %s", f, r.ID, ti.Subject, o.Subject)
 						}

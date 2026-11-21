@@ -261,7 +261,7 @@ func (c *checker) intention(o *Intention) {
 	}
 	c.retired(o, o.Retired)
 	if o.Retired != nil && o.Retired.Kind == "fulfilled" && o.IsTerminus() {
-		c.add("terminus_fulfilled", "retired.kind", "a terminus retired as fulfilled: a self-understanding is never discharged, so a terminus admits abandoned and superseded only")
+		c.add("terminus_fulfilled", "retired.kind", "a terminus retired as fulfilled: a practice is never finished, so a terminus admits abandoned and superseded only")
 	}
 }
 

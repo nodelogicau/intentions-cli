@@ -192,12 +192,14 @@ intention's ` + "`activity`" + ` and an availability's ` + "`conditional`" + `.
 
 ## Termini
 
-A terminus is titled as who the person is, not what they do: *being someone
-who follows through*, never *follow through*. The test is whether the title
-names a person or a task. Every intention that is not a terminus reaches a
-firm terminus of its own subject through ` + "`serves`" + `; one that does not
-is a warning. A terminus grounds nothing until the person, by their own act,
-has made it firm: a harness may draft one, only the person firms it.
+A terminus is titled as a practice the person chooses to keep doing, not as
+who they are and not as a task: *following through*, never *being someone who
+follows through* and never *follow through on the pack*. The test is whether
+the title could ever be done; a terminus never is. Every intention that is not
+a terminus reaches a firm terminus of its own subject through ` + "`serves`" + `;
+one that does not is a warning. A terminus grounds nothing until the person,
+by their own act, has made it firm: a harness may draft one, only the person
+firms it.
 `
 
 // WritePointer writes a .intentions pointer file in dir naming target. A
