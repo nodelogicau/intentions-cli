@@ -5,6 +5,14 @@ All notable changes to `intentions` are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- `--reference` and the MCP `reference` parameter on intentions and desires
+  are described as an informal pointer to any record outside the workspace,
+  as a URI or other string, rather than to a DKF claim, following
+  nodelogicau/intentions#44. Behaviour is unchanged: the value was never
+  resolved.
+
 ## [0.18.0] - 2026-11-22
 
 Implements four format changes within `intentions/0.2`: split termini

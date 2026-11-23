@@ -44,7 +44,7 @@ func addIntentionFieldFlags(cmd *cobra.Command, f *intentionFields, edit bool) {
 	cmd.Flags().StringVar(&f.preference, "preference", "", "earliest, latest, adjacent, or spread")
 	cmd.Flags().StringVar(&f.autoSelect, "auto-select", "", "policy condition on a terminus, e.g. max_duration=PT30M,stability=tentative")
 	cmd.Flags().StringVar(&f.autoFirm, "auto-firm", "", "policy condition on a terminus, e.g. max_duration=PT30M")
-	cmd.Flags().StringVar(&f.reference, "reference", "", "informal pointer to a DKF claim; never validated")
+	cmd.Flags().StringVar(&f.reference, "reference", "", "informal pointer to any record outside the workspace, as a URI or other string; never validated")
 	cmd.Flags().StringVar(&f.policy, "policy", "", "id of the terminus carrying auto_firm that authorises a harness to set firm; written to firmed_under")
 	addWindowFlags(cmd, &f.window, edit)
 	if !edit {

@@ -110,7 +110,7 @@ type intentionIn struct {
 	Preference  string     `json:"preference,omitempty" jsonschema:"earliest | latest | adjacent | spread"`
 	AutoSelect  string     `json:"auto_select,omitempty" jsonschema:"policy condition on a terminus: max_duration=PT30M,stability=tentative"`
 	AutoFirm    string     `json:"auto_firm,omitempty" jsonschema:"policy condition on a terminus: max_duration=PT30M"`
-	Reference   string     `json:"reference,omitempty" jsonschema:"informal pointer to a DKF claim; never validated"`
+	Reference   string     `json:"reference,omitempty" jsonschema:"informal pointer to any record outside the workspace, as a URI or other string; never validated"`
 	Policy      string     `json:"policy,omitempty" jsonschema:"id of the terminus carrying auto_firm that authorises a harness to set firm"`
 	Timestamp   string     `json:"timestamp,omitempty" jsonschema:"RFC 3339 assertion time; default now"`
 	Source      *sourceIn  `json:"source,omitempty"`
