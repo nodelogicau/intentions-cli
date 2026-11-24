@@ -44,7 +44,7 @@ type desireIn struct {
 	Location    []string   `json:"location,omitempty" jsonschema:"URIs, hints carried onto the intention on adoption"`
 	Parties     []string   `json:"parties,omitempty" jsonschema:"URIs of other particulars the want involves, a hint carried onto the intention on adoption"`
 	Serves      []servesIn `json:"serves,omitempty" jsonschema:"for-the-sake-of only, each naming a terminus of the subject, which may be a draft"`
-	Reference   string     `json:"reference,omitempty" jsonschema:"informal pointer to a DKF claim"`
+	Reference   string     `json:"reference,omitempty" jsonschema:"informal pointer to any record outside the workspace, as a URI or other string; never validated"`
 	Timestamp   string     `json:"timestamp,omitempty"`
 	Source      *sourceIn  `json:"source,omitempty"`
 }

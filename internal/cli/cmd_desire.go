@@ -31,7 +31,7 @@ func addDesireFieldFlags(cmd *cobra.Command, f *desireFields, edit bool) {
 	cmd.Flags().StringArrayVar(&f.location, "location", nil, "URI, a hint carried onto the intention on adoption (repeatable)")
 	cmd.Flags().StringArrayVar(&f.parties, "party", nil, "URI of another particular the want involves, a hint carried onto the intention on adoption (repeatable)")
 	cmd.Flags().StringArrayVar(&f.serves, "serves", nil, "<terminus id>:for-the-sake-of, the only role a desire admits; the terminus may be a draft (repeatable)")
-	cmd.Flags().StringVar(&f.reference, "reference", "", "informal pointer to a DKF claim; never validated")
+	cmd.Flags().StringVar(&f.reference, "reference", "", "informal pointer to any record outside the workspace, as a URI or other string; never validated")
 	if !edit {
 		cmd.Flags().StringVar(&f.subject, "subject", "", "URI of the particular whose desire this is (default: defaults.subject)")
 	}
